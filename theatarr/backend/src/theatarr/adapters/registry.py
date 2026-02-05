@@ -112,6 +112,19 @@ class AdapterRegistry:
         cls._instances.clear()
 
 
+def get_adapter(adapter_type: str, config: dict[str, Any]) -> ServiceAdapter:
+    """Convenience function to get or create an adapter instance.
+
+    Args:
+        adapter_type: The type of adapter.
+        config: Configuration for the adapter.
+
+    Returns:
+        An adapter instance.
+    """
+    return AdapterRegistry.create_adapter(adapter_type, config)
+
+
 def discover_adapters() -> None:
     """Discover and register all available adapters.
 

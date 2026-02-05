@@ -8,9 +8,9 @@ from getpass import getpass
 import click
 from sqlalchemy import select
 
-from theatarr.database import AsyncSessionLocal, init_db
-from theatarr.models import User
-from theatarr.services.auth import AuthService
+from theatarr.database import async_session_maker, init_db
+from theatarr.models.user import User
+from theatarr.services.auth import hash_password
 
 
 @click.group()
@@ -21,10 +21,8 @@ def cli():
 
 @cli.command()
 @click.option('--username', '-u', prompt=True, help='Username for the new user')
-@click.option('--email', '-e', prompt=True, help='Email address')
 @click.option('--password', '-p', help='Password (will prompt if not provided)')
-@click.option('--admin', is_flag=True, default=False, help='Make user an admin')
-def create_user(username: str, email: str, password: str | None, admin: bool):
+def create_user(username: str, password: str | None):
     """Create a new user account."""
     if not password:
         password = getpass('Password: ')
@@ -33,39 +31,31 @@ def create_user(username: str, email: str, password: str | None, admin: bool):
             click.echo('Error: Passwords do not match', err=True)
             sys.exit(1)
 
-    if len(password) < 8:
-        click.echo('Error: Password must be at least 8 characters', err=True)
+    if len(password) < 6:
+        click.echo('Error: Password must be at least 6 characters', err=True)
         sys.exit(1)
 
     async def _create_user():
-        await init_db()
-        async with AsyncSessionLocal() as db:
+        async with async_session_maker() as db:
             # Check if user exists
             result = await db.execute(
-                select(User).where(
-                    (User.username == username) | (User.email == email)
-                )
+                select(User).where(User.username == username)
             )
             existing = result.scalar_one_or_none()
             if existing:
-                click.echo(f'Error: User with username "{username}" or email "{email}" already exists', err=True)
+                click.echo(f'Error: User "{username}" already exists', err=True)
                 sys.exit(1)
 
             # Create user
-            auth_service = AuthService(db)
-            user = await auth_service.create_user(
+            user = User(
                 username=username,
-                email=email,
-                password=password,
+                password_hash=hash_password(password),
+                is_active=True,
             )
-
-            if admin:
-                user.is_admin = True
-                await db.commit()
+            db.add(user)
+            await db.commit()
 
             click.echo(f'User "{username}" created successfully')
-            if admin:
-                click.echo('  - Admin privileges granted')
 
     asyncio.run(_create_user())
 
@@ -82,13 +72,12 @@ def reset_password(username: str, password: str | None):
             click.echo('Error: Passwords do not match', err=True)
             sys.exit(1)
 
-    if len(password) < 8:
-        click.echo('Error: Password must be at least 8 characters', err=True)
+    if len(password) < 6:
+        click.echo('Error: Password must be at least 6 characters', err=True)
         sys.exit(1)
 
     async def _reset_password():
-        await init_db()
-        async with AsyncSessionLocal() as db:
+        async with async_session_maker() as db:
             result = await db.execute(select(User).where(User.username == username))
             user = result.scalar_one_or_none()
 
@@ -96,8 +85,7 @@ def reset_password(username: str, password: str | None):
                 click.echo(f'Error: User "{username}" not found', err=True)
                 sys.exit(1)
 
-            auth_service = AuthService(db)
-            user.password_hash = auth_service._hash_password(password)
+            user.password_hash = hash_password(password)
             await db.commit()
 
             click.echo(f'Password reset for user "{username}"')
@@ -110,7 +98,7 @@ def list_users():
     """List all users."""
     async def _list_users():
         await init_db()
-        async with AsyncSessionLocal() as db:
+        async with async_session_maker() as db:
             result = await db.execute(select(User))
             users = result.scalars().all()
 
@@ -118,12 +106,12 @@ def list_users():
                 click.echo('No users found')
                 return
 
-            click.echo(f'{"Username":<20} {"Email":<30} {"Admin":<10} {"Created"}')
-            click.echo('-' * 80)
+            click.echo(f'{"Username":<20} {"Active":<10} {"Created"}')
+            click.echo('-' * 50)
             for user in users:
-                admin_status = 'Yes' if getattr(user, 'is_admin', False) else 'No'
+                active_status = 'Yes' if user.is_active else 'No'
                 created = user.created_at.strftime('%Y-%m-%d %H:%M')
-                click.echo(f'{user.username:<20} {user.email:<30} {admin_status:<10} {created}')
+                click.echo(f'{user.username:<20} {active_status:<10} {created}')
 
     asyncio.run(_list_users())
 
@@ -141,7 +129,7 @@ def delete_user(username: str, force: bool):
 
     async def _delete_user():
         await init_db()
-        async with AsyncSessionLocal() as db:
+        async with async_session_maker() as db:
             result = await db.execute(select(User).where(User.username == username))
             user = result.scalar_one_or_none()
 
@@ -244,7 +232,7 @@ def check():
     async def _check_db():
         try:
             await init_db()
-            async with AsyncSessionLocal() as db:
+            async with async_session_maker() as db:
                 await db.execute(select(1))
             click.echo('Database Connection:')
             click.echo('  [OK] Database is accessible')

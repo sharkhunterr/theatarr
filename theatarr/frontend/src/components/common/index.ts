@@ -9,3 +9,9 @@ export type { InputProps } from './Input';
 
 export { Modal, ModalFooter } from './Modal';
 export type { ModalProps, ModalFooterProps } from './Modal';
+
+export { Select } from './Select';
+export type { SelectProps, SelectOption } from './Select';
+
+export { Spinner } from './Spinner';
+export type { SpinnerProps } from './Spinner';

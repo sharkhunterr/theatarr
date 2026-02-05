@@ -1,6 +1,6 @@
 """SQLAlchemy models for Theatarr."""
 
-from theatarr.models.base import Base
+from theatarr.database import Base
 from theatarr.models.user import User
 from theatarr.models.settings import Settings
 from theatarr.models.session import Session
