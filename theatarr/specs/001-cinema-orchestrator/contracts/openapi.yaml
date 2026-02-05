@@ -1,0 +1,2146 @@
+openapi: 3.1.0
+info:
+  title: Theatarr API
+  description: Home Cinema Orchestration System API
+  version: 1.0.0
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+
+tags:
+  - name: Sessions
+    description: Cinema session management
+  - name: Sequences
+    description: Sequence orchestration
+  - name: Services
+    description: External service integrations
+  - name: Wallmount
+    description: Display pages
+  - name: Vote
+    description: Movie voting system
+  - name: Trailers
+    description: Trailer management
+  - name: Movies
+    description: Movie metadata
+  - name: Config
+    description: Configuration import/export
+  - name: Auth
+    description: Authentication
+
+paths:
+  # ============ AUTH ============
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+
+  # ============ SESSIONS ============
+  /sessions:
+    get:
+      tags: [Sessions]
+      summary: List all sessions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/SessionStatus'
+      responses:
+        '200':
+          description: Sessions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+
+    post:
+      tags: [Sessions]
+      summary: Create a new session
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreate'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+  /sessions/{sessionId}:
+    get:
+      tags: [Sessions]
+      summary: Get session details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionDetail'
+        '404':
+          description: Session not found
+
+    put:
+      tags: [Sessions]
+      summary: Update session
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionUpdate'
+      responses:
+        '200':
+          description: Session updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+    delete:
+      tags: [Sessions]
+      summary: Delete session
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      responses:
+        '204':
+          description: Session deleted
+
+  /sessions/{sessionId}/control:
+    post:
+      tags: [Sessions]
+      summary: Control session playback (play, pause, skip, stop)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionControl'
+      responses:
+        '200':
+          description: Command executed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionState'
+
+  /sessions/{sessionId}/duplicate:
+    post:
+      tags: [Sessions]
+      summary: Duplicate a session
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      responses:
+        '201':
+          description: Session duplicated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+  # ============ SEQUENCES ============
+  /sessions/{sessionId}/sequences:
+    get:
+      tags: [Sequences]
+      summary: List sequences in session
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      responses:
+        '200':
+          description: Sequences list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sequence'
+
+    post:
+      tags: [Sequences]
+      summary: Create sequence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SequenceCreate'
+      responses:
+        '201':
+          description: Sequence created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sequence'
+
+  /sessions/{sessionId}/sequences/reorder:
+    put:
+      tags: [Sequences]
+      summary: Reorder sequences
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sequence_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: Sequences reordered
+
+  /sequences/{sequenceId}:
+    get:
+      tags: [Sequences]
+      summary: Get sequence details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sequenceId'
+      responses:
+        '200':
+          description: Sequence details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SequenceDetail'
+
+    put:
+      tags: [Sequences]
+      summary: Update sequence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sequenceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SequenceUpdate'
+      responses:
+        '200':
+          description: Sequence updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sequence'
+
+    delete:
+      tags: [Sequences]
+      summary: Delete sequence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sequenceId'
+      responses:
+        '204':
+          description: Sequence deleted
+
+  /sequences/{sequenceId}/duplicate:
+    post:
+      tags: [Sequences]
+      summary: Duplicate sequence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/sequenceId'
+      responses:
+        '201':
+          description: Sequence duplicated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sequence'
+
+  # ============ SERVICES ============
+  /services:
+    get:
+      tags: [Services]
+      summary: List configured services
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/ServiceCategory'
+      responses:
+        '200':
+          description: Services list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+
+    post:
+      tags: [Services]
+      summary: Add new service
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceCreate'
+      responses:
+        '201':
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+
+  /services/adapters:
+    get:
+      tags: [Services]
+      summary: List available adapter types
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Available adapters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdapterInfo'
+
+  /services/{serviceId}:
+    get:
+      tags: [Services]
+      summary: Get service details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/serviceId'
+      responses:
+        '200':
+          description: Service details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDetail'
+
+    put:
+      tags: [Services]
+      summary: Update service
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/serviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceUpdate'
+      responses:
+        '200':
+          description: Service updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+
+    delete:
+      tags: [Services]
+      summary: Delete service
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/serviceId'
+      responses:
+        '204':
+          description: Service deleted
+
+  /services/{serviceId}/test:
+    post:
+      tags: [Services]
+      summary: Test service connection
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/serviceId'
+      responses:
+        '200':
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionTestResult'
+
+  /services/{serviceId}/capabilities:
+    get:
+      tags: [Services]
+      summary: Get service capabilities
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/serviceId'
+      responses:
+        '200':
+          description: Service capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceCapabilities'
+
+  # ============ WALLMOUNT ============
+  /wallmount:
+    get:
+      tags: [Wallmount]
+      summary: Get current wallmount state (public endpoint)
+      parameters:
+        - name: token
+          in: query
+          schema:
+            type: string
+          description: Optional access token (if wallmount requires auth)
+      responses:
+        '200':
+          description: Wallmount state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WallmountState'
+        '403':
+          description: Token required
+
+  /templates:
+    get:
+      tags: [Wallmount]
+      summary: List wallmount templates
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Templates list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Template'
+
+    post:
+      tags: [Wallmount]
+      summary: Create template
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateCreate'
+      responses:
+        '201':
+          description: Template created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+
+  /templates/{templateId}:
+    get:
+      tags: [Wallmount]
+      summary: Get template
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/templateId'
+      responses:
+        '200':
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+
+    put:
+      tags: [Wallmount]
+      summary: Update template
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/templateId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateUpdate'
+      responses:
+        '200':
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+
+    delete:
+      tags: [Wallmount]
+      summary: Delete template
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/templateId'
+      responses:
+        '204':
+          description: Template deleted
+
+  # ============ VOTE ============
+  /vote-sessions:
+    get:
+      tags: [Vote]
+      summary: List vote sessions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Vote sessions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VoteSession'
+
+    post:
+      tags: [Vote]
+      summary: Create vote session
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoteSessionCreate'
+      responses:
+        '201':
+          description: Vote session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteSessionWithTokens'
+
+  /vote-sessions/{voteSessionId}:
+    get:
+      tags: [Vote]
+      summary: Get vote session details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/voteSessionId'
+      responses:
+        '200':
+          description: Vote session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteSessionDetail'
+
+    delete:
+      tags: [Vote]
+      summary: Delete vote session
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/voteSessionId'
+      responses:
+        '204':
+          description: Vote session deleted
+
+  /vote-sessions/{voteSessionId}/close:
+    post:
+      tags: [Vote]
+      summary: Close voting and determine winner
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/voteSessionId'
+      responses:
+        '200':
+          description: Voting closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteSessionResult'
+
+  /vote/{token}:
+    get:
+      tags: [Vote]
+      summary: Get vote page data (public)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Vote page data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VotePageData'
+        '404':
+          description: Invalid or expired token
+
+    post:
+      tags: [Vote]
+      summary: Cast a vote (public)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [movie_id]
+              properties:
+                movie_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Vote recorded
+        '400':
+          description: Already voted or invalid movie
+        '404':
+          description: Invalid or expired token
+
+  # ============ TRAILERS ============
+  /trailers:
+    get:
+      tags: [Trailers]
+      summary: List trailers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: genre
+          in: query
+          schema:
+            type: string
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Trailers list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trailer'
+
+    post:
+      tags: [Trailers]
+      summary: Manually download a trailer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrailerDownload'
+      responses:
+        '202':
+          description: Download started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadTask'
+
+  /trailers/stats:
+    get:
+      tags: [Trailers]
+      summary: Get trailer storage stats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Storage stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrailerStats'
+
+  /trailers/{trailerId}:
+    delete:
+      tags: [Trailers]
+      summary: Delete trailer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/trailerId'
+      responses:
+        '204':
+          description: Trailer deleted
+
+  /trailer-rules:
+    get:
+      tags: [Trailers]
+      summary: List trailer rules
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Rules list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrailerRule'
+
+    post:
+      tags: [Trailers]
+      summary: Create trailer rule
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrailerRuleCreate'
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrailerRule'
+
+  /trailer-rules/{ruleId}:
+    put:
+      tags: [Trailers]
+      summary: Update trailer rule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ruleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrailerRuleUpdate'
+      responses:
+        '200':
+          description: Rule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrailerRule'
+
+    delete:
+      tags: [Trailers]
+      summary: Delete trailer rule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ruleId'
+      responses:
+        '204':
+          description: Rule deleted
+
+  /trailer-rules/{ruleId}/run:
+    post:
+      tags: [Trailers]
+      summary: Manually trigger rule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ruleId'
+      responses:
+        '202':
+          description: Rule execution started
+
+  # ============ MOVIES ============
+  /movies:
+    get:
+      tags: [Movies]
+      summary: List movies from connected sources
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [plex, jellyfin, all]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Movies list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Movie'
+
+  /movies/{movieId}:
+    get:
+      tags: [Movies]
+      summary: Get movie details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/movieId'
+      responses:
+        '200':
+          description: Movie details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieDetail'
+
+  /movies/{movieId}/refresh:
+    post:
+      tags: [Movies]
+      summary: Refresh movie metadata from TMDB
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/movieId'
+      responses:
+        '200':
+          description: Metadata refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieDetail'
+
+  /movies/{movieId}/palette:
+    get:
+      tags: [Movies]
+      summary: Get movie color palette
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/movieId'
+      responses:
+        '200':
+          description: Color palette
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColorPalette'
+
+    put:
+      tags: [Movies]
+      summary: Update movie color palette (manual override)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/movieId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ColorPaletteUpdate'
+      responses:
+        '200':
+          description: Palette updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColorPalette'
+
+  # ============ CONFIG ============
+  /config/export:
+    get:
+      tags: [Config]
+      summary: Export configuration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, yaml]
+            default: json
+        - name: include_secrets
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Configuration export
+          content:
+            application/json:
+              schema:
+                type: object
+            application/x-yaml:
+              schema:
+                type: object
+
+  /config/import:
+    post:
+      tags: [Config]
+      summary: Import configuration
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigImport'
+          application/x-yaml:
+            schema:
+              $ref: '#/components/schemas/ConfigImport'
+      responses:
+        '200':
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+
+  /config/import/preview:
+    post:
+      tags: [Config]
+      summary: Preview import conflicts
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+          application/x-yaml:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Import preview with conflicts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportPreview'
+
+  /settings:
+    get:
+      tags: [Config]
+      summary: Get all settings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+
+    patch:
+      tags: [Config]
+      summary: Update settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsUpdate'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+
+  # ============ DASHBOARD ============
+  /dashboard:
+    get:
+      tags: [Config]
+      summary: Get dashboard data
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardData'
+
+  /logs:
+    get:
+      tags: [Config]
+      summary: Get session logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: session_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    sessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    sequenceId:
+      name: sequenceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    serviceId:
+      name: serviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    templateId:
+      name: templateId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    voteSessionId:
+      name: voteSessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    trailerId:
+      name: trailerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ruleId:
+      name: ruleId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    movieId:
+      name: movieId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # Auth
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          default: bearer
+        expires_in:
+          type: integer
+
+    # Session
+    SessionStatus:
+      type: string
+      enum: [draft, scheduled, running, paused, completed, interrupted]
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        movie_id:
+          type: string
+          format: uuid
+          nullable: true
+        movie:
+          $ref: '#/components/schemas/MovieSummary'
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+        sequence_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    SessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Session'
+        - type: object
+          properties:
+            sequences:
+              type: array
+              items:
+                $ref: '#/components/schemas/Sequence'
+            current_sequence_index:
+              type: integer
+            current_sequence_elapsed_ms:
+              type: integer
+            auto_resume_enabled:
+              type: boolean
+
+    SessionCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        movie_id:
+          type: string
+          format: uuid
+        scheduled_at:
+          type: string
+          format: date-time
+
+    SessionUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        movie_id:
+          type: string
+          format: uuid
+        scheduled_at:
+          type: string
+          format: date-time
+        auto_resume_enabled:
+          type: boolean
+
+    SessionControl:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [play, pause, skip, stop, restart]
+
+    SessionState:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+        current_sequence_index:
+          type: integer
+        current_sequence_elapsed_ms:
+          type: integer
+        total_sequences:
+          type: integer
+
+    # Sequence
+    DurationType:
+      type: string
+      enum: [fixed, dynamic, manual]
+
+    Sequence:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        order_index:
+          type: integer
+        duration_type:
+          $ref: '#/components/schemas/DurationType'
+        duration_ms:
+          type: integer
+          nullable: true
+        transition_ms:
+          type: integer
+
+    SequenceDetail:
+      allOf:
+        - $ref: '#/components/schemas/Sequence'
+        - type: object
+          properties:
+            actions:
+              type: array
+              items:
+                $ref: '#/components/schemas/Action'
+            node_editor_data:
+              type: object
+              nullable: true
+
+    SequenceCreate:
+      type: object
+      required: [name, duration_type]
+      properties:
+        name:
+          type: string
+        duration_type:
+          $ref: '#/components/schemas/DurationType'
+        duration_ms:
+          type: integer
+        transition_ms:
+          type: integer
+          default: 1000
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActionCreate'
+
+    SequenceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        duration_type:
+          $ref: '#/components/schemas/DurationType'
+        duration_ms:
+          type: integer
+        transition_ms:
+          type: integer
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActionCreate'
+        node_editor_data:
+          type: object
+
+    # Action
+    ActionType:
+      type: string
+      enum: [lighting, audio, display, media, actuator]
+
+    Action:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        service_id:
+          type: string
+          format: uuid
+          nullable: true
+        action_type:
+          $ref: '#/components/schemas/ActionType'
+        command:
+          type: string
+        parameters:
+          type: object
+        delay_ms:
+          type: integer
+        on_failure:
+          type: string
+          enum: [warn, skip, abort]
+
+    ActionCreate:
+      type: object
+      required: [action_type, command, parameters]
+      properties:
+        service_id:
+          type: string
+          format: uuid
+        action_type:
+          $ref: '#/components/schemas/ActionType'
+        command:
+          type: string
+        parameters:
+          type: object
+        delay_ms:
+          type: integer
+          default: 0
+        on_failure:
+          type: string
+          enum: [warn, skip, abort]
+          default: warn
+
+    # Service
+    ServiceCategory:
+      type: string
+      enum: [lighting, player, media_source, actuator, metadata]
+
+    Service:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        adapter_type:
+          type: string
+        category:
+          $ref: '#/components/schemas/ServiceCategory'
+        is_enabled:
+          type: boolean
+        connection_status:
+          type: string
+          enum: [connected, disconnected, error, unknown]
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ServiceDetail:
+      allOf:
+        - $ref: '#/components/schemas/Service'
+        - type: object
+          properties:
+            config:
+              type: object
+              description: Configuration (sensitive fields masked)
+            capabilities:
+              type: array
+              items:
+                type: string
+
+    ServiceCreate:
+      type: object
+      required: [name, adapter_type, config]
+      properties:
+        name:
+          type: string
+        adapter_type:
+          type: string
+        config:
+          type: object
+
+    ServiceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        config:
+          type: object
+        is_enabled:
+          type: boolean
+
+    AdapterInfo:
+      type: object
+      properties:
+        type:
+          type: string
+        category:
+          $ref: '#/components/schemas/ServiceCategory'
+        display_name:
+          type: string
+        description:
+          type: string
+        config_schema:
+          type: object
+
+    ConnectionTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        details:
+          type: object
+
+    ServiceCapabilities:
+      type: object
+      properties:
+        commands:
+          type: array
+          items:
+            type: string
+        features:
+          type: array
+          items:
+            type: string
+        devices:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              type:
+                type: string
+
+    # Wallmount
+    WallmountState:
+      type: object
+      properties:
+        session:
+          $ref: '#/components/schemas/SessionSummary'
+        movie:
+          $ref: '#/components/schemas/MovieSummary'
+        current_sequence:
+          $ref: '#/components/schemas/SequenceSummary'
+        countdown_seconds:
+          type: integer
+          nullable: true
+        palette:
+          $ref: '#/components/schemas/ColorPalette'
+        template:
+          $ref: '#/components/schemas/Template'
+
+    SessionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+
+    SequenceSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        index:
+          type: integer
+        total:
+          type: integer
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        layout:
+          type: object
+        styles:
+          type: object
+        variables:
+          type: object
+        is_default:
+          type: boolean
+        is_builtin:
+          type: boolean
+
+    TemplateCreate:
+      type: object
+      required: [name, layout, styles, variables]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        layout:
+          type: object
+        styles:
+          type: object
+        variables:
+          type: object
+
+    TemplateUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        layout:
+          type: object
+        styles:
+          type: object
+        variables:
+          type: object
+        is_default:
+          type: boolean
+
+    # Vote
+    VoteSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+        status:
+          type: string
+          enum: [open, closed]
+        candidate_count:
+          type: integer
+        vote_count:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    VoteSessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/VoteSession'
+        - type: object
+          properties:
+            candidates:
+              type: array
+              items:
+                $ref: '#/components/schemas/VoteCandidate'
+            winner:
+              $ref: '#/components/schemas/MovieSummary'
+
+    VoteCandidate:
+      type: object
+      properties:
+        movie:
+          $ref: '#/components/schemas/MovieSummary'
+        vote_count:
+          type: integer
+        percentage:
+          type: number
+
+    VoteSessionCreate:
+      type: object
+      required: [name, movie_ids, expires_at]
+      properties:
+        name:
+          type: string
+        session_id:
+          type: string
+          format: uuid
+        movie_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 2
+          maxItems: 6
+        expires_at:
+          type: string
+          format: date-time
+        token_count:
+          type: integer
+          default: 10
+
+    VoteSessionWithTokens:
+      allOf:
+        - $ref: '#/components/schemas/VoteSession'
+        - type: object
+          properties:
+            tokens:
+              type: array
+              items:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  url:
+                    type: string
+
+    VoteSessionResult:
+      type: object
+      properties:
+        winner:
+          $ref: '#/components/schemas/MovieSummary'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VoteCandidate'
+
+    VotePageData:
+      type: object
+      properties:
+        session_name:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        has_voted:
+          type: boolean
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/MovieSummary'
+        current_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VoteCandidate'
+
+    # Trailer
+    Trailer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        genres:
+          type: array
+          items:
+            type: string
+        year:
+          type: integer
+        quality:
+          type: string
+        duration_seconds:
+          type: integer
+        file_size_bytes:
+          type: integer
+        downloaded_at:
+          type: string
+          format: date-time
+        play_count:
+          type: integer
+
+    TrailerDownload:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+        quality:
+          type: string
+          default: "1080p"
+
+    DownloadTask:
+      type: object
+      properties:
+        task_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, downloading, completed, failed]
+
+    TrailerStats:
+      type: object
+      properties:
+        total_count:
+          type: integer
+        total_size_bytes:
+          type: integer
+        storage_limit_bytes:
+          type: integer
+        usage_percentage:
+          type: number
+        by_genre:
+          type: object
+          additionalProperties:
+            type: integer
+
+    TrailerRule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        is_enabled:
+          type: boolean
+        genres:
+          type: array
+          items:
+            type: string
+          nullable: true
+        year_min:
+          type: integer
+          nullable: true
+        year_max:
+          type: integer
+          nullable: true
+        quality_preference:
+          type: array
+          items:
+            type: string
+        storage_limit_gb:
+          type: number
+          nullable: true
+        exclude_library_movies:
+          type: boolean
+        schedule_cron:
+          type: string
+        last_run_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    TrailerRuleCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        genres:
+          type: array
+          items:
+            type: string
+        year_min:
+          type: integer
+        year_max:
+          type: integer
+        quality_preference:
+          type: array
+          items:
+            type: string
+        storage_limit_gb:
+          type: number
+        exclude_library_movies:
+          type: boolean
+          default: true
+        schedule_cron:
+          type: string
+          default: "0 3 * * *"
+
+    TrailerRuleUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        is_enabled:
+          type: boolean
+        genres:
+          type: array
+          items:
+            type: string
+        year_min:
+          type: integer
+        year_max:
+          type: integer
+        quality_preference:
+          type: array
+          items:
+            type: string
+        storage_limit_gb:
+          type: number
+        exclude_library_movies:
+          type: boolean
+        schedule_cron:
+          type: string
+
+    # Movie
+    Movie:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        year:
+          type: integer
+          nullable: true
+        poster_url:
+          type: string
+          nullable: true
+        rating:
+          type: number
+          nullable: true
+        runtime_minutes:
+          type: integer
+          nullable: true
+        source:
+          type: string
+          enum: [plex, jellyfin, tmdb, manual]
+
+    MovieSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        year:
+          type: integer
+          nullable: true
+        poster_url:
+          type: string
+          nullable: true
+
+    MovieDetail:
+      allOf:
+        - $ref: '#/components/schemas/Movie'
+        - type: object
+          properties:
+            original_title:
+              type: string
+              nullable: true
+            synopsis:
+              type: string
+              nullable: true
+            genres:
+              type: array
+              items:
+                type: string
+            backdrop_url:
+              type: string
+              nullable: true
+            trailer_url:
+              type: string
+              nullable: true
+            tmdb_id:
+              type: integer
+              nullable: true
+            plex_key:
+              type: string
+              nullable: true
+            jellyfin_id:
+              type: string
+              nullable: true
+            palette:
+              $ref: '#/components/schemas/ColorPalette'
+
+    ColorPalette:
+      type: object
+      properties:
+        dominant:
+          type: string
+        vibrant:
+          type: string
+          nullable: true
+        muted:
+          type: string
+          nullable: true
+        dark_vibrant:
+          type: string
+          nullable: true
+        dark_muted:
+          type: string
+          nullable: true
+        light_vibrant:
+          type: string
+          nullable: true
+        light_muted:
+          type: string
+          nullable: true
+        is_manual_override:
+          type: boolean
+
+    ColorPaletteUpdate:
+      type: object
+      properties:
+        dominant:
+          type: string
+        vibrant:
+          type: string
+        muted:
+          type: string
+        dark_vibrant:
+          type: string
+        dark_muted:
+          type: string
+        light_vibrant:
+          type: string
+        light_muted:
+          type: string
+
+    # Config
+    ConfigImport:
+      type: object
+      properties:
+        data:
+          type: object
+        password:
+          type: string
+          description: Password to decrypt secrets (if included)
+        conflict_resolution:
+          type: string
+          enum: [keep, overwrite, merge]
+          default: merge
+
+    ImportResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        imported:
+          type: object
+          properties:
+            sessions:
+              type: integer
+            sequences:
+              type: integer
+            services:
+              type: integer
+            templates:
+              type: integer
+            trailer_rules:
+              type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    ImportPreview:
+      type: object
+      properties:
+        conflicts:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              name:
+                type: string
+              existing_id:
+                type: string
+                format: uuid
+              action_options:
+                type: array
+                items:
+                  type: string
+                  enum: [keep, overwrite, merge]
+        new_items:
+          type: object
+          properties:
+            sessions:
+              type: integer
+            sequences:
+              type: integer
+            services:
+              type: integer
+            templates:
+              type: integer
+
+    Settings:
+      type: object
+      properties:
+        vote_token_expiry_hours:
+          type: integer
+        wallmount_requires_token:
+          type: boolean
+        tmdb_api_key_configured:
+          type: boolean
+        tmdb_cache_ttl_hours:
+          type: integer
+        trailer_storage_path:
+          type: string
+        auto_resume_sessions:
+          type: boolean
+        default_template_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    SettingsUpdate:
+      type: object
+      properties:
+        vote_token_expiry_hours:
+          type: integer
+        wallmount_requires_token:
+          type: boolean
+        tmdb_api_key:
+          type: string
+        tmdb_cache_ttl_hours:
+          type: integer
+        trailer_storage_path:
+          type: string
+        auto_resume_sessions:
+          type: boolean
+        default_template_id:
+          type: string
+          format: uuid
+
+    # Dashboard
+    DashboardData:
+      type: object
+      properties:
+        upcoming_sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+        current_session:
+          $ref: '#/components/schemas/SessionDetail'
+        services_status:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                $ref: '#/components/schemas/ServiceCategory'
+              total:
+                type: integer
+              connected:
+                type: integer
+        trailer_stats:
+          $ref: '#/components/schemas/TrailerStats'
+        recent_activity:
+          type: array
+          items:
+            $ref: '#/components/schemas/LogEntry'
+
+    LogEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: string
+          enum: [info, warning, error]
+        session_id:
+          type: string
+          format: uuid
+          nullable: true
+        message:
+          type: string
+        details:
+          type: object
