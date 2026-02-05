@@ -1,0 +1,90 @@
+/**
+ * Session store using Zustand.
+ */
+
+import { create } from 'zustand';
+
+export type SessionStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'interrupted';
+
+export interface Sequence {
+  id: string;
+  name: string;
+  duration_type: 'fixed' | 'dynamic' | 'manual';
+  duration_ms: number | null;
+  remaining_ms?: number;
+}
+
+export interface Session {
+  id: string;
+  name: string;
+  status: SessionStatus;
+  movie_id?: string;
+  scheduled_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  current_sequence_index: number;
+  current_sequence_elapsed_ms: number;
+  sequences?: Sequence[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SessionState {
+  session_id: string;
+  status: SessionStatus;
+  current_sequence_index: number;
+  current_sequence_elapsed_ms: number;
+  total_sequences: number;
+  current_sequence?: Sequence;
+}
+
+interface SessionStoreState {
+  sessions: Session[];
+  currentSession: Session | null;
+  sessionState: SessionState | null;
+  isLoading: boolean;
+  error: string | null;
+
+  // Actions
+  setSessions: (sessions: Session[]) => void;
+  setCurrentSession: (session: Session | null) => void;
+  updateSessionState: (state: SessionState) => void;
+  clearError: () => void;
+}
+
+export const useSessionStore = create<SessionStoreState>()((set) => ({
+  sessions: [],
+  currentSession: null,
+  sessionState: null,
+  isLoading: false,
+  error: null,
+
+  setSessions: (sessions) => set({ sessions }),
+
+  setCurrentSession: (session) => set({ currentSession: session }),
+
+  updateSessionState: (state) =>
+    set((prev) => {
+      // Also update the current session if it matches
+      if (prev.currentSession?.id === state.session_id) {
+        return {
+          sessionState: state,
+          currentSession: {
+            ...prev.currentSession,
+            status: state.status,
+            current_sequence_index: state.current_sequence_index,
+            current_sequence_elapsed_ms: state.current_sequence_elapsed_ms,
+          },
+        };
+      }
+      return { sessionState: state };
+    }),
+
+  clearError: () => set({ error: null }),
+}));

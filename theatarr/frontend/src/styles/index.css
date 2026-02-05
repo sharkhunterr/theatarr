@@ -1,0 +1,209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-theatarr-500: #e05d4d;
+    --color-dark-bg: #0f0f0f;
+    --color-dark-surface: #1a1a1a;
+    --color-dark-border: #2a2a2a;
+    --color-dark-text: #e5e5e5;
+    --color-dark-muted: #737373;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-dark-bg text-dark-text;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+      'Helvetica Neue', Arial, sans-serif;
+  }
+
+  /* Custom scrollbar for dark mode */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-bg;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-dark-muted;
+  }
+}
+
+@layer components {
+  /* Button variants */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium
+           transition-colors duration-200 focus:outline-none focus:ring-2
+           focus:ring-offset-2 focus:ring-offset-dark-bg disabled:opacity-50
+           disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-theatarr-600 text-white hover:bg-theatarr-700
+           focus:ring-theatarr-500;
+  }
+
+  .btn-secondary {
+    @apply btn bg-dark-surface text-dark-text border border-dark-border
+           hover:bg-dark-border focus:ring-dark-border;
+  }
+
+  .btn-ghost {
+    @apply btn text-dark-text hover:bg-dark-surface focus:ring-dark-border;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+
+  /* Card component */
+  .card {
+    @apply bg-dark-surface border border-dark-border rounded-xl p-4;
+  }
+
+  /* Input styles */
+  .input {
+    @apply w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg
+           text-dark-text placeholder-dark-muted
+           focus:outline-none focus:ring-2 focus:ring-theatarr-500 focus:border-transparent;
+  }
+
+  /* Status indicators */
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-connected {
+    @apply status-dot bg-green-500;
+  }
+
+  .status-disconnected {
+    @apply status-dot bg-red-500;
+  }
+
+  .status-unknown {
+    @apply status-dot bg-gray-500;
+  }
+
+  .status-running {
+    @apply status-dot bg-theatarr-500 animate-pulse;
+  }
+}
+
+@layer utilities {
+  /* Text gradient */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-theatarr-400 to-theatarr-600;
+  }
+
+  /* Glass effect for wallmount */
+  .glass {
+    @apply backdrop-blur-lg bg-black/30;
+  }
+
+  /* Mobile responsive utilities */
+  .container-responsive {
+    @apply w-full px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Touch-friendly tap targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Safe area for notched devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* Mobile Navigation */
+@media (max-width: 767px) {
+  .mobile-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-dark-surface border-t border-dark-border;
+    @apply flex justify-around py-2 z-50;
+    padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+  }
+
+  .mobile-nav-item {
+    @apply flex flex-col items-center gap-1 p-2 text-dark-muted text-xs;
+    @apply hover:text-theatarr-500 transition-colors;
+  }
+
+  .mobile-nav-item.active {
+    @apply text-theatarr-500;
+  }
+
+  /* Add bottom padding for mobile nav */
+  .main-with-nav {
+    @apply pb-20;
+  }
+}
+
+/* Hide mobile nav on desktop */
+@media (min-width: 768px) {
+  .mobile-nav {
+    @apply hidden;
+  }
+}
+
+/* Responsive card grid */
+.card-grid-responsive {
+  @apply grid gap-4;
+  @apply grid-cols-1;
+  @apply sm:grid-cols-2;
+  @apply lg:grid-cols-3;
+  @apply xl:grid-cols-4;
+}
+
+/* Responsive poster grid */
+.poster-grid-responsive {
+  @apply grid gap-4;
+  @apply grid-cols-2;
+  @apply sm:grid-cols-3;
+  @apply md:grid-cols-4;
+  @apply lg:grid-cols-5;
+  @apply xl:grid-cols-6;
+}
+
+/* Full-width button on mobile */
+.btn-full-mobile {
+  @apply w-full sm:w-auto;
+}
+
+/* Stack buttons on mobile */
+.btn-group-responsive {
+  @apply flex flex-col gap-2;
+  @apply sm:flex-row sm:justify-end;
+}
+
+/* Hide on mobile, show on desktop */
+.hide-mobile {
+  @apply hidden md:block;
+}
+
+/* Show on mobile, hide on desktop */
+.show-mobile {
+  @apply block md:hidden;
+}
+
+/* Responsive typography */
+.heading-responsive {
+  @apply text-2xl sm:text-3xl lg:text-4xl font-bold;
+}
+
+.subheading-responsive {
+  @apply text-base sm:text-lg lg:text-xl;
+}
