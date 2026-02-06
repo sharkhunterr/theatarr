@@ -105,11 +105,16 @@ class VoteSession(Base, UUIDMixin, TimestampMixin):
 
         now = datetime.now(timezone.utc)
 
-        if self.opens_at and now < self.opens_at:
-            return False
+        # Handle timezone-naive datetimes by treating them as UTC
+        if self.opens_at:
+            opens_at = self.opens_at if self.opens_at.tzinfo else self.opens_at.replace(tzinfo=timezone.utc)
+            if now < opens_at:
+                return False
 
-        if self.closes_at and now > self.closes_at:
-            return False
+        if self.closes_at:
+            closes_at = self.closes_at if self.closes_at.tzinfo else self.closes_at.replace(tzinfo=timezone.utc)
+            if now > closes_at:
+                return False
 
         return True
 

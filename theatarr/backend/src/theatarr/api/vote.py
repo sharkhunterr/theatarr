@@ -3,7 +3,8 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Header, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from theatarr.api.deps import AdminUser
 from theatarr.api.errors import NotFoundError
@@ -98,7 +99,7 @@ async def list_vote_sessions(
     offset: int = 0,
 ) -> VoteSessionListResponse:
     """List all vote sessions (admin only)."""
-    query = select(VoteSession)
+    query = select(VoteSession).options(selectinload(VoteSession.votes))
 
     if status_filter:
         query = query.where(VoteSession.status == status_filter)
@@ -150,7 +151,14 @@ async def create_vote_session(
     )
     db.add(vote_session)
     await db.commit()
-    await db.refresh(vote_session)
+
+    # Re-fetch with votes relationship loaded
+    result = await db.execute(
+        select(VoteSession)
+        .options(selectinload(VoteSession.votes))
+        .where(VoteSession.id == vote_session.id)
+    )
+    vote_session = result.scalar_one()
 
     return _vote_session_to_response(vote_session)
 
@@ -167,7 +175,9 @@ async def get_vote_session(
 ) -> VoteSessionResponse:
     """Get a vote session by ID (admin only)."""
     result = await db.execute(
-        select(VoteSession).where(VoteSession.id == session_id)
+        select(VoteSession)
+        .options(selectinload(VoteSession.votes))
+        .where(VoteSession.id == session_id)
     )
     vote_session = result.scalar_one_or_none()
 
@@ -190,7 +200,9 @@ async def update_vote_session(
 ) -> VoteSessionResponse:
     """Update a vote session (admin only)."""
     result = await db.execute(
-        select(VoteSession).where(VoteSession.id == session_id)
+        select(VoteSession)
+        .options(selectinload(VoteSession.votes))
+        .where(VoteSession.id == session_id)
     )
     vote_session = result.scalar_one_or_none()
 
@@ -210,7 +222,14 @@ async def update_vote_session(
         setattr(vote_session, field, value)
 
     await db.commit()
-    await db.refresh(vote_session)
+
+    # Re-fetch with votes relationship loaded
+    result = await db.execute(
+        select(VoteSession)
+        .options(selectinload(VoteSession.votes))
+        .where(VoteSession.id == session_id)
+    )
+    vote_session = result.scalar_one()
 
     return _vote_session_to_response(vote_session)
 
@@ -250,7 +269,9 @@ async def open_vote_session(
 ) -> VoteSessionResponse:
     """Open a vote session for voting (admin only)."""
     result = await db.execute(
-        select(VoteSession).where(VoteSession.id == session_id)
+        select(VoteSession)
+        .options(selectinload(VoteSession.votes))
+        .where(VoteSession.id == session_id)
     )
     vote_session = result.scalar_one_or_none()
 
@@ -281,7 +302,9 @@ async def close_vote_session(
 ) -> VoteSessionResponse:
     """Close a vote session (admin only)."""
     result = await db.execute(
-        select(VoteSession).where(VoteSession.id == session_id)
+        select(VoteSession)
+        .options(selectinload(VoteSession.votes))
+        .where(VoteSession.id == session_id)
     )
     vote_session = result.scalar_one_or_none()
 

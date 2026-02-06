@@ -1,17 +1,8 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Plus, Trash2, Search } from 'lucide-react';
 import { Button, Input } from '../common';
+import { MovieSelector, MovieOption } from './MovieSelector';
 import { apiClient } from '../../api/client';
-
-interface MovieOption {
-  title: string;
-  year?: number;
-  poster_url?: string;
-  overview?: string;
-  rating?: number;
-  genres?: string[];
-}
 
 interface VoteSessionFormProps {
   onSave: () => void;
@@ -21,55 +12,55 @@ interface VoteSessionFormProps {
 export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [movieOptions, setMovieOptions] = useState<MovieOption[]>([
-    { title: '' },
-    { title: '' },
-  ]);
+  const [movieOptions, setMovieOptions] = useState<MovieOption[]>([]);
   const [maxVotesPerUser, setMaxVotesPerUser] = useState(1);
   const [allowMultipleVotes, setAllowMultipleVotes] = useState(false);
   const [showResultsDuringVoting, setShowResultsDuringVoting] = useState(false);
   const [closesAt, setClosesAt] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      await apiClient.post('/vote-sessions', data);
+      return await apiClient.post('/vote-sessions', data);
     },
     onSuccess: () => {
       onSave();
     },
+    onError: (error: any) => {
+      console.error('Create vote session error:', error);
+      const message = error?.message || 'Erreur lors de la création de la session de vote';
+      setErrorMessage(message);
+    },
   });
 
-  const handleAddMovie = () => {
-    setMovieOptions([...movieOptions, { title: '' }]);
-  };
-
-  const handleRemoveMovie = (index: number) => {
-    if (movieOptions.length > 2) {
-      setMovieOptions(movieOptions.filter((_, i) => i !== index));
+  const handleAddMovie = (movie: MovieOption) => {
+    if (movieOptions.length < 10) {
+      setMovieOptions([...movieOptions, movie]);
     }
   };
 
-  const handleUpdateMovie = (index: number, updates: Partial<MovieOption>) => {
-    setMovieOptions(
-      movieOptions.map((opt, i) => (i === index ? { ...opt, ...updates } : opt))
-    );
+  const handleRemoveMovie = (index: number) => {
+    setMovieOptions(movieOptions.filter((_, i) => i !== index));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
 
-    // Filter out empty movies
-    const validMovies = movieOptions.filter((m) => m.title.trim());
+    if (!name.trim()) {
+      setErrorMessage('Le nom de la session est requis');
+      return;
+    }
 
-    if (validMovies.length < 2) {
-      alert('Please add at least 2 movies');
+    if (movieOptions.length < 2) {
+      setErrorMessage('Veuillez ajouter au moins 2 films');
       return;
     }
 
     createMutation.mutate({
       name,
       description: description || undefined,
-      movie_options: validMovies,
+      movie_options: movieOptions,
       max_votes_per_user: maxVotesPerUser,
       allow_multiple_votes: allowMultipleVotes,
       show_results_during_voting: showResultsDuringVoting,
@@ -80,125 +71,62 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="flex flex-col">
+      {/* Scrollable content */}
+      <div className="space-y-6">
+        {/* Error Message */}
+        {(createMutation.error || errorMessage) && (
+          <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+            {errorMessage || 'Erreur lors de la création. Veuillez réessayer.'}
+          </div>
+        )}
+
       {/* Basic Info */}
       <div className="space-y-4">
         <Input
-          label="Session Name"
+          label="Nom de la session"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
-          placeholder="Movie Night Vote"
+          placeholder="Ex: Soirée film du samedi"
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            Description
+          <label className="block text-sm font-medium text-dark-text mb-1">
+            Description (optionnel)
           </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What movie should we watch?"
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Quel film voulez-vous regarder ce soir ?"
+            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:ring-2 focus:ring-theatarr-500 focus:border-transparent"
             rows={2}
           />
         </div>
       </div>
 
-      {/* Movie Options */}
+      {/* Movie Selection */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Movies</h3>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddMovie}
-            disabled={movieOptions.length >= 10}
-          >
-            <Plus size={14} />
-            <span className="ml-1">Add Movie</span>
-          </Button>
-        </div>
-
-        <div className="space-y-3">
-          {movieOptions.map((movie, index) => (
-            <div
-              key={index}
-              className="flex items-start gap-3 p-4 bg-gray-800 rounded-lg"
-            >
-              {/* Poster preview */}
-              <div className="w-16 h-24 bg-gray-700 rounded flex-shrink-0 overflow-hidden">
-                {movie.poster_url && (
-                  <img
-                    src={movie.poster_url}
-                    alt={movie.title}
-                    className="w-full h-full object-cover"
-                  />
-                )}
-              </div>
-
-              {/* Movie inputs */}
-              <div className="flex-1 space-y-2">
-                <Input
-                  placeholder="Movie title"
-                  value={movie.title}
-                  onChange={(e) =>
-                    handleUpdateMovie(index, { title: e.target.value })
-                  }
-                  required
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    placeholder="Year"
-                    type="number"
-                    value={movie.year || ''}
-                    onChange={(e) =>
-                      handleUpdateMovie(index, {
-                        year: e.target.value ? parseInt(e.target.value) : undefined,
-                      })
-                    }
-                  />
-                  <Input
-                    placeholder="Poster URL"
-                    value={movie.poster_url || ''}
-                    onChange={(e) =>
-                      handleUpdateMovie(index, { poster_url: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Remove button */}
-              {movieOptions.length > 2 && (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveMovie(index)}
-                  className="p-2 text-red-400 hover:text-red-300 hover:bg-gray-700 rounded"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <p className="text-sm text-gray-500 mt-2">
-          Add 2-10 movies for voting. You can add poster URLs from TMDB or other sources.
-        </p>
+        <h3 className="text-lg font-semibold text-dark-text mb-4">Films</h3>
+        <MovieSelector
+          selectedMovies={movieOptions}
+          onSelect={handleAddMovie}
+          onRemove={handleRemoveMovie}
+          maxSelections={10}
+        />
       </div>
 
       {/* Voting Options */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Voting Options</h3>
+      <div className="border-t border-dark-border pt-6">
+        <h3 className="text-lg font-semibold text-dark-text mb-4">Options de vote</h3>
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between p-3 bg-dark-surface rounded-lg">
             <div>
-              <label className="text-sm font-medium text-gray-300">
-                Max Votes Per User
+              <label className="text-sm font-medium text-dark-text">
+                Votes max par utilisateur
               </label>
-              <p className="text-xs text-gray-500">
-                How many movies can each person vote for
+              <p className="text-xs text-dark-muted">
+                Combien de films chaque personne peut voter
               </p>
             </div>
             <Input
@@ -207,47 +135,47 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
               max={10}
               value={maxVotesPerUser}
               onChange={(e) => setMaxVotesPerUser(parseInt(e.target.value) || 1)}
-              className="w-20"
+              className="w-20 text-center"
             />
           </div>
 
-          <label className="flex items-center gap-3 cursor-pointer">
+          <label className="flex items-center gap-3 p-3 bg-dark-surface rounded-lg cursor-pointer hover:bg-dark-border/30 transition-colors">
             <input
               type="checkbox"
               checked={allowMultipleVotes}
               onChange={(e) => setAllowMultipleVotes(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500"
+              className="w-5 h-5 rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500"
             />
             <div>
-              <span className="text-sm font-medium text-gray-300">
-                Allow Multiple Votes
+              <span className="text-sm font-medium text-dark-text">
+                Autoriser les votes multiples
               </span>
-              <p className="text-xs text-gray-500">
-                Users can vote for multiple different movies
+              <p className="text-xs text-dark-muted">
+                Les utilisateurs peuvent voter pour plusieurs films différents
               </p>
             </div>
           </label>
 
-          <label className="flex items-center gap-3 cursor-pointer">
+          <label className="flex items-center gap-3 p-3 bg-dark-surface rounded-lg cursor-pointer hover:bg-dark-border/30 transition-colors">
             <input
               type="checkbox"
               checked={showResultsDuringVoting}
               onChange={(e) => setShowResultsDuringVoting(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500"
+              className="w-5 h-5 rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500"
             />
             <div>
-              <span className="text-sm font-medium text-gray-300">
-                Show Results During Voting
+              <span className="text-sm font-medium text-dark-text">
+                Afficher les résultats en temps réel
               </span>
-              <p className="text-xs text-gray-500">
-                Voters can see current results in real-time
+              <p className="text-xs text-dark-muted">
+                Les votants peuvent voir les résultats actuels
               </p>
             </div>
           </label>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Closes At (optional)
+          <div className="p-3 bg-dark-surface rounded-lg">
+            <label className="block text-sm font-medium text-dark-text mb-2">
+              Date de fermeture (optionnel)
             </label>
             <Input
               type="datetime-local"
@@ -258,24 +186,20 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex justify-end gap-4 pt-4 border-t border-gray-700">
+      </div>
+
+      {/* Actions - Sticky at bottom */}
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 mt-6 border-t border-dark-border bg-dark-surface sticky bottom-0">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
+          Annuler
         </Button>
         <Button
           type="submit"
-          disabled={createMutation.isPending || !name || movieOptions.filter((m) => m.title).length < 2}
+          disabled={createMutation.isPending || !name || movieOptions.length < 2}
         >
-          {createMutation.isPending ? 'Creating...' : 'Create Vote Session'}
+          {createMutation.isPending ? 'Création...' : 'Créer la session de vote'}
         </Button>
       </div>
-
-      {createMutation.error && (
-        <div className="text-red-500 text-sm">
-          Failed to create vote session. Please try again.
-        </div>
-      )}
     </form>
   );
 }

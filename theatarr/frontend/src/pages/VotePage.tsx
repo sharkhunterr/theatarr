@@ -6,6 +6,7 @@ import { MovieVoteCard } from '../components/vote/MovieVoteCard';
 import { VoteResults } from '../components/vote/VoteResults';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { Spinner } from '../components/common';
+import { API_BASE } from '../api/client';
 
 interface MovieOption {
   title: string;
@@ -43,7 +44,7 @@ export function VotePage() {
   const { data: session, isLoading, error } = useQuery<VoteSessionPublic>({
     queryKey: ['vote-session', token],
     queryFn: async () => {
-      const response = await fetch(`/api/v1/vote/${token}`);
+      const response = await fetch(`${API_BASE}/api/v1/vote/${token}`);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.detail || 'Failed to load vote session');
@@ -75,7 +76,7 @@ export function VotePage() {
   // Cast vote mutation
   const voteMutation = useMutation({
     mutationFn: async (movieIndex: number) => {
-      const response = await fetch(`/api/v1/vote/${token}`, {
+      const response = await fetch(`${API_BASE}/api/v1/vote/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ movie_index: movieIndex }),
