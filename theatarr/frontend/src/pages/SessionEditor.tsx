@@ -20,7 +20,12 @@ import {
   Search,
   X,
   Palette,
+  Vote,
+  Shuffle,
+  Info,
+  Users,
 } from 'lucide-react';
+import clsx from 'clsx';
 import { Button, Spinner } from '../components/common';
 import {
   WorkflowEditor,
@@ -31,8 +36,13 @@ import {
   ActionType,
 } from '../components/workflow';
 import { ActionEditorPanel, ActionItem } from '../components/sessions/ActionEditorPanel';
+import { VoteModeConfig } from '../components/sessions/VoteModeConfig';
+import { MysteryModeConfig } from '../components/sessions/MysteryModeConfig';
+import { ParticipantsSelector } from '../components/sessions/ParticipantsSelector';
+import { TemplateSelector } from '../components/sessions/TemplateSelector';
 import { apiClient } from '../api/client';
 import { useLayoutStore } from '../stores/layoutStore';
+import type { MovieSelectionMode, MysteryConfig } from '../stores/sessionStore';
 
 interface ColorPalette {
   primary: string;
@@ -45,6 +55,27 @@ interface ColorPalette {
   muted_light: string;
   muted_dark: string;
   raw_palette?: string[];
+}
+
+interface VoteSessionConfig {
+  name?: string;
+  description?: string;
+  movie_options: Array<{
+    title: string;
+    year?: number;
+    poster_url?: string;
+    movie_id?: string;
+    source?: string;
+    source_id?: string;
+  }>;
+  max_votes_per_user: number;
+  allow_multiple_votes: boolean;
+  require_token: boolean;
+  show_results_during_voting: boolean;
+  anonymous_voting: boolean;
+  opens_at?: string;
+  closes_at?: string;
+  open_immediately?: boolean;
 }
 
 interface Session {
@@ -60,6 +91,13 @@ interface Session {
   movie_source_id?: string | null;
   movie_source?: string | null;
   color_palette?: ColorPalette | null;
+  // Movie selection mode fields
+  movie_selection_mode?: MovieSelectionMode;
+  linked_vote_session_id?: string | null;
+  mystery_reveal_at?: string | null;
+  mystery_config?: MysteryConfig | null;
+  // Template override
+  template_id?: string | null;
 }
 
 interface Service {
@@ -72,6 +110,7 @@ interface Service {
 }
 
 type EditorMode = 'linear' | 'node';
+type MainTab = 'general' | 'movie' | 'participants' | 'actions';
 
 // Serialize workflow for API - strip React Flow internal properties
 function serializeWorkflow(workflow: WorkflowData): Record<string, unknown> {
@@ -221,6 +260,32 @@ export function SessionEditor() {
     changeMovie: language === 'fr' ? 'Changer' : 'Change',
     extractingPalette: language === 'fr' ? 'Extraction de la palette...' : 'Extracting palette...',
     colorPalette: language === 'fr' ? 'Palette de couleurs' : 'Color Palette',
+    selectionMode: language === 'fr' ? 'Mode de sélection du film' : 'Movie Selection Mode',
+    fixed: language === 'fr' ? 'Fixe' : 'Fixed',
+    fixedDesc: language === 'fr' ? 'Film choisi directement' : 'Directly chosen movie',
+    vote: language === 'fr' ? 'Vote' : 'Vote',
+    voteDesc: language === 'fr' ? 'Film déterminé par vote' : 'Movie determined by vote',
+    mystery: language === 'fr' ? 'Mystère' : 'Mystery',
+    mysteryDesc: language === 'fr' ? 'Film révélé plus tard' : 'Movie revealed later',
+    // Tab labels
+    tabGeneral: language === 'fr' ? 'Général' : 'General',
+    tabMovie: language === 'fr' ? 'Film' : 'Movie',
+    tabUsers: language === 'fr' ? 'Utilisateurs' : 'Users',
+    tabActions: language === 'fr' ? 'Actions' : 'Actions',
+    // General tab
+    generalInfo: language === 'fr' ? 'Informations générales' : 'General Information',
+    name: language === 'fr' ? 'Nom' : 'Name',
+    description: language === 'fr' ? 'Description' : 'Description',
+    schedule: language === 'fr' ? 'Planification' : 'Schedule',
+    // Template
+    wallmountTemplate: language === 'fr' ? 'Template Wallmount' : 'Wallmount Template',
+    activeTemplateLabel: language === 'fr' ? 'Template actif (global)' : 'Active template (global)',
+    noActiveTemplate: language === 'fr' ? 'Aucun template actif' : 'No active template',
+    manageTemplates: language === 'fr' ? 'Gérer les templates' : 'Manage templates',
+    templateHelp: language === 'fr' ? 'Par défaut, le template actif global est utilisé. Vous pouvez choisir un template spécifique pour cette session.' : 'By default, the global active template is used. You can choose a specific template for this session.',
+    useGlobalTemplate: language === 'fr' ? 'Utiliser le template global actif' : 'Use global active template',
+    selectTemplate: language === 'fr' ? 'Choisir un template' : 'Select template',
+    customTemplate: language === 'fr' ? 'Template personnalisé' : 'Custom template',
   };
 
   const [session, setSession] = useState<Session | null>(
@@ -232,9 +297,28 @@ export function SessionEditor() {
           status: 'draft',
           scheduled_at: null,
           workflow: createDefaultWorkflow(),
+          movie_selection_mode: 'fixed',
         }
       : null
   );
+
+  // Main tab state
+  const [activeTab, setActiveTab] = useState<MainTab>('general');
+
+  // Vote mode config state (for inline vote session creation)
+  const [voteConfig, setVoteConfig] = useState<VoteSessionConfig>({
+    movie_options: [],
+    max_votes_per_user: 1,
+    allow_multiple_votes: false,
+    require_token: true,
+    show_results_during_voting: false,
+    anonymous_voting: true,
+  });
+
+  // Mystery mode config state
+  const [mysteryConfig, setMysteryConfig] = useState<MysteryConfig>({
+    source: 'random',
+  });
   const [isLoading, setIsLoading] = useState(!isNew);
   const [isSaving, setIsSaving] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>('linear');
@@ -245,6 +329,7 @@ export function SessionEditor() {
   const [isMovieSearchOpen, setIsMovieSearchOpen] = useState(false);
   const [isExtractingPalette, setIsExtractingPalette] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'actions' | 'properties'>('actions');
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
 
   // Fetch services
   const { data: servicesData } = useQuery<{ items: Service[] }>({
@@ -252,6 +337,20 @@ export function SessionEditor() {
     queryFn: () => apiClient.get('/services'),
   });
   const services = servicesData?.items || [];
+
+  // Fetch existing participants when editing
+  const { data: existingParticipants } = useQuery<{ items: Array<{ user_id: string }> }>({
+    queryKey: ['session-participants', id],
+    queryFn: () => apiClient.get(`/sessions/${id}/participants`),
+    enabled: !isNew && !!id,
+  });
+
+  // Load existing participants into state when data is fetched
+  useEffect(() => {
+    if (existingParticipants?.items) {
+      setSelectedParticipantIds(existingParticipants.items.map(p => p.user_id));
+    }
+  }, [existingParticipants]);
 
   // Movie search query
   const { data: movieSearchResults, isLoading: isSearchingMovies } = useQuery<Array<{
@@ -360,27 +459,64 @@ export function SessionEditor() {
         ? actionsToWorkflow(actions)
         : session.workflow || createDefaultWorkflow();
 
-      const payload = {
+      const mode = session.movie_selection_mode || 'fixed';
+
+      const payload: Record<string, unknown> = {
         name: session.name,
         description: session.description || null,
         scheduled_at: session.scheduled_at || null,
-        movie_title: session.movie_title || null,
-        movie_poster_url: session.movie_poster_url || null,
-        movie_source_id: session.movie_source_id || null,
-        movie_source: session.movie_source || null,
-        color_palette: session.color_palette || null,
         workflow: serializeWorkflow(workflowToSave),
+        movie_selection_mode: mode,
+        template_id: session.template_id || null,
       };
+
+      // Mode-specific fields
+      if (mode === 'fixed') {
+        payload.movie_title = session.movie_title || null;
+        payload.movie_poster_url = session.movie_poster_url || null;
+        payload.movie_source_id = session.movie_source_id || null;
+        payload.movie_source = session.movie_source || null;
+        payload.color_palette = session.color_palette || null;
+      } else if (mode === 'vote') {
+        if (session.linked_vote_session_id) {
+          payload.linked_vote_session_id = session.linked_vote_session_id;
+        } else if (voteConfig.movie_options.length >= 2) {
+          payload.vote_session_config = {
+            name: voteConfig.name || session.name,
+            movie_options: voteConfig.movie_options,
+            max_votes_per_user: voteConfig.max_votes_per_user,
+            allow_multiple_votes: voteConfig.allow_multiple_votes,
+            require_token: voteConfig.require_token,
+            show_results_during_voting: voteConfig.show_results_during_voting,
+            anonymous_voting: voteConfig.anonymous_voting,
+            open_immediately: voteConfig.open_immediately,
+          };
+        }
+      } else if (mode === 'mystery') {
+        payload.mystery_reveal_at = session.mystery_reveal_at || null;
+        payload.mystery_config = mysteryConfig;
+      }
 
       console.log('Saving session:', JSON.stringify(payload, null, 2));
 
+      let sessionId = id;
       if (isNew) {
         const created = await apiClient.post<Session>('/sessions', payload);
-        navigate(`/sessions/${created.id}`);
+        sessionId = created.id;
       } else {
         await apiClient.patch(`/sessions/${id}`, payload);
-        navigate(`/sessions/${id}`);
       }
+
+      // Save participants if any selected
+      if (selectedParticipantIds.length > 0 && sessionId) {
+        try {
+          await apiClient.post(`/sessions/${sessionId}/participants`, selectedParticipantIds);
+        } catch (error) {
+          console.error('Failed to add participants:', error);
+        }
+      }
+
+      navigate('/sessions');
     } catch (error) {
       console.error('Failed to save session:', error);
       alert(t.saveError);
@@ -497,384 +633,585 @@ export function SessionEditor() {
   const selectedAction = selectedActionIndex !== null ? actions[selectedActionIndex] : null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[calc(100vh-7rem)]">
-      {/* Header - Responsive */}
-      <div className="flex flex-col gap-2 mb-3 flex-shrink-0">
-        {/* Top row: Back + Name + Save */}
-        <div className="flex items-center gap-2">
-          <Link to={isNew ? '/sessions' : `/sessions/${id || ''}`}>
+    <div>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <Link to="/sessions">
             <Button variant="ghost" size="sm">
               <ArrowLeft size={16} />
             </Button>
           </Link>
-          <input
-            type="text"
-            value={session.name}
-            onChange={(e) => setSession({ ...session, name: e.target.value })}
-            className="flex-1 text-base md:text-lg font-bold bg-dark-surface border border-dark-border hover:border-dark-muted focus:border-theatarr-500 focus:outline-none focus:ring-1 focus:ring-theatarr-500 rounded-lg px-3 py-1.5 text-dark-text"
-            placeholder={t.sessionName}
-          />
-          <Button size="sm" onClick={handleSave} disabled={isSaving} className="flex-shrink-0">
-            <Save size={14} className="md:mr-1" />
-            <span className="hidden md:inline">{isSaving ? t.saving : t.save}</span>
-          </Button>
-        </div>
-
-        {/* Second row: Mode toggle (hidden on mobile for linear-only) + Cancel */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="hidden md:flex rounded-lg overflow-hidden border border-dark-border">
-            <button
-              onClick={() => handleModeSwitch('linear')}
-              className={`px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                editorMode === 'linear'
-                  ? 'bg-theatarr-500 text-white'
-                  : 'bg-dark-surface text-dark-muted hover:text-dark-text'
-              }`}
-            >
-              <List size={14} />
-              {t.linearMode}
-            </button>
-            <button
-              onClick={() => handleModeSwitch('node')}
-              className={`px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                editorMode === 'node'
-                  ? 'bg-theatarr-500 text-white'
-                  : 'bg-dark-surface text-dark-muted hover:text-dark-text'
-              }`}
-            >
-              <GitBranch size={14} />
-              {t.nodeMode}
-            </button>
+          <div>
+            <h1 className="text-2xl font-bold text-dark-text">
+              {isNew ? t.newSession : session.name}
+            </h1>
+            <p className="text-dark-muted text-sm mt-1">
+              {session.description || (language === 'fr' ? 'Configurez votre session cinéma' : 'Configure your cinema session')}
+            </p>
           </div>
-          <div className="flex-1 md:hidden" />
+        </div>
+        <div className="flex items-center gap-2">
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => navigate(isNew ? '/sessions' : `/sessions/${id || ''}`)}
+            onClick={() => navigate('/sessions')}
           >
             {t.cancel}
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={isSaving}>
+            <Save size={16} className="mr-1" />
+            {isSaving ? t.saving : t.save}
           </Button>
         </div>
       </div>
 
-      {/* Description & Schedule - Stack on mobile */}
-      <div className="mb-3 flex-shrink-0 flex flex-col md:flex-row gap-2 md:gap-3">
-        <div className="flex-1">
-          <input
-            type="text"
-            value={session.description || ''}
-            onChange={(e) => setSession({ ...session, description: e.target.value })}
-            className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-dark-text placeholder:text-dark-muted"
-            placeholder={t.descriptionPlaceholder}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Calendar size={16} className="text-dark-muted flex-shrink-0" />
-          <input
-            type="datetime-local"
-            value={session.scheduled_at ? session.scheduled_at.slice(0, 16) : ''}
-            onChange={(e) => setSession({ ...session, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
-            className="flex-1 md:flex-none bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-dark-text"
-            title={t.scheduledAtHelp}
-          />
-        </div>
+      {/* Tabs - Same style as ConfigPage */}
+      <div className="flex gap-4 mb-6 border-b border-dark-border">
+        <button
+          onClick={() => setActiveTab('general')}
+          className={`pb-3 px-1 font-medium transition-colors ${
+            activeTab === 'general'
+              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
+              : 'text-dark-muted hover:text-dark-text'
+          }`}
+        >
+          <Info size={16} className="inline mr-2" />
+          {t.tabGeneral}
+        </button>
+        <button
+          onClick={() => setActiveTab('movie')}
+          className={`pb-3 px-1 font-medium transition-colors ${
+            activeTab === 'movie'
+              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
+              : 'text-dark-muted hover:text-dark-text'
+          }`}
+        >
+          <Film size={16} className="inline mr-2" />
+          {t.tabMovie}
+        </button>
+        <button
+          onClick={() => setActiveTab('participants')}
+          className={`pb-3 px-1 font-medium transition-colors ${
+            activeTab === 'participants'
+              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
+              : 'text-dark-muted hover:text-dark-text'
+          }`}
+        >
+          <Users size={16} className="inline mr-2" />
+          {t.tabUsers}
+          {selectedParticipantIds.length > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-theatarr-500/20 text-theatarr-400">
+              {selectedParticipantIds.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('actions')}
+          className={`pb-3 px-1 font-medium transition-colors ${
+            activeTab === 'actions'
+              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
+              : 'text-dark-muted hover:text-dark-text'
+          }`}
+        >
+          <Zap size={16} className="inline mr-2" />
+          {t.tabActions}
+          {actions.length > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-theatarr-500/20 text-theatarr-400">
+              {actions.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Movie Selection - Responsive */}
-      <div className="mb-3 flex-shrink-0 bg-dark-surface border border-dark-border rounded-lg p-3">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <Film size={16} className="text-theatarr-500" />
-            <span className="text-sm font-medium text-dark-text">{t.selectMovie}</span>
-          </div>
-
-          {session.movie_title && !isMovieSearchOpen ? (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                {session.movie_poster_url && (
-                  <img
-                    src={session.movie_poster_url}
-                    alt={session.movie_title}
-                    className="w-10 h-14 sm:w-12 sm:h-18 object-cover rounded flex-shrink-0"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-dark-text truncate text-sm">{session.movie_title}</div>
-                  {session.movie_source && (
-                    <div className="text-xs text-dark-muted">via {session.movie_source}</div>
-                  )}
-                  {/* Palette preview on mobile */}
-                  {session.color_palette && (
-                    <div className="flex items-center gap-1 mt-1 sm:hidden">
-                      {[session.color_palette.primary, session.color_palette.accent, session.color_palette.vibrant].filter(Boolean).slice(0, 3).map((color, i) => (
-                        <div key={i} className="w-4 h-4 rounded-sm border border-dark-border" style={{ backgroundColor: color }} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {isExtractingPalette && (
-                  <div className="flex items-center gap-2 text-xs text-dark-muted">
-                    <Spinner size="sm" />
-                    <span className="hidden sm:inline">{t.extractingPalette}</span>
-                  </div>
-                )}
-                {session.color_palette && (
-                  <div className="hidden sm:flex items-center gap-1">
-                    <Palette size={14} className="text-dark-muted" />
-                    {[session.color_palette.primary, session.color_palette.accent, session.color_palette.vibrant].filter(Boolean).slice(0, 3).map((color, i) => (
-                      <div key={i} className="w-4 h-4 rounded-sm border border-dark-border" style={{ backgroundColor: color }} />
-                    ))}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setIsMovieSearchOpen(true)}
-                  className="px-2 py-1 text-xs bg-dark-bg hover:bg-dark-border text-dark-text rounded"
-                >
-                  {t.changeMovie}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRemoveMovie}
-                  className="p-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded"
-                >
-                  <X size={12} />
-                </button>
-              </div>
+      {/* Tab Content */}
+      <div>
+        {/* GENERAL TAB */}
+        {activeTab === 'general' && (
+          <div className="space-y-4">
+            {/* Name */}
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
+              <label className="text-sm font-medium text-dark-text block mb-2">{t.name}</label>
+              <input
+                type="text"
+                value={session.name}
+                onChange={(e) => setSession({ ...session, name: e.target.value })}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text placeholder:text-dark-muted"
+                placeholder={t.sessionName}
+              />
             </div>
-          ) : (
-            <div className="relative">
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
+
+            {/* Description */}
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
+              <label className="text-sm font-medium text-dark-text block mb-2">{t.description}</label>
+              <textarea
+                value={session.description || ''}
+                onChange={(e) => setSession({ ...session, description: e.target.value })}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text placeholder:text-dark-muted resize-none"
+                placeholder={t.descriptionPlaceholder}
+                rows={3}
+              />
+            </div>
+
+            {/* Schedule */}
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
+              <label className="text-sm font-medium text-dark-text block mb-2">{t.schedule}</label>
+              <div className="flex items-center gap-2">
+                <Calendar size={16} className="text-dark-muted flex-shrink-0" />
                 <input
-                  type="text"
-                  placeholder={t.searchMovie}
-                  value={movieSearchQuery}
-                  onChange={(e) => { setMovieSearchQuery(e.target.value); setIsMovieSearchOpen(true); }}
-                  onFocus={() => setIsMovieSearchOpen(true)}
-                  className="w-full bg-dark-bg border border-dark-border rounded-lg pl-10 pr-3 py-2 text-dark-text text-sm"
+                  type="datetime-local"
+                  value={session.scheduled_at ? session.scheduled_at.slice(0, 16) : ''}
+                  onChange={(e) => setSession({ ...session, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                  className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text"
+                  title={t.scheduledAtHelp}
                 />
               </div>
-
-              {isMovieSearchOpen && movieSearchQuery.length >= 2 && (
-                <div className="absolute z-30 w-full mt-2 bg-dark-surface border border-dark-border rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                  {isSearchingMovies ? (
-                    <div className="p-4 text-center"><Spinner size="sm" /></div>
-                  ) : movieSearchResults && movieSearchResults.length > 0 ? (
-                    <div className="py-1">
-                      {movieSearchResults.map((movie) => (
-                        <button
-                          key={`${movie.source}-${movie.id}`}
-                          type="button"
-                          onClick={() => handleSelectMovie(movie)}
-                          className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-dark-border/50"
-                        >
-                          <div className="w-8 h-12 bg-dark-border rounded flex-shrink-0 overflow-hidden">
-                            {movie.poster_url ? (
-                              <img src={movie.poster_url} alt={movie.title} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center"><Film size={12} className="text-dark-muted" /></div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-dark-text text-sm truncate">{movie.title}</div>
-                            <div className="text-xs text-dark-muted">{movie.year} • {movie.source}</div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-dark-muted text-sm">{t.noResults}</div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content - Linear Mode with mobile tabs */}
-      {editorMode === 'linear' ? (
-        <>
-          {/* Mobile Tab Switcher */}
-          <div className="md:hidden flex mb-2 gap-1 flex-shrink-0">
-            <button
-              onClick={() => setMobilePanel('actions')}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
-                mobilePanel === 'actions'
-                  ? 'bg-theatarr-500 text-white'
-                  : 'bg-dark-surface text-dark-muted'
-              }`}
-            >
-              {t.actions} ({actions.length})
-            </button>
-            <button
-              onClick={() => setMobilePanel('properties')}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
-                mobilePanel === 'properties'
-                  ? 'bg-theatarr-500 text-white'
-                  : 'bg-dark-surface text-dark-muted'
-              }`}
-            >
-              {t.properties}
-            </button>
-          </div>
-
-          {/* Desktop: Side by side | Mobile: Tab content */}
-          <div className="flex flex-1 min-h-0 gap-3">
-            {/* Actions List - Hidden on mobile when properties tab is active */}
-            <div className={`${mobilePanel === 'properties' ? 'hidden' : 'flex'} md:flex w-full md:w-80 bg-dark-surface border border-dark-border rounded-lg overflow-hidden flex-col flex-shrink-0`}>
-              <div className="p-3 border-b border-dark-border">
-                <h3 className="text-sm font-medium text-dark-text mb-2 hidden md:block">{t.actions}</h3>
-                {/* Add Action Buttons */}
-                <div className="flex flex-wrap gap-1">
-                  {(Object.keys(actionTypeConfig) as ActionType[]).map((type) => {
-                    const config = actionTypeConfig[type];
-                    const Icon = config.icon;
-                    return (
-                      <button
-                        key={type}
-                        onClick={() => { addAction(type); setMobilePanel('properties'); }}
-                        className={`px-2 py-1.5 rounded text-xs font-medium flex items-center gap-1 ${config.bgColor} ${config.color} hover:opacity-80 transition-opacity`}
-                        title={language === 'fr' ? config.label.fr : config.label.en}
-                      >
-                        <Icon size={12} />
-                        <span className="hidden sm:inline">{language === 'fr' ? config.label.fr : config.label.en}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-auto">
-                {actions.length === 0 ? (
-                  <div className="text-center text-dark-muted text-xs p-6">
-                    {t.noActions}
-                  </div>
-                ) : (
-                  <div className="p-2 space-y-1">
-                    {actions.map((action, index) => {
-                      const config = actionTypeConfig[action.action_type];
-                      const Icon = config.icon;
-                      const isSelected = selectedActionIndex === index;
-
-                      return (
-                        <div
-                          key={action.id}
-                          onClick={() => { setSelectedActionIndex(index); setMobilePanel('properties'); }}
-                          className={`p-2 rounded-lg border cursor-pointer transition-all ${
-                            isSelected
-                              ? 'border-theatarr-500 bg-theatarr-500/10'
-                              : 'border-transparent bg-dark-bg hover:bg-dark-bg/80'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            {/* Move buttons */}
-                            <div className="flex flex-col">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); moveAction(index, 'up'); }}
-                                className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-0.5"
-                                disabled={index === 0}
-                              >
-                                <ChevronUp size={12} />
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); moveAction(index, 'down'); }}
-                                className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-0.5"
-                                disabled={index === actions.length - 1}
-                              >
-                                <ChevronDown size={12} />
-                              </button>
-                            </div>
-
-                            {/* Icon */}
-                            <div className={`p-1.5 rounded ${config.bgColor}`}>
-                              <Icon size={14} className={config.color} />
-                            </div>
-
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="text-xs font-medium text-dark-text truncate">
-                                {action.command}
-                              </div>
-                              <div className="text-[10px] text-dark-muted truncate">
-                                {language === 'fr' ? config.label.fr : config.label.en}
-                              </div>
-                            </div>
-
-                            {/* Delete */}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); deleteAction(index); }}
-                              className="p-1 text-dark-muted hover:text-red-400 transition-colors"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <p className="text-xs text-dark-muted mt-2">{t.scheduledAtHelp}</p>
             </div>
 
-            {/* Action Editor Panel - Hidden on mobile when actions tab is active */}
-            <div className={`${mobilePanel === 'actions' ? 'hidden' : 'flex'} md:flex flex-1 bg-dark-surface border border-dark-border rounded-lg overflow-hidden flex-col`}>
-              <div className="p-3 border-b border-dark-border hidden md:block">
-                <h3 className="text-sm font-medium text-dark-text">{t.properties}</h3>
+            {/* Wallmount Template */}
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <label className="text-sm font-medium text-dark-text flex items-center gap-2">
+                  <Monitor size={16} className="text-theatarr-500" />
+                  {t.wallmountTemplate}
+                </label>
+                <Link
+                  to="/templates"
+                  className="text-xs text-theatarr-400 hover:text-theatarr-300 transition-colors"
+                >
+                  {t.manageTemplates}
+                </Link>
               </div>
-              <div className="flex-1 overflow-auto p-3 md:p-4">
-                {selectedAction ? (
-                  <ActionEditorPanel
-                    action={selectedAction}
-                    services={services}
-                    onChange={(updates) => updateAction(selectedActionIndex!, updates)}
-                    onDelete={() => { deleteAction(selectedActionIndex!); setMobilePanel('actions'); }}
-                    colorPalette={session.color_palette}
-                  />
-                ) : (
-                  <div className="text-center text-dark-muted text-sm py-12">
-                    {t.selectAction}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      ) : (
-        /* Node Mode - Desktop only, force linear on mobile */
-        <div className="flex flex-1 min-h-0 gap-3">
-          <div className="flex-1 bg-dark-surface border border-dark-border rounded-lg overflow-hidden">
-            {session.workflow && (
-              <WorkflowEditor
-                workflow={session.workflow}
-                onChange={handleWorkflowChange}
-                onNodeSelect={handleNodeSelect}
-                selectedNodeId={selectedNode?.id || null}
+
+              <TemplateSelector
+                selectedTemplateId={session.template_id || null}
+                onChange={(templateId) => setSession({ ...session, template_id: templateId })}
               />
+            </div>
+          </div>
+        )}
+
+        {/* MOVIE TAB */}
+        {activeTab === 'movie' && (
+          <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
+            {/* Mode Selector */}
+            <div className="mb-4">
+              <label className="text-sm font-medium text-dark-text mb-2 block">{t.selectionMode}</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSession({ ...session, movie_selection_mode: 'fixed' })}
+                  className={clsx(
+                    'p-3 rounded-lg border text-center transition-colors',
+                    session.movie_selection_mode === 'fixed' || !session.movie_selection_mode
+                      ? 'bg-theatarr-500/20 border-theatarr-500 text-theatarr-400'
+                      : 'border-dark-border text-dark-muted hover:text-dark-text hover:border-dark-muted'
+                  )}
+                >
+                  <Film size={20} className="mx-auto mb-1" />
+                  <div className="text-sm font-medium">{t.fixed}</div>
+                  <div className="text-xs opacity-70 hidden sm:block">{t.fixedDesc}</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSession({ ...session, movie_selection_mode: 'vote' })}
+                  className={clsx(
+                    'p-3 rounded-lg border text-center transition-colors',
+                    session.movie_selection_mode === 'vote'
+                      ? 'bg-theatarr-500/20 border-theatarr-500 text-theatarr-400'
+                      : 'border-dark-border text-dark-muted hover:text-dark-text hover:border-dark-muted'
+                  )}
+                >
+                  <Vote size={20} className="mx-auto mb-1" />
+                  <div className="text-sm font-medium">{t.vote}</div>
+                  <div className="text-xs opacity-70 hidden sm:block">{t.voteDesc}</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSession({ ...session, movie_selection_mode: 'mystery' })}
+                  className={clsx(
+                    'p-3 rounded-lg border text-center transition-colors',
+                    session.movie_selection_mode === 'mystery'
+                      ? 'bg-theatarr-500/20 border-theatarr-500 text-theatarr-400'
+                      : 'border-dark-border text-dark-muted hover:text-dark-text hover:border-dark-muted'
+                  )}
+                >
+                  <Shuffle size={20} className="mx-auto mb-1" />
+                  <div className="text-sm font-medium">{t.mystery}</div>
+                  <div className="text-xs opacity-70 hidden sm:block">{t.mysteryDesc}</div>
+                </button>
+              </div>
+            </div>
+
+            {/* FIXED Mode - Direct Movie Selection */}
+            {(session.movie_selection_mode === 'fixed' || !session.movie_selection_mode) && (
+              <div className="border-t border-dark-border pt-4 mt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Film size={16} className="text-theatarr-500" />
+                  <span className="text-sm font-medium text-dark-text">{t.selectMovie}</span>
+                </div>
+
+                {session.movie_title && !isMovieSearchOpen ? (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {session.movie_poster_url && (
+                        <img
+                          src={session.movie_poster_url}
+                          alt={session.movie_title}
+                          className="w-12 h-18 object-cover rounded flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-dark-text truncate">{session.movie_title}</div>
+                        {session.movie_source && (
+                          <div className="text-xs text-dark-muted">via {session.movie_source}</div>
+                        )}
+                        {/* Palette preview */}
+                        {session.color_palette && (
+                          <div className="flex items-center gap-1 mt-2">
+                            <Palette size={14} className="text-dark-muted" />
+                            {[session.color_palette.primary, session.color_palette.accent, session.color_palette.vibrant].filter(Boolean).slice(0, 5).map((color, i) => (
+                              <div key={i} className="w-5 h-5 rounded border border-dark-border" style={{ backgroundColor: color }} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isExtractingPalette && (
+                        <div className="flex items-center gap-2 text-xs text-dark-muted">
+                          <Spinner size="sm" />
+                          <span>{t.extractingPalette}</span>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsMovieSearchOpen(true)}
+                        className="px-3 py-1.5 text-sm bg-dark-bg hover:bg-dark-border text-dark-text rounded-lg"
+                      >
+                        {t.changeMovie}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveMovie}
+                        className="p-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="relative">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
+                      <input
+                        type="text"
+                        placeholder={t.searchMovie}
+                        value={movieSearchQuery}
+                        onChange={(e) => { setMovieSearchQuery(e.target.value); setIsMovieSearchOpen(true); }}
+                        onFocus={() => setIsMovieSearchOpen(true)}
+                        className="w-full bg-dark-bg border border-dark-border rounded-lg pl-10 pr-3 py-2 text-dark-text text-sm"
+                      />
+                    </div>
+
+                    {isMovieSearchOpen && movieSearchQuery.length >= 2 && (
+                      <div className="absolute z-30 w-full mt-2 bg-dark-surface border border-dark-border rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                        {isSearchingMovies ? (
+                          <div className="p-4 text-center"><Spinner size="sm" /></div>
+                        ) : movieSearchResults && movieSearchResults.length > 0 ? (
+                          <div className="py-1">
+                            {movieSearchResults.map((movie) => (
+                              <button
+                                key={`${movie.source}-${movie.id}`}
+                                type="button"
+                                onClick={() => handleSelectMovie(movie)}
+                                className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-dark-border/50"
+                              >
+                                <div className="w-10 h-14 bg-dark-border rounded flex-shrink-0 overflow-hidden">
+                                  {movie.poster_url ? (
+                                    <img src={movie.poster_url} alt={movie.title} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center"><Film size={14} className="text-dark-muted" /></div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-dark-text truncate">{movie.title}</div>
+                                  <div className="text-xs text-dark-muted">{movie.year} - {movie.source}</div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-4 text-center text-dark-muted text-sm">{t.noResults}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* VOTE Mode - Vote Configuration */}
+            {session.movie_selection_mode === 'vote' && (
+              <div className="border-t border-dark-border pt-4 mt-4">
+                <VoteModeConfig
+                  sessionName={session.name}
+                  config={voteConfig}
+                  onChange={setVoteConfig}
+                  linkedVoteSessionId={session.linked_vote_session_id || undefined}
+                  onLinkVoteSession={(id) => setSession({ ...session, linked_vote_session_id: id })}
+                />
+              </div>
+            )}
+
+            {/* MYSTERY Mode - Mystery Configuration */}
+            {session.movie_selection_mode === 'mystery' && (
+              <div className="border-t border-dark-border pt-4 mt-4">
+                <MysteryModeConfig
+                  config={mysteryConfig}
+                  onChange={setMysteryConfig}
+                  revealAt={session.mystery_reveal_at || undefined}
+                  onRevealAtChange={(revealAt) => setSession({ ...session, mystery_reveal_at: revealAt })}
+                />
+              </div>
             )}
           </div>
+        )}
 
-          <div className="hidden md:flex w-72 bg-dark-surface border border-dark-border rounded-lg overflow-hidden flex-col">
-            <div className="p-3 border-b border-dark-border">
-              <h3 className="text-sm font-medium text-dark-text">{t.properties}</h3>
-            </div>
-            <div className="flex-1 overflow-auto">
-              {selectedNode ? (
-                <WorkflowNodeEditor
-                  node={selectedNode}
-                  onUpdate={handleNodeUpdate}
-                  onDelete={handleNodeDelete}
-                />
-              ) : (
-                <div className="p-4 text-sm text-dark-muted text-center">{t.selectNode}</div>
-              )}
-            </div>
+        {/* PARTICIPANTS TAB */}
+        {activeTab === 'participants' && (
+          <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
+            <ParticipantsSelector
+              selectedUserIds={selectedParticipantIds}
+              onChange={setSelectedParticipantIds}
+            />
           </div>
-        </div>
-      )}
+        )}
+
+        {/* ACTIONS TAB */}
+        {activeTab === 'actions' && (
+          <div className="flex flex-col h-full">
+            {/* Mode toggle + Mobile panel switcher */}
+            <div className="flex items-center justify-between gap-2 mb-3 flex-shrink-0">
+              {/* Editor mode toggle (Linear/Nodes) */}
+              <div className="hidden md:flex rounded-lg overflow-hidden border border-dark-border">
+                <button
+                  onClick={() => handleModeSwitch('linear')}
+                  className={clsx(
+                    'px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors',
+                    editorMode === 'linear'
+                      ? 'bg-theatarr-500 text-white'
+                      : 'bg-dark-surface text-dark-muted hover:text-dark-text'
+                  )}
+                >
+                  <List size={14} />
+                  {t.linearMode}
+                </button>
+                <button
+                  onClick={() => handleModeSwitch('node')}
+                  className={clsx(
+                    'px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors',
+                    editorMode === 'node'
+                      ? 'bg-theatarr-500 text-white'
+                      : 'bg-dark-surface text-dark-muted hover:text-dark-text'
+                  )}
+                >
+                  <GitBranch size={14} />
+                  {t.nodeMode}
+                </button>
+              </div>
+
+              {/* Mobile tab switcher for actions/properties */}
+              <div className="md:hidden flex flex-1 gap-1">
+                <button
+                  onClick={() => setMobilePanel('actions')}
+                  className={clsx(
+                    'flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors',
+                    mobilePanel === 'actions'
+                      ? 'bg-theatarr-500 text-white'
+                      : 'bg-dark-surface text-dark-muted'
+                  )}
+                >
+                  {t.actions} ({actions.length})
+                </button>
+                <button
+                  onClick={() => setMobilePanel('properties')}
+                  className={clsx(
+                    'flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors',
+                    mobilePanel === 'properties'
+                      ? 'bg-theatarr-500 text-white'
+                      : 'bg-dark-surface text-dark-muted'
+                  )}
+                >
+                  {t.properties}
+                </button>
+              </div>
+            </div>
+
+            {/* Linear Mode Content */}
+            {editorMode === 'linear' ? (
+              <div className="flex flex-1 min-h-0 gap-3">
+                {/* Actions List */}
+                <div className={clsx(
+                  'w-full md:w-80 bg-dark-surface border border-dark-border rounded-lg overflow-hidden flex-col flex-shrink-0',
+                  mobilePanel === 'properties' ? 'hidden md:flex' : 'flex'
+                )}>
+                  <div className="p-3 border-b border-dark-border">
+                    <h3 className="text-sm font-medium text-dark-text mb-2 hidden md:block">{t.actions}</h3>
+                    {/* Add Action Buttons */}
+                    <div className="flex flex-wrap gap-1">
+                      {(Object.keys(actionTypeConfig) as ActionType[]).map((type) => {
+                        const config = actionTypeConfig[type];
+                        const Icon = config.icon;
+                        return (
+                          <button
+                            key={type}
+                            onClick={() => { addAction(type); setMobilePanel('properties'); }}
+                            className={`px-2 py-1.5 rounded text-xs font-medium flex items-center gap-1 ${config.bgColor} ${config.color} hover:opacity-80 transition-opacity`}
+                            title={language === 'fr' ? config.label.fr : config.label.en}
+                          >
+                            <Icon size={12} />
+                            <span className="hidden sm:inline">{language === 'fr' ? config.label.fr : config.label.en}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-auto">
+                    {actions.length === 0 ? (
+                      <div className="text-center text-dark-muted text-xs p-6">
+                        {t.noActions}
+                      </div>
+                    ) : (
+                      <div className="p-2 space-y-1">
+                        {actions.map((action, index) => {
+                          const config = actionTypeConfig[action.action_type];
+                          const Icon = config.icon;
+                          const isSelected = selectedActionIndex === index;
+
+                          return (
+                            <div
+                              key={action.id}
+                              onClick={() => { setSelectedActionIndex(index); setMobilePanel('properties'); }}
+                              className={clsx(
+                                'p-2 rounded-lg border cursor-pointer transition-all',
+                                isSelected
+                                  ? 'border-theatarr-500 bg-theatarr-500/10'
+                                  : 'border-transparent bg-dark-bg hover:bg-dark-bg/80'
+                              )}
+                            >
+                              <div className="flex items-center gap-2">
+                                {/* Move buttons */}
+                                <div className="flex flex-col">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); moveAction(index, 'up'); }}
+                                    className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-0.5"
+                                    disabled={index === 0}
+                                  >
+                                    <ChevronUp size={12} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); moveAction(index, 'down'); }}
+                                    className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-0.5"
+                                    disabled={index === actions.length - 1}
+                                  >
+                                    <ChevronDown size={12} />
+                                  </button>
+                                </div>
+
+                                {/* Icon */}
+                                <div className={`p-1.5 rounded ${config.bgColor}`}>
+                                  <Icon size={14} className={config.color} />
+                                </div>
+
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium text-dark-text truncate">
+                                    {action.command}
+                                  </div>
+                                  <div className="text-[10px] text-dark-muted truncate">
+                                    {language === 'fr' ? config.label.fr : config.label.en}
+                                  </div>
+                                </div>
+
+                                {/* Delete */}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteAction(index); }}
+                                  className="p-1 text-dark-muted hover:text-red-400 transition-colors"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Editor Panel */}
+                <div className={clsx(
+                  'flex-1 bg-dark-surface border border-dark-border rounded-lg overflow-hidden flex-col',
+                  mobilePanel === 'actions' ? 'hidden md:flex' : 'flex'
+                )}>
+                  <div className="p-3 border-b border-dark-border hidden md:block">
+                    <h3 className="text-sm font-medium text-dark-text">{t.properties}</h3>
+                  </div>
+                  <div className="flex-1 overflow-auto p-3 md:p-4">
+                    {selectedAction ? (
+                      <ActionEditorPanel
+                        action={selectedAction}
+                        services={services}
+                        onChange={(updates) => updateAction(selectedActionIndex!, updates)}
+                        onDelete={() => { deleteAction(selectedActionIndex!); setMobilePanel('actions'); }}
+                        colorPalette={session.color_palette}
+                      />
+                    ) : (
+                      <div className="text-center text-dark-muted text-sm py-12">
+                        {t.selectAction}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Node Mode */
+              <div className="flex flex-1 min-h-0 gap-3">
+                <div className="flex-1 bg-dark-surface border border-dark-border rounded-lg overflow-hidden">
+                  {session.workflow && (
+                    <WorkflowEditor
+                      workflow={session.workflow}
+                      onChange={handleWorkflowChange}
+                      onNodeSelect={handleNodeSelect}
+                      selectedNodeId={selectedNode?.id || null}
+                    />
+                  )}
+                </div>
+
+                <div className="hidden md:flex w-72 bg-dark-surface border border-dark-border rounded-lg overflow-hidden flex-col">
+                  <div className="p-3 border-b border-dark-border">
+                    <h3 className="text-sm font-medium text-dark-text">{t.properties}</h3>
+                  </div>
+                  <div className="flex-1 overflow-auto">
+                    {selectedNode ? (
+                      <WorkflowNodeEditor
+                        node={selectedNode}
+                        onUpdate={handleNodeUpdate}
+                        onDelete={handleNodeDelete}
+                      />
+                    ) : (
+                      <div className="p-4 text-sm text-dark-muted text-center">{t.selectNode}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

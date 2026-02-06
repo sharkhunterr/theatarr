@@ -12,6 +12,10 @@ export type SessionStatus =
   | 'completed'
   | 'interrupted';
 
+export type MovieSelectionMode = 'fixed' | 'vote' | 'mystery';
+
+export type MysterySource = 'random' | 'filtered' | 'curated';
+
 export interface Sequence {
   id: string;
   name: string;
@@ -29,6 +33,44 @@ export interface ColorPalette {
   vibrant_dark: string;
   muted: string;
   raw_palette?: string[];
+}
+
+export interface MysteryFilters {
+  genres?: string[];
+  year_min?: number;
+  year_max?: number;
+  rating_min?: number;
+}
+
+export interface MysteryMovieOption {
+  title: string;
+  year?: number;
+  poster_url?: string;
+  movie_id?: string;
+  source?: string;
+  source_id?: string;
+}
+
+export interface MysteryConfig {
+  source: MysterySource;
+  filters?: MysteryFilters;
+  curated_movies?: MysteryMovieOption[];
+}
+
+export interface VoteSessionSummary {
+  id: string;
+  name: string;
+  status: string;
+  total_votes: number;
+  is_open: boolean;
+  winning_movie_index?: number;
+  movie_options?: Array<{
+    title: string;
+    year?: number;
+    poster_url?: string;
+    movie_id?: string;
+    vote_count?: number;
+  }>;
 }
 
 export interface Session {
@@ -52,6 +94,18 @@ export interface Session {
   workflow?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  // Movie selection mode fields
+  movie_selection_mode?: MovieSelectionMode;
+  movie_resolved?: boolean;
+  movie_resolved_at?: string;
+  linked_vote_session_id?: string;
+  linked_vote_session?: VoteSessionSummary;
+  mystery_reveal_at?: string;
+  mystery_config?: MysteryConfig;
+  // Enriched fields from list
+  participants_accepted?: number;
+  participants_total?: number;
+  actions_count?: number;
 }
 
 export interface SessionState {

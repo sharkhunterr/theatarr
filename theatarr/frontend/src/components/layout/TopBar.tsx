@@ -3,7 +3,8 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Menu, Globe, Sun, Moon, User, LogOut, ChevronDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Menu, Globe, Sun, Moon, User, LogOut, ChevronDown, UserCircle, Monitor } from 'lucide-react';
 import clsx from 'clsx';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -149,6 +150,8 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
   }, []);
 
   const logoutLabel = language === 'fr' ? 'Deconnexion' : 'Logout';
+  const portalLabel = language === 'fr' ? 'Portail Utilisateur' : 'User Portal';
+  const wallmountLabel = language === 'fr' ? 'Wallmount' : 'Wallmount';
 
   return (
     <div ref={ref} className="relative">
@@ -169,6 +172,25 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
             <p className="text-sm font-medium text-dark-text">{user?.username}</p>
             <p className="text-xs text-dark-muted">Administrator</p>
           </div>
+          <Link
+            to="/portal"
+            onClick={() => setOpen(false)}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2 text-theatarr-500"
+          >
+            <UserCircle size={16} />
+            {portalLabel}
+          </Link>
+          <a
+            href="/wallmount"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2 text-dark-text"
+          >
+            <Monitor size={16} />
+            {wallmountLabel}
+          </a>
+          <div className="border-t border-dark-border my-1" />
           <button
             onClick={() => {
               logout();

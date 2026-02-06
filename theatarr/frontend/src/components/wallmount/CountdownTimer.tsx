@@ -8,7 +8,7 @@ interface CountdownTimerProps {
     accent?: string;
     text?: string;
   };
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'giant';
   showSeconds?: boolean;
   showLabels?: boolean;
   animate?: boolean;
@@ -69,6 +69,7 @@ export function CountdownTimer({
     md: 'text-4xl',
     lg: 'text-6xl',
     xl: 'text-8xl',
+    giant: 'text-[12rem]',
   };
 
   const labelSizeClasses = {
@@ -76,6 +77,7 @@ export function CountdownTimer({
     md: 'text-sm',
     lg: 'text-base',
     xl: 'text-lg',
+    giant: 'text-2xl',
   };
 
   const padNumber = (num: number) => num.toString().padStart(2, '0');

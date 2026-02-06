@@ -76,6 +76,9 @@ class VoteSessionResponse(BaseSchema):
     is_open: bool
     created_at: datetime
     updated_at: datetime
+    # Link to session (when created via session movie selection mode)
+    linked_session_id: str | None = None
+    linked_session_name: str | None = None
 
 
 class VoteSessionListResponse(BaseSchema):

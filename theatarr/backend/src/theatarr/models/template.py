@@ -75,61 +75,122 @@ class Template(UUIDMixin, TimestampMixin, Base):
 
 # Built-in template configurations
 BUILTIN_TEMPLATES = {
-    "countdown": {
-        "name": "Countdown Timer",
-        "description": "Shows countdown until session starts with movie poster background",
+    "poster_focus": {
+        "name": "Affiche Plein Ecran",
+        "description": "Affiche en plein ecran avec compte a rebours discret en bas",
         "template_type": TemplateType.COUNTDOWN,
         "is_builtin": True,
         "layout": {
+            "style": "poster-fullscreen",
             "components": [
-                {"type": "backdrop", "opacity": 0.3},
-                {"type": "poster", "position": "left", "size": "large"},
-                {"type": "countdown", "position": "center", "format": "hh:mm:ss"},
-                {"type": "title", "position": "bottom"},
+                {"type": "poster", "position": "fullscreen"},
+                {"type": "gradient_overlay", "position": "bottom", "height": "30%"},
+                {"type": "title", "position": "bottom-center", "size": "xlarge"},
+                {"type": "countdown", "position": "bottom-center", "size": "large"},
             ]
         },
         "config": {
             "show_seconds": True,
             "animate_numbers": True,
-            "use_palette_colors": True,
         },
     },
-    "movie_info": {
-        "name": "Movie Information",
-        "description": "Displays detailed movie information with poster and metadata",
+    "split_horizontal": {
+        "name": "Ecran Divise",
+        "description": "Affiche a gauche, informations detaillees a droite (realisateur, genres, resume, note, votes)",
         "template_type": TemplateType.MOVIE_INFO,
         "is_builtin": True,
         "layout": {
+            "style": "split-horizontal",
             "components": [
-                {"type": "backdrop", "opacity": 0.2, "blur": 20},
-                {"type": "poster", "position": "left", "size": "medium"},
-                {"type": "title", "position": "top-right"},
-                {"type": "metadata", "fields": ["year", "runtime", "rating"]},
-                {"type": "overview", "max_lines": 5},
-                {"type": "cast", "limit": 5},
+                {"type": "poster", "position": "left", "size": "40%"},
+                {"type": "info_panel", "position": "right"},
+                {"type": "title", "size": "xlarge"},
+                {"type": "tagline", "style": "italic"},
+                {"type": "genres"},
+                {"type": "directors"},
+                {"type": "cast", "limit": 4},
+                {"type": "overview", "max_lines": 4},
+                {"type": "metadata", "fields": ["year", "runtime", "rating", "votes"]},
+                {"type": "countdown", "size": "large", "style": "prominent"},
+                {"type": "session_info", "fields": ["name", "scheduled_at"]},
             ]
         },
         "config": {
+            "show_seconds": True,
             "show_rating": True,
+            "show_votes": True,
             "show_genres": True,
-            "animate_entry": True,
+            "show_director": True,
+            "show_overview": True,
+            "use_palette_colors": True,
         },
     },
-    "session_status": {
-        "name": "Session Status",
-        "description": "Shows current session progress and sequence information",
-        "template_type": TemplateType.SESSION_STATUS,
+    "cinema_classic": {
+        "name": "Cinema Classique",
+        "description": "Style cinema retro avec texte defilant et effets lumineux",
+        "template_type": TemplateType.MOVIE_INFO,
         "is_builtin": True,
         "layout": {
+            "style": "cinema-marquee",
             "components": [
-                {"type": "session_progress"},
-                {"type": "current_sequence"},
-                {"type": "upcoming_sequences", "limit": 3},
+                {"type": "backdrop", "opacity": 0.2, "blur": 20},
+                {"type": "marquee", "position": "top", "text": "title", "speed": "slow"},
+                {"type": "poster", "position": "center", "size": "large"},
+                {"type": "blink", "position": "corners", "text": "countdown_short"},
+                {"type": "marquee", "position": "bottom", "text": "session_name", "speed": "medium"},
             ]
         },
         "config": {
-            "show_elapsed_time": True,
-            "show_remaining_time": True,
+            "enable_glow_effects": True,
+            "blink_interval": 800,
+            "marquee_speed": 40,
+        },
+    },
+    "minimal_countdown": {
+        "name": "Compte a Rebours Minimal",
+        "description": "Design minimaliste centre sur le compte a rebours",
+        "template_type": TemplateType.COUNTDOWN,
+        "is_builtin": True,
+        "layout": {
+            "style": "minimal-center",
+            "components": [
+                {"type": "backdrop", "opacity": 0.1, "blur": 50},
+                {"type": "session_info", "position": "top-center", "fields": ["name"]},
+                {"type": "countdown", "position": "center", "size": "giant"},
+                {"type": "title", "position": "bottom-center", "size": "medium"},
+                {"type": "poster", "position": "bottom-right", "size": "thumbnail"},
+            ]
+        },
+        "config": {
+            "show_seconds": True,
+            "animate_numbers": True,
+        },
+    },
+    "modern_gradient": {
+        "name": "Moderne Degrade",
+        "description": "Design moderne avec degrade et typographie elegante",
+        "template_type": TemplateType.MOVIE_INFO,
+        "is_builtin": True,
+        "layout": {
+            "style": "modern-gradient",
+            "components": [
+                {"type": "backdrop", "opacity": 0.5, "gradient": "left-to-right"},
+                {"type": "poster", "position": "right", "size": "full-height", "shadow": True},
+                {"type": "title", "position": "left", "size": "xlarge", "weight": "bold"},
+                {"type": "tagline", "style": "italic"},
+                {"type": "metadata", "fields": ["year", "runtime", "rating"]},
+                {"type": "countdown", "size": "large"},
+                {"type": "session_info", "position": "top-left", "fields": ["name", "scheduled_at"]},
+            ]
+        },
+        "config": {
+            "gradient_direction": "to-right",
+            "gradient_opacity": 0.8,
+            "use_palette_colors": True,
+            "font_family": "modern",
+            "text_shadow": True,
+            "card_style": "glass",
+            "show_logo": True,
         },
     },
 }

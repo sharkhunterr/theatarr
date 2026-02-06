@@ -13,6 +13,8 @@ from theatarr.models.base import TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
     from theatarr.models.sequence import Sequence
+    from theatarr.models.template import Template
+    from theatarr.models.vote import VoteSession
 
 
 class SessionStatus(str, Enum):
@@ -24,6 +26,14 @@ class SessionStatus(str, Enum):
     PAUSED = "paused"
     COMPLETED = "completed"
     INTERRUPTED = "interrupted"
+
+
+class MovieSelectionMode(str, Enum):
+    """Mode for selecting the movie for a session."""
+
+    FIXED = "fixed"      # Movie is directly selected (current behavior)
+    VOTE = "vote"        # Movie is determined by vote session result
+    MYSTERY = "mystery"  # Movie is revealed at a specific time
 
 
 class Session(UUIDMixin, TimestampMixin, Base):
@@ -108,12 +118,58 @@ class Session(UUIDMixin, TimestampMixin, Base):
         nullable=True,
     )
 
+    # Movie selection mode fields
+    movie_selection_mode: Mapped[str] = mapped_column(
+        String(20),
+        default=MovieSelectionMode.FIXED.value,
+        nullable=False,
+    )
+    linked_vote_session_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("vote_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    mystery_reveal_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    mystery_config: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    movie_resolved: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    movie_resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # Template override (if None, uses the globally active template)
+    template_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     # Relationships
     sequences: Mapped[list["Sequence"]] = relationship(
         "Sequence",
         back_populates="session",
         cascade="all, delete-orphan",
         order_by="Sequence.order_index",
+        lazy="selectin",
+    )
+    linked_vote_session: Mapped["VoteSession | None"] = relationship(
+        "VoteSession",
+        foreign_keys=[linked_vote_session_id],
+        lazy="selectin",
+    )
+    template: Mapped["Template | None"] = relationship(
+        "Template",
+        foreign_keys=[template_id],
         lazy="selectin",
     )
 

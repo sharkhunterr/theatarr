@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from theatarr.config import settings
-from theatarr.models.session import Session, SessionStatus
+from theatarr.models.session import MovieSelectionMode, Session, SessionStatus
 from theatarr.services.engine import SequenceEngine, get_engine
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,7 @@ class SessionScheduler:
         while self._running:
             try:
                 await self._check_scheduled_sessions()
+                await self._check_mystery_reveals()
                 await asyncio.sleep(self._check_interval)
             except asyncio.CancelledError:
                 break
@@ -85,6 +86,32 @@ class SessionScheduler:
                 await engine.start_session(session.id)
             except Exception as e:
                 logger.exception(f"Failed to start scheduled session {session.id}: {e}")
+
+    async def _check_mystery_reveals(self) -> None:
+        """Check and reveal any mystery movies that are due."""
+        from theatarr.services.movie_resolution import (
+            resolve_mystery_movie,
+            MovieResolutionError,
+        )
+
+        now = datetime.now(timezone.utc)
+
+        # Find mystery sessions due for reveal
+        result = await self.db.execute(
+            select(Session).where(
+                Session.movie_selection_mode == MovieSelectionMode.MYSTERY.value,
+                Session.movie_resolved == False,
+                Session.mystery_reveal_at <= now,
+            )
+        )
+        sessions = result.scalars().all()
+
+        for session in sessions:
+            try:
+                logger.info(f"Revealing mystery movie for session: {session.id} ({session.name})")
+                await resolve_mystery_movie(self.db, session)
+            except MovieResolutionError as e:
+                logger.exception(f"Failed to reveal mystery movie for session {session.id}: {e}")
 
     async def _auto_resume_interrupted_sessions(self) -> None:
         """Auto-resume sessions that were interrupted (e.g., by system restart)."""

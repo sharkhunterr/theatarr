@@ -41,6 +41,8 @@ interface VoteSession {
   closes_at?: string;
   winning_movie_index?: number;
   created_at: string;
+  linked_session_id?: string;
+  linked_session_name?: string;
 }
 
 interface VoteToken {
@@ -70,10 +72,10 @@ export function VoteSessionManager() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const t = {
-    title: language === 'fr' ? 'Sessions de vote' : 'Vote Sessions',
-    subtitle: language === 'fr' ? 'Créez et gérez les sessions de vote pour vos films' : 'Create and manage movie voting sessions',
-    createButton: language === 'fr' ? 'Nouvelle session' : 'New Session',
-    all: language === 'fr' ? 'Toutes' : 'All',
+    title: language === 'fr' ? 'Votes' : 'Votes',
+    subtitle: language === 'fr' ? 'Créez et gérez les votes pour vos films' : 'Create and manage movie votes',
+    createButton: language === 'fr' ? 'Nouveau vote' : 'New Vote',
+    all: language === 'fr' ? 'Tous' : 'All',
     draft: language === 'fr' ? 'Brouillon' : 'Draft',
     open: language === 'fr' ? 'Ouvert' : 'Open',
     closed: language === 'fr' ? 'Fermé' : 'Closed',
@@ -84,13 +86,14 @@ export function VoteSessionManager() {
     tokens: language === 'fr' ? 'Liens' : 'Links',
     results: language === 'fr' ? 'Résultats' : 'Results',
     delete: language === 'fr' ? 'Supprimer' : 'Delete',
-    noSessions: language === 'fr' ? 'Aucune session de vote' : 'No vote sessions',
-    createFirst: language === 'fr' ? 'Créer votre première session' : 'Create Your First Session',
+    noSessions: language === 'fr' ? 'Aucun vote' : 'No votes',
+    createFirst: language === 'fr' ? 'Créer votre premier vote' : 'Create Your First Vote',
     generateTokens: language === 'fr' ? 'Générer 5 liens' : 'Generate 5 Links',
     noTokens: language === 'fr' ? 'Aucun lien généré. Cliquez sur "Générer" pour créer des liens de vote.' : 'No links generated yet. Click "Generate" to create vote links.',
     totalVotes: language === 'fr' ? 'Votes totaux' : 'Total Votes',
     closesAt: language === 'fr' ? 'Ferme le' : 'Closes',
     copied: language === 'fr' ? 'Copié !' : 'Copied!',
+    linkedToSession: language === 'fr' ? 'Lié à la séance' : 'Linked to session',
   };
 
   const { data, isLoading, error } = useQuery<VoteSessionListResponse>({
@@ -194,14 +197,14 @@ export function VoteSessionManager() {
     return (
       <div className="p-4">
         <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400">
-          {language === 'fr' ? 'Erreur lors du chargement des sessions' : 'Failed to load vote sessions'}
+          {language === 'fr' ? 'Erreur lors du chargement des votes' : 'Failed to load votes'}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
@@ -284,6 +287,16 @@ export function VoteSessionManager() {
                       >
                         {session.status === 'draft' ? t.draft : session.status === 'open' ? t.open : t.closed}
                       </span>
+                      {session.linked_session_id && (
+                        <a
+                          href={`/sessions/${session.linked_session_id}`}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-theatarr-500/20 text-theatarr-400 border border-theatarr-500/30 hover:bg-theatarr-500/30 transition-colors"
+                          title={session.linked_session_name || t.linkedToSession}
+                        >
+                          <Link2 size={10} />
+                          {session.linked_session_name || t.linkedToSession}
+                        </a>
+                      )}
                     </div>
                     {session.description && (
                       <p className="text-dark-muted text-sm mb-2 line-clamp-1">{session.description}</p>
@@ -381,7 +394,7 @@ export function VoteSessionManager() {
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title={language === 'fr' ? 'Nouvelle session de vote' : 'New Vote Session'}
+        title={language === 'fr' ? 'Nouveau vote' : 'New Vote'}
         size="lg"
       >
         <VoteSessionForm

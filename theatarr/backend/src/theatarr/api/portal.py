@@ -133,15 +133,8 @@ async def get_my_stats(
     user: CurrentUser,
 ) -> PortalStatsResponse:
     """Get current user's statistics for portal home."""
-    now = datetime.now(timezone.utc)
-
-    # Count pending votes
-    pending_votes_query = select(func.count(VoteSessionParticipant.id)).where(
-        VoteSessionParticipant.user_id == user.id,
-        VoteSessionParticipant.has_voted == False,
-    )
-    # Join to check vote session is open
-    pending_votes_query = (
+    # Count pending votes from direct participation
+    direct_pending_query = (
         select(func.count(VoteSessionParticipant.id))
         .join(VoteSession)
         .where(
@@ -150,8 +143,33 @@ async def get_my_stats(
             VoteSession.status == VoteSessionStatus.OPEN,
         )
     )
-    pending_votes_result = await db.execute(pending_votes_query)
-    pending_votes = pending_votes_result.scalar() or 0
+    direct_pending_result = await db.execute(direct_pending_query)
+    pending_votes = direct_pending_result.scalar() or 0
+
+    # Also count pending votes from session-linked vote sessions
+    session_linked_query = (
+        select(VoteSession.id)
+        .join(Session, VoteSession.linked_session_id == Session.id)
+        .join(SessionParticipant)
+        .where(
+            SessionParticipant.user_id == user.id,
+            VoteSession.linked_session_id.isnot(None),
+            VoteSession.status == VoteSessionStatus.OPEN,
+        )
+    )
+    session_linked_result = await db.execute(session_linked_query)
+    session_linked_vote_ids = [row[0] for row in session_linked_result.all()]
+
+    # Check which session-linked votes user hasn't voted in
+    for vs_id in session_linked_vote_ids:
+        vote_check = await db.execute(
+            select(Vote).where(
+                Vote.vote_session_id == vs_id,
+                Vote.voter_identifier == f"user:{user.id}",
+            )
+        )
+        if vote_check.scalar_one_or_none() is None:
+            pending_votes += 1
 
     # Count upcoming sessions
     upcoming_sessions_query = (
@@ -179,10 +197,9 @@ async def get_my_stats(
     total_sessions_result = await db.execute(total_sessions_query)
     total_sessions_attended = total_sessions_result.scalar() or 0
 
-    # Count total votes cast
-    total_votes_query = select(func.count(VoteSessionParticipant.id)).where(
-        VoteSessionParticipant.user_id == user.id,
-        VoteSessionParticipant.has_voted == True,
+    # Count total votes cast by this user (using Vote table for accuracy)
+    total_votes_query = select(func.count(Vote.id)).where(
+        Vote.voter_identifier == f"user:{user.id}",
     )
     total_votes_result = await db.execute(total_votes_query)
     total_votes_cast = total_votes_result.scalar() or 0
@@ -230,6 +247,16 @@ async def get_my_sessions(
     items = []
     for p in participations:
         session = p.session
+        # Check if linked vote session is open
+        linked_vote_is_open = None
+        if session.linked_vote_session_id:
+            vote_result = await db.execute(
+                select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
+            )
+            linked_vote = vote_result.scalar_one_or_none()
+            if linked_vote:
+                linked_vote_is_open = linked_vote.is_open
+
         items.append(
             PortalSessionSummary(
                 id=session.id,
@@ -239,6 +266,10 @@ async def get_my_sessions(
                 status=session.status.value if isinstance(session.status, SessionStatus) else session.status,
                 scheduled_at=session.scheduled_at,
                 invitation_status=p.invitation_status,
+                movie_selection_mode=session.movie_selection_mode,
+                movie_resolved=session.movie_resolved,
+                linked_vote_session_id=session.linked_vote_session_id,
+                linked_vote_is_open=linked_vote_is_open,
             )
         )
 
@@ -280,6 +311,17 @@ async def get_session_detail(
         raise NotFoundError("Session", session_id)
 
     session = participation.session
+
+    # Check if linked vote session is open
+    linked_vote_is_open = None
+    if session.linked_vote_session_id:
+        vote_result = await db.execute(
+            select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
+        )
+        linked_vote = vote_result.scalar_one_or_none()
+        if linked_vote:
+            linked_vote_is_open = linked_vote.is_open
+
     return PortalSessionDetail(
         id=session.id,
         name=session.name,
@@ -294,6 +336,10 @@ async def get_session_detail(
         completed_at=session.completed_at,
         invitation_status=participation.invitation_status,
         responded_at=participation.responded_at,
+        movie_selection_mode=session.movie_selection_mode,
+        movie_resolved=session.movie_resolved,
+        linked_vote_session_id=session.linked_vote_session_id,
+        linked_vote_is_open=linked_vote_is_open,
     )
 
 
@@ -348,23 +394,45 @@ async def get_my_votes(
     skip: int = 0,
     limit: int = 20,
 ) -> PortalVoteListResponse:
-    """Get vote sessions where the current user is a participant."""
-    query = (
+    """Get vote sessions where the current user is a participant.
+
+    This includes:
+    1. Vote sessions where user is a direct participant
+    2. Vote sessions linked to cinema sessions where user is a participant
+    """
+    # Get vote sessions from direct participation
+    direct_query = (
         select(VoteSessionParticipant)
         .options(selectinload(VoteSessionParticipant.vote_session))
         .where(VoteSessionParticipant.user_id == user.id)
-        .order_by(VoteSessionParticipant.invited_at.desc())
-        .offset(skip)
-        .limit(limit)
     )
+    direct_result = await db.execute(direct_query)
+    direct_participations = direct_result.scalars().all()
 
-    result = await db.execute(query)
-    participations = result.scalars().all()
+    # Get vote sessions linked to cinema sessions where user is a participant
+    session_linked_query = (
+        select(VoteSession)
+        .join(Session, VoteSession.linked_session_id == Session.id)
+        .join(SessionParticipant)
+        .where(
+            SessionParticipant.user_id == user.id,
+            VoteSession.linked_session_id.isnot(None),
+        )
+    )
+    session_linked_result = await db.execute(session_linked_query)
+    session_linked_votes = session_linked_result.scalars().all()
 
+    # Combine and deduplicate
+    seen_vote_session_ids = set()
     items = []
-    for p in participations:
+
+    # Add direct participations
+    for p in direct_participations:
         vs = p.vote_session
-        # Get first 3 movie options for preview
+        if vs.id in seen_vote_session_ids:
+            continue
+        seen_vote_session_ids.add(vs.id)
+
         movie_options = vs.movie_options or []
         preview = movie_options[:3]
 
@@ -380,12 +448,39 @@ async def get_my_votes(
             )
         )
 
-    # Get total count
-    count_query = select(func.count(VoteSessionParticipant.id)).where(
-        VoteSessionParticipant.user_id == user.id
-    )
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
+    # Add session-linked vote sessions (where user may not be direct participant)
+    for vs in session_linked_votes:
+        if vs.id in seen_vote_session_ids:
+            continue
+        seen_vote_session_ids.add(vs.id)
+
+        movie_options = vs.movie_options or []
+        preview = movie_options[:3]
+
+        # Check if user has voted in this session
+        vote_check = await db.execute(
+            select(Vote).where(
+                Vote.vote_session_id == vs.id,
+                Vote.voter_identifier == f"user:{user.id}",
+            )
+        )
+        has_voted = vote_check.scalar_one_or_none() is not None
+
+        items.append(
+            PortalVoteSessionSummary(
+                id=vs.id,
+                name=vs.name,
+                description=vs.description,
+                movie_options_preview=preview,
+                has_voted=has_voted,
+                closes_at=vs.closes_at,
+                status=vs.status.value if isinstance(vs.status, VoteSessionStatus) else vs.status,
+            )
+        )
+
+    # Sort by created_at desc and paginate
+    total = len(items)
+    items = items[skip : skip + limit]
 
     return PortalVoteListResponse(items=items, total=total)
 
@@ -399,8 +494,14 @@ async def get_pending_votes(
     db: DbSession,
     user: CurrentUser,
 ) -> PortalVoteListResponse:
-    """Get vote sessions where the user hasn't voted yet and voting is open."""
-    query = (
+    """Get vote sessions where the user hasn't voted yet and voting is open.
+
+    This includes:
+    1. Vote sessions where user is a direct participant and hasn't voted
+    2. Vote sessions linked to cinema sessions where user is a participant and hasn't voted
+    """
+    # Get pending from direct participation
+    direct_query = (
         select(VoteSessionParticipant)
         .options(selectinload(VoteSessionParticipant.vote_session))
         .join(VoteSession)
@@ -411,13 +512,33 @@ async def get_pending_votes(
         )
         .order_by(VoteSession.closes_at.asc())
     )
+    direct_result = await db.execute(direct_query)
+    direct_participations = direct_result.scalars().all()
 
-    result = await db.execute(query)
-    participations = result.scalars().all()
+    # Get pending from session-linked votes
+    session_linked_query = (
+        select(VoteSession)
+        .join(Session, VoteSession.linked_session_id == Session.id)
+        .join(SessionParticipant)
+        .where(
+            SessionParticipant.user_id == user.id,
+            VoteSession.linked_session_id.isnot(None),
+            VoteSession.status == VoteSessionStatus.OPEN,
+        )
+    )
+    session_linked_result = await db.execute(session_linked_query)
+    session_linked_votes = session_linked_result.scalars().all()
 
+    # Combine and deduplicate
+    seen_vote_session_ids = set()
     items = []
-    for p in participations:
+
+    for p in direct_participations:
         vs = p.vote_session
+        if vs.id in seen_vote_session_ids:
+            continue
+        seen_vote_session_ids.add(vs.id)
+
         movie_options = vs.movie_options or []
         preview = movie_options[:3]
 
@@ -428,6 +549,37 @@ async def get_pending_votes(
                 description=vs.description,
                 movie_options_preview=preview,
                 has_voted=p.has_voted,
+                closes_at=vs.closes_at,
+                status=vs.status.value if isinstance(vs.status, VoteSessionStatus) else vs.status,
+            )
+        )
+
+    # Add session-linked where user hasn't voted
+    for vs in session_linked_votes:
+        if vs.id in seen_vote_session_ids:
+            continue
+
+        # Check if user has voted
+        vote_check = await db.execute(
+            select(Vote).where(
+                Vote.vote_session_id == vs.id,
+                Vote.voter_identifier == f"user:{user.id}",
+            )
+        )
+        if vote_check.scalar_one_or_none() is not None:
+            continue  # Already voted
+
+        seen_vote_session_ids.add(vs.id)
+        movie_options = vs.movie_options or []
+        preview = movie_options[:3]
+
+        items.append(
+            PortalVoteSessionSummary(
+                id=vs.id,
+                name=vs.name,
+                description=vs.description,
+                movie_options_preview=preview,
+                has_voted=False,
                 closes_at=vs.closes_at,
                 status=vs.status.value if isinstance(vs.status, VoteSessionStatus) else vs.status,
             )
@@ -446,8 +598,13 @@ async def get_vote_detail(
     user: CurrentUser,
     vote_session_id: str,
 ) -> PortalVoteSessionDetail:
-    """Get detailed vote session info for a participant."""
-    # Check if user is a participant
+    """Get detailed vote session info for a participant.
+
+    Access is allowed if user is:
+    1. A direct vote session participant
+    2. A participant in a cinema session linked to this vote session
+    """
+    # Check if user is a direct vote session participant
     result = await db.execute(
         select(VoteSessionParticipant)
         .options(selectinload(VoteSessionParticipant.vote_session))
@@ -458,23 +615,38 @@ async def get_vote_detail(
     )
     participation = result.scalar_one_or_none()
 
-    if not participation:
-        raise NotFoundError("Vote session", vote_session_id)
+    has_access = participation is not None
+    vs = None
 
-    vs = participation.vote_session
-
-    # Get user's vote if they voted
-    my_vote_index = None
-    if participation.has_voted:
-        vote_result = await db.execute(
-            select(Vote).where(
-                Vote.vote_session_id == vote_session_id,
-                Vote.voter_identifier == f"user:{user.id}",
+    if participation:
+        vs = participation.vote_session
+    else:
+        # Check if vote session is linked to a session where user is a participant
+        linked_result = await db.execute(
+            select(VoteSession)
+            .join(Session, VoteSession.linked_session_id == Session.id)
+            .join(SessionParticipant)
+            .where(
+                VoteSession.id == vote_session_id,
+                SessionParticipant.user_id == user.id,
             )
         )
-        my_vote = vote_result.scalar_one_or_none()
-        if my_vote:
-            my_vote_index = my_vote.movie_index
+        vs = linked_result.scalar_one_or_none()
+        has_access = vs is not None
+
+    if not has_access or not vs:
+        raise NotFoundError("Vote session", vote_session_id)
+
+    # Get user's vote if they voted
+    vote_result = await db.execute(
+        select(Vote).where(
+            Vote.vote_session_id == vote_session_id,
+            Vote.voter_identifier == f"user:{user.id}",
+        )
+    )
+    my_vote = vote_result.scalar_one_or_none()
+    my_vote_index = my_vote.movie_index if my_vote else None
+    has_voted = my_vote is not None
 
     # Get results if allowed
     show_results = vs.show_results_during_voting or vs.status == VoteSessionStatus.CLOSED
@@ -493,7 +665,7 @@ async def get_vote_detail(
         name=vs.name,
         description=vs.description,
         movie_options=vs.movie_options or [],
-        has_voted=participation.has_voted,
+        has_voted=has_voted,
         my_vote_index=my_vote_index,
         show_results=show_results,
         results=results,
@@ -514,8 +686,13 @@ async def cast_vote(
     vote_session_id: str,
     data: PortalVoteCast,
 ) -> PortalVoteResponse:
-    """Cast a vote as an authenticated user."""
-    # Check if user is a participant
+    """Cast a vote as an authenticated user.
+
+    Access is allowed if user is:
+    1. A direct vote session participant
+    2. A participant in a cinema session linked to this vote session
+    """
+    # Check if user is a direct vote session participant
     result = await db.execute(
         select(VoteSessionParticipant)
         .options(selectinload(VoteSessionParticipant.vote_session))
@@ -526,10 +703,27 @@ async def cast_vote(
     )
     participation = result.scalar_one_or_none()
 
-    if not participation:
-        raise NotFoundError("Vote session", vote_session_id)
+    vs = None
+    is_session_linked_access = False
 
-    vs = participation.vote_session
+    if participation:
+        vs = participation.vote_session
+    else:
+        # Check if vote session is linked to a session where user is a participant
+        linked_result = await db.execute(
+            select(VoteSession)
+            .join(Session, VoteSession.linked_session_id == Session.id)
+            .join(SessionParticipant)
+            .where(
+                VoteSession.id == vote_session_id,
+                SessionParticipant.user_id == user.id,
+            )
+        )
+        vs = linked_result.scalar_one_or_none()
+        is_session_linked_access = vs is not None
+
+    if not vs:
+        raise NotFoundError("Vote session", vote_session_id)
 
     # Check if voting is open
     if not vs.is_open:
@@ -539,7 +733,15 @@ async def cast_vote(
         )
 
     # Check if already voted
-    if participation.has_voted and not vs.allow_multiple_votes:
+    existing_vote = await db.execute(
+        select(Vote).where(
+            Vote.vote_session_id == vote_session_id,
+            Vote.voter_identifier == f"user:{user.id}",
+        )
+    )
+    has_already_voted = existing_vote.scalar_one_or_none() is not None
+
+    if has_already_voted and not vs.allow_multiple_votes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You have already voted",
@@ -561,9 +763,10 @@ async def cast_vote(
     )
     db.add(vote)
 
-    # Update participation
-    participation.has_voted = True
-    participation.voted_at = datetime.now(timezone.utc)
+    # Update direct participation if exists
+    if participation:
+        participation.has_voted = True
+        participation.voted_at = datetime.now(timezone.utc)
 
     await db.commit()
 

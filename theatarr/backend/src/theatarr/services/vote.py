@@ -224,6 +224,7 @@ async def close_voting(
     db: AsyncSession,
     vote_session: VoteSession,
     assign_winner: bool = True,
+    auto_resolve_linked: bool = True,
 ) -> VoteSession:
     """Close a vote session and optionally determine the winner.
 
@@ -231,6 +232,7 @@ async def close_voting(
         db: Database session
         vote_session: The vote session to close
         assign_winner: Whether to determine and assign the winner
+        auto_resolve_linked: Whether to auto-resolve linked session movie
 
     Returns:
         Updated VoteSession
@@ -254,6 +256,29 @@ async def close_voting(
 
     await db.commit()
     await db.refresh(vote_session)
+
+    # Auto-resolve linked session movie if enabled
+    if assign_winner and auto_resolve_linked and vote_session.linked_session_id:
+        from theatarr.models.session import Session
+        from theatarr.services.movie_resolution import (
+            resolve_vote_winner,
+            MovieResolutionError,
+        )
+
+        result = await db.execute(
+            select(Session).where(Session.id == vote_session.linked_session_id)
+        )
+        linked_session = result.scalar_one_or_none()
+
+        if linked_session and not linked_session.movie_resolved:
+            try:
+                await resolve_vote_winner(db, linked_session, vote_session)
+            except MovieResolutionError as e:
+                # Log but don't fail the close operation
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"Failed to auto-resolve movie for session {linked_session.id}: {e}"
+                )
 
     return vote_session
 

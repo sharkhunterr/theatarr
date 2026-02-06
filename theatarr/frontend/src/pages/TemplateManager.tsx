@@ -50,14 +50,13 @@ export function TemplateManager() {
   const { data, isLoading, error } = useQuery<TemplateListResponse>({
     queryKey: ['templates'],
     queryFn: async () => {
-      const response = await apiClient.get('/templates');
-      return response.data;
+      return await apiClient.get<TemplateListResponse>('/templates');
     },
   });
 
   const activateMutation = useMutation({
     mutationFn: async (templateId: string) => {
-      await apiClient.post(`/templates/${templateId}/activate`);
+      await apiClient.post(`/templates/${templateId}/activate`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
@@ -75,7 +74,7 @@ export function TemplateManager() {
 
   const initBuiltinsMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.post('/templates/init-builtins');
+      await apiClient.post('/templates/init-builtins', {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });

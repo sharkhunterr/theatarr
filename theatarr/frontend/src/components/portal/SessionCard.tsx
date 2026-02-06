@@ -2,7 +2,7 @@
  * Session card component for portal.
  */
 
-import { Calendar, Check, X, Clock } from 'lucide-react';
+import { Calendar, Check, X, Clock, Vote, Shuffle, Trophy, Sparkles, Film } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -14,6 +14,10 @@ interface SessionCardProps {
   status: string;
   scheduledAt?: string | null;
   invitationStatus: string;
+  movieSelectionMode?: string | null;
+  movieResolved?: boolean;
+  linkedVoteSessionId?: string | null;
+  linkedVoteIsOpen?: boolean | null;
 }
 
 export function SessionCard({
@@ -24,6 +28,10 @@ export function SessionCard({
   status,
   scheduledAt,
   invitationStatus,
+  movieSelectionMode,
+  movieResolved,
+  linkedVoteSessionId,
+  linkedVoteIsOpen,
 }: SessionCardProps) {
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -59,6 +67,50 @@ export function SessionCard({
 
   const InvitationIcon = invitationIcons[invitationStatus] || Clock;
 
+  // Get movie display info based on selection mode
+  const getMovieDisplayInfo = () => {
+    const mode = movieSelectionMode || 'fixed';
+
+    if (mode === 'vote') {
+      if (movieResolved && movieTitle) {
+        return {
+          text: movieTitle,
+          icon: <Trophy size={14} className="text-yellow-500" />,
+          showVoteLink: false,
+        };
+      }
+      return {
+        text: 'En attente du vote',
+        icon: <Vote size={14} className="text-blue-400" />,
+        showVoteLink: linkedVoteSessionId && linkedVoteIsOpen,
+      };
+    }
+
+    if (mode === 'mystery') {
+      if (movieResolved && movieTitle) {
+        return {
+          text: movieTitle,
+          icon: <Sparkles size={14} className="text-purple-400" />,
+          showVoteLink: false,
+        };
+      }
+      return {
+        text: 'Film mystère',
+        icon: <Shuffle size={14} className="text-purple-400 animate-pulse" />,
+        showVoteLink: false,
+      };
+    }
+
+    // Fixed mode
+    return {
+      text: movieTitle || 'Film non sélectionné',
+      icon: <Film size={14} className="text-dark-muted" />,
+      showVoteLink: false,
+    };
+  };
+
+  const movieInfo = getMovieDisplayInfo();
+
   return (
     <Link
       to={`/portal/sessions/${id}`}
@@ -84,8 +136,19 @@ export function SessionCard({
         <div className="flex-1 p-3 flex flex-col justify-between">
           <div>
             <h3 className="font-medium text-dark-text line-clamp-1">{name}</h3>
-            {movieTitle && (
-              <p className="text-sm text-dark-muted line-clamp-1">{movieTitle}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {movieInfo.icon}
+              <p className="text-sm text-dark-muted line-clamp-1">{movieInfo.text}</p>
+            </div>
+            {movieInfo.showVoteLink && linkedVoteSessionId && (
+              <Link
+                to={`/portal/votes/${linkedVoteSessionId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 text-xs font-medium rounded-full bg-theatarr-500/20 text-theatarr-400 border border-theatarr-500/30 hover:bg-theatarr-500/30 transition-colors"
+              >
+                <Vote size={10} />
+                Voter maintenant
+              </Link>
             )}
           </div>
 

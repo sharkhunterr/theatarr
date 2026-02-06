@@ -66,8 +66,15 @@ class VoteSession(Base, UUIDMixin, TimestampMixin):
     )
     winning_movie_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    # Link to session that will use the winner
+    # Link to session that will use the winner (legacy field)
     target_session_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Bidirectional link to session using vote mode
+    linked_session_id: Mapped[str | None] = mapped_column(
         String(36),
         ForeignKey("sessions.id", ondelete="SET NULL"),
         nullable=True,

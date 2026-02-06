@@ -197,24 +197,19 @@ export function UsersPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-theatarr-500/20 flex items-center justify-center">
-            <Users className="text-theatarr-500" size={20} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-dark-text">Utilisateurs</h1>
-            <p className="text-sm text-dark-muted">
-              {data?.total || 0} utilisateur{(data?.total || 0) !== 1 ? 's' : ''}
-            </p>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-dark-text">Utilisateurs</h1>
+          <p className="text-dark-muted text-sm mt-1">
+            {data?.total || 0} utilisateur{(data?.total || 0) !== 1 ? 's' : ''} enregistre{(data?.total || 0) !== 1 ? 's' : ''}
+          </p>
         </div>
 
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-theatarr-500 text-white rounded-lg font-medium hover:bg-theatarr-600 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-theatarr-600 text-white rounded-lg font-medium hover:bg-theatarr-700 transition-colors"
         >
           <Plus size={18} />
           <span className="hidden sm:inline">Nouvel utilisateur</span>
@@ -222,7 +217,7 @@ export function UsersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
           <input
@@ -365,7 +360,7 @@ export function UsersPage() {
               </p>
               <button
                 onClick={openCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-theatarr-500 text-white rounded-lg font-medium hover:bg-theatarr-600 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-theatarr-600 text-white rounded-lg font-medium hover:bg-theatarr-700 transition-colors"
               >
                 <Plus size={18} />
                 Nouvel utilisateur
@@ -477,7 +472,7 @@ export function UsersPage() {
               <button
                 onClick={handleSubmit}
                 disabled={createUserMutation.isPending || updateUserMutation.isPending}
-                className="flex-1 py-2 bg-theatarr-500 text-white rounded-lg font-medium hover:bg-theatarr-600 transition-colors disabled:opacity-50"
+                className="flex-1 py-2 bg-theatarr-600 text-white rounded-lg font-medium hover:bg-theatarr-700 transition-colors disabled:opacity-50"
               >
                 {createUserMutation.isPending || updateUserMutation.isPending
                   ? 'Enregistrement...'
@@ -541,7 +536,7 @@ export function UsersPage() {
                   }
                 }}
                 disabled={newPassword.length < 6 || changePasswordMutation.isPending}
-                className="flex-1 py-2 bg-theatarr-500 text-white rounded-lg font-medium hover:bg-theatarr-600 transition-colors disabled:opacity-50"
+                className="flex-1 py-2 bg-theatarr-600 text-white rounded-lg font-medium hover:bg-theatarr-700 transition-colors disabled:opacity-50"
               >
                 {changePasswordMutation.isPending ? 'Changement...' : 'Changer'}
               </button>

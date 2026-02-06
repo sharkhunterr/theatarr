@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { SessionsPage } from './pages/SessionsPage';
-import { SessionPage } from './pages/SessionPage';
 import { SessionEditor } from './pages/SessionEditor';
 import { ServicesConfig } from './pages/ServicesConfig';
 import { WallmountPage } from './pages/WallmountPage';
@@ -132,6 +131,7 @@ function AppRoutes() {
     <Routes>
       {/* Public routes */}
       <Route path="/wallmount" element={<WallmountPage />} />
+      <Route path="/wallmount/:sessionId" element={<WallmountPage />} />
       <Route path="/vote/:token" element={<VotePage />} />
       <Route path="/login" element={<Login />} />
 
@@ -157,14 +157,6 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <SessionEditor />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/sessions/:id"
-        element={
-          <RequireAuth>
-            <SessionPage />
           </RequireAuth>
         }
       />

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Play, Pause, Clock, Film } from 'lucide-react';
+import { Play, Pause, Clock, Film, Vote, Shuffle, Trophy, Sparkles, ExternalLink } from 'lucide-react';
 import { Card, CardContent } from '../common';
 import { Session, SessionStatus } from '../../stores/sessionStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -27,9 +27,69 @@ const statusLabels: Record<SessionStatus, string> = {
   interrupted: 'Interrupted',
 };
 
+function getMovieDisplayInfo(session: Session): {
+  text: string;
+  icon: React.ReactNode;
+  className: string;
+} {
+  const mode = session.movie_selection_mode || 'fixed';
+
+  if (mode === 'fixed') {
+    if (session.movie_title) {
+      return {
+        text: session.movie_title,
+        icon: <Film size={14} />,
+        className: 'text-dark-text',
+      };
+    }
+    return {
+      text: 'No movie selected',
+      icon: <Film size={14} />,
+      className: 'text-dark-muted',
+    };
+  }
+
+  if (mode === 'vote') {
+    if (session.movie_resolved && session.movie_title) {
+      return {
+        text: session.movie_title,
+        icon: <Trophy size={14} className="text-yellow-500" />,
+        className: 'text-dark-text',
+      };
+    }
+    return {
+      text: 'Awaiting vote results',
+      icon: <Vote size={14} className="text-blue-400" />,
+      className: 'text-blue-400',
+    };
+  }
+
+  if (mode === 'mystery') {
+    if (session.movie_resolved && session.movie_title) {
+      return {
+        text: session.movie_title,
+        icon: <Sparkles size={14} className="text-purple-400" />,
+        className: 'text-dark-text',
+      };
+    }
+    return {
+      text: 'Mystery movie',
+      icon: <Shuffle size={14} className="text-purple-400 animate-pulse" />,
+      className: 'text-purple-400',
+    };
+  }
+
+  return {
+    text: 'Unknown',
+    icon: <Film size={14} />,
+    className: 'text-dark-muted',
+  };
+}
+
 export function SessionCard({ session, onPlay }: SessionCardProps) {
   const canPlay = session.status === 'draft' || session.status === 'paused';
   const isRunning = session.status === 'running';
+  const movieInfo = getMovieDisplayInfo(session);
 
   return (
     <Card variant="interactive" className="group">
@@ -44,6 +104,23 @@ export function SessionCard({ session, onPlay }: SessionCardProps) {
                 <Film size={14} />
                 <span>{session.total_sequences} sequences</span>
               </div>
+              {/* Movie display based on selection mode */}
+              <div className={`flex items-center gap-2 mt-1 text-sm ${movieInfo.className}`}>
+                {movieInfo.icon}
+                <span className="truncate">{movieInfo.text}</span>
+              </div>
+              {/* Vote session link badge */}
+              {session.linked_vote_session_id && (
+                <Link
+                  to={`/votes`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 mt-2 px-2 py-1 text-xs font-medium rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+                >
+                  <Vote size={12} />
+                  {session.movie_resolved ? 'Vote terminé' : 'Voter'}
+                  <ExternalLink size={10} />
+                </Link>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

@@ -18,6 +18,11 @@ class PortalSessionSummary(BaseSchema):
     status: str
     scheduled_at: datetime | None
     invitation_status: str
+    # Movie selection mode
+    movie_selection_mode: str | None = None
+    movie_resolved: bool = False
+    linked_vote_session_id: str | None = None
+    linked_vote_is_open: bool | None = None
 
 
 class PortalSessionDetail(BaseSchema):
@@ -36,6 +41,11 @@ class PortalSessionDetail(BaseSchema):
     completed_at: datetime | None
     invitation_status: str
     responded_at: datetime | None
+    # Movie selection mode
+    movie_selection_mode: str | None = None
+    movie_resolved: bool = False
+    linked_vote_session_id: str | None = None
+    linked_vote_is_open: bool | None = None
 
 
 class PortalSessionListResponse(BaseSchema):

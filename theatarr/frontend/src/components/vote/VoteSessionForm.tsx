@@ -28,7 +28,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
     },
     onError: (error: any) => {
       console.error('Create vote session error:', error);
-      const message = error?.message || 'Erreur lors de la création de la session de vote';
+      const message = error?.message || 'Erreur lors de la création du vote';
       setErrorMessage(message);
     },
   });
@@ -197,7 +197,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
           type="submit"
           disabled={createMutation.isPending || !name || movieOptions.length < 2}
         >
-          {createMutation.isPending ? 'Création...' : 'Créer la session de vote'}
+          {createMutation.isPending ? 'Création...' : 'Créer le vote'}
         </Button>
       </div>
     </form>

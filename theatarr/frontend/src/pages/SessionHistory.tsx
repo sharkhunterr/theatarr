@@ -93,7 +93,7 @@ export function SessionHistory() {
       case 'stopped':
         return <XCircle size={16} className="text-red-400" />;
       default:
-        return <Clock size={16} className="text-gray-400" />;
+        return <Clock size={16} className="text-dark-muted" />;
     }
   };
 
@@ -113,27 +113,27 @@ export function SessionHistory() {
   };
 
   return (
-    <div className="p-8">
+    <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Session History</h1>
-          <p className="text-gray-500 mt-1">View past sessions and playback statistics</p>
+          <h1 className="text-2xl font-bold text-dark-text">Historique</h1>
+          <p className="text-dark-muted text-sm mt-1">Historique des sessions et statistiques de lecture</p>
         </div>
       </div>
 
       {/* Stats Overview */}
       {statsData && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <div className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-                  <Film size={20} className="text-indigo-400" />
+                <div className="w-10 h-10 rounded-lg bg-theatarr-500/20 flex items-center justify-center">
+                  <Film size={20} className="text-theatarr-400" />
                 </div>
                 <div>
                   <div className="text-2xl font-bold">{statsData.total_sessions}</div>
-                  <div className="text-sm text-gray-500">Total Sessions</div>
+                  <div className="text-sm text-dark-muted">Sessions totales</div>
                 </div>
               </div>
             </div>
@@ -146,7 +146,7 @@ export function SessionHistory() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold">{statsData.sessions_this_week}</div>
-                  <div className="text-sm text-gray-500">This Week</div>
+                  <div className="text-sm text-dark-muted">Cette semaine</div>
                 </div>
               </div>
             </div>
@@ -161,7 +161,7 @@ export function SessionHistory() {
                   <div className="text-2xl font-bold">
                     {statsData.avg_session_duration_minutes.toFixed(0)}m
                   </div>
-                  <div className="text-sm text-gray-500">Avg Duration</div>
+                  <div className="text-sm text-dark-muted">Duree moyenne</div>
                 </div>
               </div>
             </div>
@@ -176,7 +176,7 @@ export function SessionHistory() {
                   <div className="text-2xl font-bold">
                     {statsData.total_playback_hours.toFixed(1)}h
                   </div>
-                  <div className="text-sm text-gray-500">Total Playback</div>
+                  <div className="text-sm text-dark-muted">Lecture totale</div>
                 </div>
               </div>
             </div>
@@ -186,9 +186,9 @@ export function SessionHistory() {
 
       {/* Daily Chart */}
       {statsData && statsData.daily_stats.length > 0 && (
-        <Card className="mb-8">
+        <Card className="mb-6">
           <div className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Last 7 Days</h2>
+            <h2 className="text-lg font-semibold mb-4 text-dark-text">7 derniers jours</h2>
             <div className="flex items-end gap-2 h-32">
               {statsData.daily_stats.map((day) => {
                 const maxSessions = Math.max(...statsData.daily_stats.map((d) => d.sessions_started), 1);
@@ -199,13 +199,13 @@ export function SessionHistory() {
                     className="flex-1 flex flex-col items-center"
                   >
                     <div
-                      className="w-full bg-indigo-500/50 rounded-t"
+                      className="w-full bg-theatarr-500/50 rounded-t"
                       style={{ height: `${height}%`, minHeight: day.sessions_started > 0 ? '8px' : '0' }}
                     />
-                    <div className="text-xs text-gray-500 mt-2">
+                    <div className="text-xs text-dark-muted mt-2">
                       {new Date(day.date).toLocaleDateString(undefined, { weekday: 'short' })}
                     </div>
-                    <div className="text-xs text-gray-400">{day.sessions_started}</div>
+                    <div className="text-xs text-dark-muted">{day.sessions_started}</div>
                   </div>
                 );
               })}
@@ -225,11 +225,11 @@ export function SessionHistory() {
             }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               statusFilter === status
-                ? 'bg-indigo-500 text-white'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                ? 'bg-theatarr-500 text-white'
+                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
             }`}
           >
-            {status || 'All'}
+            {status === '' ? 'Tous' : status === 'completed' ? 'Termine' : status === 'running' ? 'En cours' : status === 'paused' ? 'En pause' : 'Arrete'}
           </button>
         ))}
       </div>
@@ -244,28 +244,28 @@ export function SessionHistory() {
           <div className="space-y-3">
             {historyData.items.map((session) => (
               <Card key={session.id}>
-                <Link to={`/sessions/${session.id}`} className="block p-4 hover:bg-gray-700/50 transition-colors">
+                <Link to={`/sessions/${session.id}`} className="block p-4 hover:bg-dark-border/50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       {getStatusIcon(session.status)}
                       <div>
                         <div className="font-medium">{session.name}</div>
                         {session.movie_title && (
-                          <div className="text-sm text-gray-500">{session.movie_title}</div>
+                          <div className="text-sm text-dark-muted">{session.movie_title}</div>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-6 text-sm text-gray-400">
+                    <div className="flex items-center gap-6 text-sm text-dark-muted">
                       <div>
-                        <span className="text-gray-500">Started:</span>{' '}
+                        <span className="text-dark-muted">Debut :</span>{' '}
                         {formatDate(session.started_at)}
                       </div>
                       <div>
-                        <span className="text-gray-500">Duration:</span>{' '}
+                        <span className="text-dark-muted">Duree :</span>{' '}
                         {formatDuration(session.duration_seconds)}
                       </div>
                       <div>
-                        <span className="text-gray-500">Sequences:</span>{' '}
+                        <span className="text-dark-muted">Sequences :</span>{' '}
                         {session.sequences_completed}/{session.total_sequences}
                       </div>
                       <span
@@ -276,7 +276,7 @@ export function SessionHistory() {
                             ? 'bg-blue-500/20 text-blue-400'
                             : session.status === 'paused'
                             ? 'bg-yellow-500/20 text-yellow-400'
-                            : 'bg-gray-500/20 text-gray-400'
+                            : 'bg-dark-border/20 text-dark-muted'
                         }`}
                       >
                         {session.status}
@@ -297,10 +297,10 @@ export function SessionHistory() {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
-                Previous
+                Precedent
               </Button>
-              <span className="text-sm text-gray-400">
-                Page {page} of {historyData.total_pages}
+              <span className="text-sm text-dark-muted">
+                Page {page} sur {historyData.total_pages}
               </span>
               <Button
                 variant="ghost"
@@ -308,15 +308,15 @@ export function SessionHistory() {
                 onClick={() => setPage((p) => Math.min(historyData.total_pages, p + 1))}
                 disabled={page === historyData.total_pages}
               >
-                Next
+                Suivant
               </Button>
             </div>
           )}
         </>
       ) : (
         <div className="text-center py-12">
-          <History size={48} className="mx-auto text-gray-600 mb-4" />
-          <p className="text-gray-500">No session history found</p>
+          <History size={48} className="mx-auto text-dark-muted mb-4" />
+          <p className="text-dark-muted">Aucun historique trouve</p>
         </div>
       )}
     </div>

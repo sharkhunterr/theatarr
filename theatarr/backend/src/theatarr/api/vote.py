@@ -11,6 +11,7 @@ from theatarr.api.errors import NotFoundError
 from theatarr.api.ws import ws_manager, Channel
 from theatarr.config import settings
 from theatarr.database import DbSession
+from theatarr.models.session import Session
 from theatarr.models.vote import Vote, VoteSession, VoteSessionStatus, VoteToken
 from theatarr.schemas.vote import (
     VoteCast,
@@ -38,7 +39,10 @@ from theatarr.services.vote import (
 router = APIRouter(tags=["Votes"])
 
 
-def _vote_session_to_response(vs: VoteSession) -> VoteSessionResponse:
+def _vote_session_to_response(
+    vs: VoteSession,
+    linked_session_name: str | None = None,
+) -> VoteSessionResponse:
     """Convert VoteSession model to response schema."""
     return VoteSessionResponse(
         id=vs.id,
@@ -61,6 +65,8 @@ def _vote_session_to_response(vs: VoteSession) -> VoteSessionResponse:
         is_open=vs.is_open,
         created_at=vs.created_at,
         updated_at=vs.updated_at,
+        linked_session_id=vs.linked_session_id,
+        linked_session_name=linked_session_name,
     )
 
 
@@ -99,7 +105,15 @@ async def list_vote_sessions(
     offset: int = 0,
 ) -> VoteSessionListResponse:
     """List all vote sessions (admin only)."""
-    query = select(VoteSession).options(selectinload(VoteSession.votes))
+    # Use outerjoin to fetch linked session names
+    from sqlalchemy.orm import aliased
+    LinkedSession = aliased(Session)
+
+    query = (
+        select(VoteSession, LinkedSession.name.label("linked_session_name"))
+        .outerjoin(LinkedSession, VoteSession.linked_session_id == LinkedSession.id)
+        .options(selectinload(VoteSession.votes))
+    )
 
     if status_filter:
         query = query.where(VoteSession.status == status_filter)
@@ -108,7 +122,7 @@ async def list_vote_sessions(
     query = query.limit(limit).offset(offset)
 
     result = await db.execute(query)
-    sessions = result.scalars().all()
+    rows = result.all()
 
     # Get total count
     count_query = select(VoteSession)
@@ -118,7 +132,7 @@ async def list_vote_sessions(
     total = len(count_result.scalars().all())
 
     return VoteSessionListResponse(
-        items=[_vote_session_to_response(vs) for vs in sessions],
+        items=[_vote_session_to_response(vs, linked_session_name) for vs, linked_session_name in rows],
         total=total,
     )
 
@@ -174,17 +188,22 @@ async def get_vote_session(
     session_id: str,
 ) -> VoteSessionResponse:
     """Get a vote session by ID (admin only)."""
+    from sqlalchemy.orm import aliased
+    LinkedSession = aliased(Session)
+
     result = await db.execute(
-        select(VoteSession)
+        select(VoteSession, LinkedSession.name.label("linked_session_name"))
+        .outerjoin(LinkedSession, VoteSession.linked_session_id == LinkedSession.id)
         .options(selectinload(VoteSession.votes))
         .where(VoteSession.id == session_id)
     )
-    vote_session = result.scalar_one_or_none()
+    row = result.one_or_none()
 
-    if not vote_session:
+    if not row:
         raise NotFoundError("VoteSession", session_id)
 
-    return _vote_session_to_response(vote_session)
+    vote_session, linked_session_name = row
+    return _vote_session_to_response(vote_session, linked_session_name)
 
 
 @router.patch(
@@ -311,9 +330,12 @@ async def close_vote_session(
     if not vote_session:
         raise NotFoundError("VoteSession", session_id)
 
+    # Store linked session ID before closing (it may auto-resolve)
+    linked_session_id = vote_session.linked_session_id
+
     vote_session = await close_voting(db, vote_session, assign_winner)
 
-    # Broadcast results
+    # Broadcast vote closed results
     results = await get_vote_results(db, vote_session)
     await ws_manager.broadcast(
         Channel.VOTE.value,
@@ -325,6 +347,30 @@ async def close_vote_session(
             },
         },
     )
+
+    # If linked to a session and movie was resolved, broadcast movie_resolved
+    if linked_session_id and assign_winner:
+        from theatarr.models.session import Session
+
+        session_result = await db.execute(
+            select(Session).where(Session.id == linked_session_id)
+        )
+        linked_session = session_result.scalar_one_or_none()
+
+        if linked_session and linked_session.movie_resolved:
+            await ws_manager.broadcast(
+                Channel.SESSION.value,
+                {
+                    "type": "movie_resolved",
+                    "payload": {
+                        "session_id": linked_session.id,
+                        "movie_title": linked_session.movie_title,
+                        "movie_poster_url": linked_session.movie_poster_url,
+                        "selection_mode": "vote",
+                        "vote_session_id": vote_session.id,
+                    },
+                },
+            )
 
     return _vote_session_to_response(vote_session)
 

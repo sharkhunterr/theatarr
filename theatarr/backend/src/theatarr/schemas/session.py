@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +20,22 @@ class SessionStatus(str, Enum):
     INTERRUPTED = "interrupted"
 
 
+class MovieSelectionMode(str, Enum):
+    """Mode for selecting the movie for a session."""
+
+    FIXED = "fixed"      # Movie is directly selected (current behavior)
+    VOTE = "vote"        # Movie is determined by vote session result
+    MYSTERY = "mystery"  # Movie is revealed at a specific time
+
+
+class MysterySource(str, Enum):
+    """Source for mystery movie selection."""
+
+    RANDOM = "random"       # Random from library
+    FILTERED = "filtered"   # Filtered by genre, year, rating
+    CURATED = "curated"     # From a curated list
+
+
 class SessionControlAction(str, Enum):
     """Control actions for a session."""
 
@@ -27,6 +44,56 @@ class SessionControlAction(str, Enum):
     STOP = "stop"
     SKIP = "skip"
     RESTART = "restart"
+
+
+# ============================================================================
+# Mystery Mode Config
+# ============================================================================
+
+
+class MysteryFilters(BaseSchema):
+    """Filters for mystery movie selection."""
+
+    genres: list[str] | None = None
+    year_min: int | None = None
+    year_max: int | None = None
+    rating_min: float | None = None
+
+
+class MysteryMovieOption(BaseSchema):
+    """Movie option for curated mystery list."""
+
+    title: str
+    year: int | None = None
+    poster_url: str | None = None
+    movie_id: str | None = None
+    source: str | None = None
+    source_id: str | None = None
+
+
+class MysteryConfig(BaseSchema):
+    """Configuration for mystery movie selection."""
+
+    source: MysterySource = MysterySource.RANDOM
+    filters: MysteryFilters | None = None
+    curated_movies: list[MysteryMovieOption] | None = None
+
+
+# ============================================================================
+# Vote Session Summary (for embedding in Session)
+# ============================================================================
+
+
+class VoteSessionSummary(BaseSchema):
+    """Summary of a linked vote session."""
+
+    id: str
+    name: str
+    status: str
+    total_votes: int
+    is_open: bool
+    winning_movie_index: int | None = None
+    movie_options: list[dict[str, Any]] | None = None
 
 
 # ============================================================================
@@ -96,6 +163,20 @@ class SessionCreate(SessionBase):
     sequences: list[SequenceInput] = Field(default_factory=list)
     workflow: dict | None = None  # JSON workflow data (nodes, edges)
 
+    # Movie selection mode
+    movie_selection_mode: MovieSelectionMode = MovieSelectionMode.FIXED
+
+    # For VOTE mode: create inline or link existing
+    vote_session_config: dict | None = None  # VoteSessionCreate fields
+    linked_vote_session_id: str | None = None
+
+    # For MYSTERY mode
+    mystery_reveal_at: datetime | None = None
+    mystery_config: MysteryConfig | None = None
+
+    # Template override (if None, uses globally active template)
+    template_id: str | None = None
+
 
 class SessionUpdate(BaseSchema):
     """Schema for updating a session."""
@@ -113,10 +194,32 @@ class SessionUpdate(BaseSchema):
     workflow: dict | None = None  # JSON workflow data (nodes, edges)
     color_palette: dict | None = None
 
+    # Movie selection mode
+    movie_selection_mode: MovieSelectionMode | None = None
+
+    # For VOTE mode
+    vote_session_config: dict | None = None
+    linked_vote_session_id: str | None = None
+
+    # For MYSTERY mode
+    mystery_reveal_at: datetime | None = None
+    mystery_config: MysteryConfig | None = None
+
+    # Template override (if None, uses globally active template)
+    template_id: str | None = None
+
 
 # ============================================================================
 # Session Response
 # ============================================================================
+
+
+class TemplateSummary(BaseSchema):
+    """Summary of a template for embedding in session."""
+
+    id: str
+    name: str
+    template_type: str
 
 
 class SessionResponse(SessionBase, IDTimestampSchema):
@@ -129,6 +232,24 @@ class SessionResponse(SessionBase, IDTimestampSchema):
     current_sequence_elapsed_ms: int
     total_sequences: int = 0
 
+    # Movie selection mode fields
+    movie_selection_mode: MovieSelectionMode = MovieSelectionMode.FIXED
+    movie_resolved: bool = False
+    movie_resolved_at: datetime | None = None
+    linked_vote_session_id: str | None = None
+    mystery_reveal_at: datetime | None = None
+    mystery_config: MysteryConfig | None = None
+
+    # Template override
+    template_id: str | None = None
+    template: TemplateSummary | None = None
+
+    # List view enriched fields
+    linked_vote_session: VoteSessionSummary | None = None
+    participants_accepted: int = 0
+    participants_total: int = 0
+    actions_count: int = 0
+
 
 class SessionDetailResponse(SessionResponse):
     """Session response with sequences included."""
@@ -136,6 +257,7 @@ class SessionDetailResponse(SessionResponse):
     sequences: list[SequenceSummary] = []
     current_sequence: SequenceSummary | None = None
     workflow: dict | None = None
+    linked_vote_session: VoteSessionSummary | None = None
 
 
 class SessionListResponse(BaseSchema):

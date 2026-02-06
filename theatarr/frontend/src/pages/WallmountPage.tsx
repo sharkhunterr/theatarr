@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { TemplateRenderer } from '../components/wallmount';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { API_BASE } from '../api/client';
@@ -45,14 +46,16 @@ interface WallmountState {
 }
 
 export function WallmountPage() {
+  const { sessionId } = useParams<{ sessionId?: string }>();
   const [state, setState] = useState<WallmountState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Connect to WebSocket for real-time updates
+  // Connect to WebSocket for real-time updates (only for global wallmount)
   const { lastMessage, isConnected } = useWebSocket({
-    autoConnect: true,
+    autoConnect: !sessionId, // Only auto-connect if no specific session
     onMessage: (message) => {
+      if (sessionId) return; // Ignore WebSocket updates for specific session view
       if (message.type === 'wallmount_state' && message.payload) {
         setState(message.payload as WallmountState);
       } else if (message.type === 'session_state' && message.payload) {
@@ -75,7 +78,10 @@ export function WallmountPage() {
   useEffect(() => {
     const fetchState = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/v1/wallmount/state`);
+        const url = sessionId
+          ? `${API_BASE}/api/v1/wallmount/state?session_id=${sessionId}`
+          : `${API_BASE}/api/v1/wallmount/state`;
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error('Failed to fetch wallmount state');
         }
@@ -91,9 +97,9 @@ export function WallmountPage() {
     fetchState();
 
     // Poll for updates as backup to WebSocket
-    const pollInterval = setInterval(fetchState, 10000);
+    const pollInterval = setInterval(fetchState, sessionId ? 30000 : 10000);
     return () => clearInterval(pollInterval);
-  }, []);
+  }, [sessionId]);
 
   // Subscribe to wallmount channel when connected
   useEffect(() => {

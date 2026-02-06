@@ -3,16 +3,22 @@
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, Integer, case
+from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
 from theatarr.api.deps import AdminUser
 from theatarr.api.errors import NotFoundError
+from theatarr.api.ws import ws_manager, Channel
 from theatarr.database import DbSession
 from theatarr.models.action import Action
-from theatarr.models.session import Session, SessionStatus
+from theatarr.models.session import MovieSelectionMode, Session, SessionStatus
 from theatarr.models.sequence import DurationType, Sequence
+from theatarr.models.session_participant import SessionParticipant, InvitationStatus
+from theatarr.models.vote import VoteSession, VoteSessionStatus
 from theatarr.schemas.session import (
+    MovieSelectionMode as MovieSelectionModeSchema,
+    MysteryConfig,
     SessionControlAction,
     SessionControlRequest,
     SessionControlResponse,
@@ -23,6 +29,8 @@ from theatarr.schemas.session import (
     SessionState,
     SessionUpdate,
     SequenceSummary,
+    TemplateSummary,
+    VoteSessionSummary,
 )
 from theatarr.services.engine import (
     EngineError,
@@ -30,13 +38,47 @@ from theatarr.services.engine import (
     SessionNotRunnableError,
     get_engine,
 )
+from theatarr.services.movie_resolution import (
+    MovieResolutionError,
+    resolve_mystery_movie,
+    resolve_vote_winner,
+)
+from theatarr.services.movie_sync import ensure_movie_synced
 from theatarr.services.scheduler import get_scheduler
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
 
-def _session_to_response(session: Session) -> SessionResponse:
+def _session_to_response(
+    session: Session,
+    linked_vote_session: VoteSession | None = None,
+    participants_accepted: int = 0,
+    participants_total: int = 0,
+    actions_count: int = 0,
+) -> SessionResponse:
     """Convert Session model to response schema."""
+    # Parse mystery config if present
+    mystery_config = None
+    if session.mystery_config:
+        mystery_config = MysteryConfig(**session.mystery_config)
+
+    # Build vote session summary if provided
+    vote_summary = None
+    if linked_vote_session:
+        vote_summary = _vote_session_to_summary(linked_vote_session)
+
+    # Build template summary if present
+    template_summary = None
+    if session.template:
+        template_type = session.template.template_type
+        if hasattr(template_type, 'value'):
+            template_type = template_type.value
+        template_summary = TemplateSummary(
+            id=session.template.id,
+            name=session.template.name,
+            template_type=template_type,
+        )
+
     return SessionResponse(
         id=session.id,
         name=session.name,
@@ -57,6 +99,44 @@ def _session_to_response(session: Session) -> SessionResponse:
         total_sequences=session.total_sequences,
         created_at=session.created_at,
         updated_at=session.updated_at,
+        # Movie selection mode fields
+        movie_selection_mode=MovieSelectionModeSchema(session.movie_selection_mode),
+        movie_resolved=session.movie_resolved,
+        movie_resolved_at=session.movie_resolved_at,
+        linked_vote_session_id=session.linked_vote_session_id,
+        mystery_reveal_at=session.mystery_reveal_at,
+        mystery_config=mystery_config,
+        # Template override
+        template_id=session.template_id,
+        template=template_summary,
+        # Enriched fields
+        linked_vote_session=vote_summary,
+        participants_accepted=participants_accepted,
+        participants_total=participants_total,
+        actions_count=actions_count,
+    )
+
+
+def _vote_session_to_summary(vs: VoteSession, include_vote_counts: bool = True) -> VoteSessionSummary:
+    """Convert VoteSession model to summary schema."""
+    movie_options = vs.movie_options
+
+    # Enrich movie_options with vote counts if available
+    if include_vote_counts and movie_options and vs.votes is not None:
+        vote_counts = vs.get_vote_counts()
+        movie_options = [
+            {**opt, "vote_count": vote_counts.get(i, 0)}
+            for i, opt in enumerate(movie_options)
+        ]
+
+    return VoteSessionSummary(
+        id=vs.id,
+        name=vs.name,
+        status=vs.status.value if isinstance(vs.status, VoteSessionStatus) else vs.status,
+        total_votes=vs.total_votes,
+        is_open=vs.is_open,
+        winning_movie_index=vs.winning_movie_index,
+        movie_options=movie_options,
     )
 
 
@@ -69,6 +149,16 @@ def _sequence_to_summary(sequence: Sequence) -> SequenceSummary:
         duration_type=sequence.duration_type.value,
         duration_ms=sequence.duration_ms,
         transition_ms=sequence.transition_ms,
+    )
+
+
+def _count_actions_in_workflow(workflow: dict | None) -> int:
+    """Count action nodes in a workflow."""
+    if not workflow or not workflow.get("nodes"):
+        return 0
+    return sum(
+        1 for node in workflow.get("nodes", [])
+        if node.get("data", {}).get("nodeType") == "action"
     )
 
 
@@ -101,8 +191,48 @@ async def list_sessions(
         count_query = count_query.where(Session.status == status_filter)
     total = await db.execute(count_query)
 
+    # Enrich sessions with additional data
+    enriched_items = []
+    for session in sessions:
+        # Get linked vote session if any (with votes for counting)
+        linked_vote = None
+        if session.linked_vote_session_id:
+            vs_result = await db.execute(
+                select(VoteSession)
+                .where(VoteSession.id == session.linked_vote_session_id)
+                .options(selectinload(VoteSession.votes))
+            )
+            linked_vote = vs_result.scalar_one_or_none()
+
+        # Get participant counts
+        participants_result = await db.execute(
+            select(
+                func.count(SessionParticipant.id).label("total"),
+                func.sum(
+                    case(
+                        (SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value, 1),
+                        else_=0
+                    )
+                ).label("accepted")
+            ).where(SessionParticipant.session_id == session.id)
+        )
+        participant_row = participants_result.first()
+        participants_total = participant_row.total if participant_row else 0
+        participants_accepted = int(participant_row.accepted or 0) if participant_row else 0
+
+        # Count actions in workflow
+        actions_count = _count_actions_in_workflow(session.workflow)
+
+        enriched_items.append(_session_to_response(
+            session,
+            linked_vote_session=linked_vote,
+            participants_accepted=participants_accepted,
+            participants_total=participants_total,
+            actions_count=actions_count,
+        ))
+
     return SessionListResponse(
-        items=[_session_to_response(s) for s in sessions],
+        items=enriched_items,
         total=total.scalar() or 0,
     )
 
@@ -119,10 +249,25 @@ async def create_session(
     data: SessionCreate,
 ) -> SessionResponse:
     """Create a new session."""
+    # Prepare mystery config if present
+    mystery_config_dict = None
+    if data.mystery_config:
+        mystery_config_dict = data.mystery_config.model_dump()
+
+    # Auto-sync movie from source if movie_source is provided but movie_id is not
+    movie_id = data.movie_id
+    if not movie_id and data.movie_source and data.movie_source_id:
+        movie_id = await ensure_movie_synced(
+            db=db,
+            movie_source=data.movie_source,
+            movie_source_id=data.movie_source_id,
+            movie_poster_url=data.movie_poster_url,
+        )
+
     session = Session(
         name=data.name,
         description=data.description,
-        movie_id=data.movie_id,
+        movie_id=movie_id,
         movie_title=data.movie_title,
         movie_poster_url=data.movie_poster_url,
         movie_source_id=data.movie_source_id,
@@ -132,9 +277,56 @@ async def create_session(
         auto_resume_enabled=data.auto_resume_enabled,
         workflow=data.workflow,
         status=SessionStatus.SCHEDULED if data.scheduled_at else SessionStatus.DRAFT,
+        # Movie selection mode fields
+        movie_selection_mode=data.movie_selection_mode.value,
+        mystery_reveal_at=data.mystery_reveal_at,
+        mystery_config=mystery_config_dict,
+        # FIXED mode starts as resolved
+        movie_resolved=data.movie_selection_mode == MovieSelectionModeSchema.FIXED and data.movie_title is not None,
+        # Template override
+        template_id=data.template_id,
     )
     db.add(session)
     await db.flush()  # Get session.id without committing
+
+    # Handle VOTE mode: create inline vote session or link existing
+    if data.movie_selection_mode == MovieSelectionModeSchema.VOTE:
+        if data.linked_vote_session_id:
+            # Link to existing vote session
+            result = await db.execute(
+                select(VoteSession).where(VoteSession.id == data.linked_vote_session_id)
+            )
+            vote_session = result.scalar_one_or_none()
+            if vote_session:
+                session.linked_vote_session_id = vote_session.id
+                vote_session.linked_session_id = session.id
+        elif data.vote_session_config:
+            # Create inline vote session
+            vote_config = data.vote_session_config
+            # Use session name as vote name (unless explicitly provided)
+            vote_name = vote_config.get("name") or data.name
+            # Determine initial status
+            open_immediately = vote_config.get("open_immediately", False)
+            initial_status = VoteSessionStatus.OPEN if open_immediately else VoteSessionStatus.DRAFT
+
+            vote_session = VoteSession(
+                name=vote_name,
+                description=vote_config.get("description"),
+                status=initial_status,
+                movie_options=vote_config.get("movie_options", []),
+                max_votes_per_user=vote_config.get("max_votes_per_user", 1),
+                allow_multiple_votes=vote_config.get("allow_multiple_votes", False),
+                require_token=vote_config.get("require_token", True),
+                show_results_during_voting=vote_config.get("show_results_during_voting", False),
+                anonymous_voting=vote_config.get("anonymous_voting", True),
+                opens_at=vote_config.get("opens_at"),
+                closes_at=vote_config.get("closes_at"),
+                linked_session_id=session.id,
+                created_by=user.id,
+            )
+            db.add(vote_session)
+            await db.flush()
+            session.linked_vote_session_id = vote_session.id
 
     # Create sequences if provided
     for order_index, seq_data in enumerate(data.sequences):
@@ -193,6 +385,36 @@ async def get_session(
     if session.current_sequence:
         current_seq = _sequence_to_summary(session.current_sequence)
 
+    # Get linked vote session summary if present
+    linked_vote_session = None
+    if session.linked_vote_session_id:
+        from sqlalchemy.orm import selectinload
+        result = await db.execute(
+            select(VoteSession)
+            .options(selectinload(VoteSession.votes))
+            .where(VoteSession.id == session.linked_vote_session_id)
+        )
+        vs = result.scalar_one_or_none()
+        if vs:
+            linked_vote_session = _vote_session_to_summary(vs)
+
+    # Parse mystery config if present
+    mystery_config = None
+    if session.mystery_config:
+        mystery_config = MysteryConfig(**session.mystery_config)
+
+    # Build template summary if present
+    template_summary = None
+    if session.template:
+        template_type = session.template.template_type
+        if hasattr(template_type, 'value'):
+            template_type = template_type.value
+        template_summary = TemplateSummary(
+            id=session.template.id,
+            name=session.template.name,
+            template_type=template_type,
+        )
+
     return SessionDetailResponse(
         id=session.id,
         name=session.name,
@@ -216,6 +438,17 @@ async def get_session(
         sequences=sequences,
         current_sequence=current_seq,
         workflow=session.workflow,
+        # Movie selection mode fields
+        movie_selection_mode=MovieSelectionModeSchema(session.movie_selection_mode),
+        movie_resolved=session.movie_resolved,
+        movie_resolved_at=session.movie_resolved_at,
+        linked_vote_session_id=session.linked_vote_session_id,
+        linked_vote_session=linked_vote_session,
+        mystery_reveal_at=session.mystery_reveal_at,
+        mystery_config=mystery_config,
+        # Template override
+        template_id=session.template_id,
+        template=template_summary,
     )
 
 
@@ -243,6 +476,17 @@ async def update_session(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot update session in status: {session.status}",
         )
+
+    # Auto-sync movie from source if movie_source is provided but movie_id is not
+    if data.movie_source and data.movie_source_id and not data.movie_id:
+        synced_movie_id = await ensure_movie_synced(
+            db=db,
+            movie_source=data.movie_source,
+            movie_source_id=data.movie_source_id,
+            movie_poster_url=data.movie_poster_url,
+        )
+        if synced_movie_id:
+            session.movie_id = synced_movie_id
 
     # Update basic fields (exclude sequences)
     update_data = data.model_dump(exclude_unset=True, exclude={"sequences"})
@@ -473,6 +717,125 @@ async def extract_palette(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+
+# ============================================================================
+# Movie Selection Mode endpoints
+# ============================================================================
+
+
+@router.post(
+    "/{session_id}/reveal-mystery",
+    response_model=SessionResponse,
+    summary="Reveal Mystery Movie",
+)
+async def reveal_mystery_movie(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+) -> SessionResponse:
+    """Manually reveal the mystery movie before scheduled time."""
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise NotFoundError("Session", session_id)
+
+    if session.movie_selection_mode != MovieSelectionMode.MYSTERY.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session is not in mystery mode",
+        )
+
+    if session.movie_resolved:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Movie has already been revealed",
+        )
+
+    try:
+        session = await resolve_mystery_movie(db, session)
+    except MovieResolutionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+    # Broadcast movie resolved event
+    await ws_manager.broadcast(
+        Channel.SESSION.value,
+        {
+            "type": "movie_resolved",
+            "payload": {
+                "session_id": session.id,
+                "movie_title": session.movie_title,
+                "movie_poster_url": session.movie_poster_url,
+                "selection_mode": "mystery",
+            },
+        },
+    )
+
+    return _session_to_response(session)
+
+
+@router.post(
+    "/{session_id}/resolve-vote",
+    response_model=SessionResponse,
+    summary="Resolve Vote Result",
+)
+async def resolve_vote_result(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+) -> SessionResponse:
+    """Manually resolve the vote result and apply winning movie to session."""
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise NotFoundError("Session", session_id)
+
+    if session.movie_selection_mode != MovieSelectionMode.VOTE.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session is not in vote mode",
+        )
+
+    if session.movie_resolved:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Movie has already been resolved",
+        )
+
+    if not session.linked_vote_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session has no linked vote session",
+        )
+
+    try:
+        session = await resolve_vote_winner(db, session)
+    except MovieResolutionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+    # Broadcast movie resolved event
+    await ws_manager.broadcast(
+        Channel.SESSION.value,
+        {
+            "type": "movie_resolved",
+            "payload": {
+                "session_id": session.id,
+                "movie_title": session.movie_title,
+                "movie_poster_url": session.movie_poster_url,
+                "selection_mode": "vote",
+            },
+        },
+    )
+
+    return _session_to_response(session)
 
 
 # ============================================================================

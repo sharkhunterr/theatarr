@@ -17,6 +17,10 @@ interface PortalSession {
   status: string;
   scheduled_at: string | null;
   invitation_status: string;
+  movie_selection_mode?: string | null;
+  movie_resolved?: boolean;
+  linked_vote_session_id?: string | null;
+  linked_vote_is_open?: boolean | null;
 }
 
 const statusFilters = [
@@ -91,6 +95,10 @@ export function MySessions() {
               status={session.status}
               scheduledAt={session.scheduled_at}
               invitationStatus={session.invitation_status}
+              movieSelectionMode={session.movie_selection_mode}
+              movieResolved={session.movie_resolved}
+              linkedVoteSessionId={session.linked_vote_session_id}
+              linkedVoteIsOpen={session.linked_vote_is_open}
             />
           ))}
         </div>

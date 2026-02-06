@@ -73,8 +73,7 @@ export function TrailersManager() {
     queryKey: ['trailers', filter],
     queryFn: async () => {
       const params = filter !== 'all' ? `?status_filter=${filter}` : '';
-      const response = await apiClient.get(`/trailers${params}`);
-      return response.data;
+      return apiClient.get(`/trailers${params}`);
     },
     enabled: activeTab === 'library',
   });
@@ -83,8 +82,7 @@ export function TrailersManager() {
   const { data: rulesData, isLoading: rulesLoading } = useQuery({
     queryKey: ['trailer-rules'],
     queryFn: async () => {
-      const response = await apiClient.get('/trailers/rules');
-      return response.data;
+      return apiClient.get('/trailers/rules');
     },
     enabled: activeTab === 'rules',
   });
@@ -93,8 +91,7 @@ export function TrailersManager() {
   const { data: storageStats } = useQuery<StorageStatsData>({
     queryKey: ['trailer-stats'],
     queryFn: async () => {
-      const response = await apiClient.get('/trailers/stats');
-      return response.data;
+      return apiClient.get('/trailers/stats');
     },
   });
 
@@ -126,7 +123,7 @@ export function TrailersManager() {
   // Run rule mutation
   const runRuleMutation = useMutation({
     mutationFn: async (ruleId: string) => {
-      await apiClient.post(`/trailers/rules/${ruleId}/run`);
+      await apiClient.post(`/trailers/rules/${ruleId}/run`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trailer-rules'] });
@@ -160,55 +157,55 @@ export function TrailersManager() {
   };
 
   return (
-    <div className="p-8">
+    <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Trailers</h1>
-          <p className="text-gray-500 mt-1">Manage your trailer library and download rules</p>
+          <h1 className="text-2xl font-bold text-dark-text">Bandes-annonces</h1>
+          <p className="text-dark-muted text-sm mt-1">Gerez votre bibliotheque de bandes-annonces et les regles de telechargement</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           {activeTab === 'library' && (
             <Button onClick={() => setIsDownloadOpen(true)}>
-              <Download size={16} />
-              <span className="ml-2">Download Trailer</span>
+              <Download size={16} className="mr-1" />
+              <span className="hidden sm:inline">Telecharger</span>
             </Button>
           )}
           {activeTab === 'rules' && (
             <Button onClick={() => setIsRuleFormOpen(true)}>
-              <Plus size={16} />
-              <span className="ml-2">Create Rule</span>
+              <Plus size={16} className="mr-1" />
+              <span className="hidden sm:inline">Creer une regle</span>
             </Button>
           )}
         </div>
       </div>
 
       {/* Storage Stats */}
-      {storageStats && <StorageStats stats={storageStats} className="mb-8" />}
+      {storageStats && <StorageStats stats={storageStats} className="mb-6" />}
 
       {/* Tabs */}
-      <div className="flex gap-4 mb-6 border-b border-gray-700">
+      <div className="flex gap-4 mb-6 border-b border-dark-border">
         <button
           onClick={() => setActiveTab('library')}
           className={`pb-3 px-1 font-medium transition-colors ${
             activeTab === 'library'
-              ? 'text-indigo-400 border-b-2 border-indigo-400'
-              : 'text-gray-400 hover:text-white'
+              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
+              : 'text-dark-muted hover:text-dark-text'
           }`}
         >
           <Film size={16} className="inline mr-2" />
-          Library
+          Bibliotheque
         </button>
         <button
           onClick={() => setActiveTab('rules')}
           className={`pb-3 px-1 font-medium transition-colors ${
             activeTab === 'rules'
-              ? 'text-indigo-400 border-b-2 border-indigo-400'
-              : 'text-gray-400 hover:text-white'
+              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
+              : 'text-dark-muted hover:text-dark-text'
           }`}
         >
           <Settings size={16} className="inline mr-2" />
-          Download Rules
+          Regles
         </button>
       </div>
 
@@ -223,11 +220,11 @@ export function TrailersManager() {
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filter === f
-                    ? 'bg-indigo-500 text-white'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    ? 'bg-theatarr-500 text-white'
+                    : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
                 }`}
               >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {f === 'all' ? 'Tous' : f === 'ready' ? 'Pret' : f === 'pending' ? 'En cours' : 'Erreur'}
               </button>
             ))}
           </div>
@@ -248,8 +245,8 @@ export function TrailersManager() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <Film size={48} className="mx-auto text-gray-600 mb-4" />
-              <p className="text-gray-500">No trailers found</p>
+              <Film size={48} className="mx-auto text-dark-muted mb-4" />
+              <p className="text-dark-muted">No trailers found</p>
               <Button className="mt-4" onClick={() => setIsDownloadOpen(true)}>
                 Download Your First Trailer
               </Button>
@@ -278,17 +275,17 @@ export function TrailersManager() {
                             className={`px-2 py-0.5 rounded text-xs font-medium ${
                               rule.is_enabled
                                 ? 'bg-green-500/20 text-green-400'
-                                : 'bg-gray-500/20 text-gray-400'
+                                : 'bg-gray-500/20 text-dark-muted'
                             }`}
                           >
                             {rule.is_enabled ? 'Active' : 'Disabled'}
                           </span>
                         </div>
                         {rule.description && (
-                          <p className="text-gray-400 text-sm mt-1">{rule.description}</p>
+                          <p className="text-dark-muted text-sm mt-1">{rule.description}</p>
                         )}
 
-                        <div className="flex flex-wrap gap-4 mt-4 text-sm text-gray-400">
+                        <div className="flex flex-wrap gap-4 mt-4 text-sm text-dark-muted">
                           <span className="flex items-center gap-1">
                             <HardDrive size={14} />
                             {rule.storage_used_gb.toFixed(1)} / {rule.max_storage_gb} GB
@@ -307,7 +304,7 @@ export function TrailersManager() {
                         </div>
 
                         {rule.last_run_at && (
-                          <p className="text-xs text-gray-500 mt-2">
+                          <p className="text-xs text-dark-muted mt-2">
                             Last run: {new Date(rule.last_run_at).toLocaleString()}
                           </p>
                         )}
@@ -342,8 +339,8 @@ export function TrailersManager() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <Settings size={48} className="mx-auto text-gray-600 mb-4" />
-              <p className="text-gray-500">No download rules configured</p>
+              <Settings size={48} className="mx-auto text-dark-muted mb-4" />
+              <p className="text-dark-muted">No download rules configured</p>
               <Button className="mt-4" onClick={() => setIsRuleFormOpen(true)}>
                 Create Your First Rule
               </Button>

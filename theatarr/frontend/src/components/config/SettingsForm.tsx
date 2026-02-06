@@ -6,6 +6,8 @@ interface SettingsFormProps {
   settings: Record<string, unknown>;
   onSave: (settings: Record<string, unknown>) => void;
   isSaving: boolean;
+  onHasChangesChange?: (hasChanges: boolean) => void;
+  renderActions?: (props: { hasChanges: boolean; onSave: () => void; onReset: () => void }) => React.ReactNode;
 }
 
 interface SettingDefinition {
@@ -152,7 +154,7 @@ const SETTINGS_SCHEMA: SettingDefinition[] = [
   },
 ];
 
-export function SettingsForm({ settings, onSave, isSaving }: SettingsFormProps) {
+export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, renderActions }: SettingsFormProps) {
   const [localSettings, setLocalSettings] = useState<Record<string, unknown>>({});
   const [customSettings, setCustomSettings] = useState<Array<{ key: string; value: string }>>([]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -174,6 +176,11 @@ export function SettingsForm({ settings, onSave, isSaving }: SettingsFormProps) 
 
     setHasChanges(false);
   }, [settings]);
+
+  // Notify parent of hasChanges state
+  useEffect(() => {
+    onHasChangesChange?.(hasChanges);
+  }, [hasChanges, onHasChangesChange]);
 
   const updateSetting = (key: string, value: unknown) => {
     setLocalSettings((prev) => ({ ...prev, [key]: value }));
@@ -255,9 +262,9 @@ export function SettingsForm({ settings, onSave, isSaving }: SettingsFormProps) 
               type="checkbox"
               checked={value as boolean}
               onChange={(e) => updateSetting(def.key, e.target.checked)}
-              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500"
+              className="w-4 h-4 rounded border-dark-border bg-dark-bg text-theatarr-500"
             />
-            <span className="text-sm text-gray-300">Enabled</span>
+            <span className="text-sm text-dark-text">Enabled</span>
           </label>
         );
       case 'number':
@@ -279,7 +286,7 @@ export function SettingsForm({ settings, onSave, isSaving }: SettingsFormProps) 
                 updateSetting(def.key, e.target.value);
               }
             }}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:ring-2 focus:ring-theatarr-500 font-mono text-sm"
             rows={4}
           />
         );
@@ -304,8 +311,8 @@ export function SettingsForm({ settings, onSave, isSaving }: SettingsFormProps) 
               {defs.map((def) => (
                 <div key={def.key} className="grid grid-cols-3 gap-4 items-start">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300">{def.label}</label>
-                    <p className="text-xs text-gray-500 mt-0.5">{def.description}</p>
+                    <label className="block text-sm font-medium text-dark-text">{def.label}</label>
+                    <p className="text-xs text-dark-muted mt-0.5">{def.description}</p>
                   </div>
                   <div className="col-span-2">{renderSettingInput(def)}</div>
                 </div>
@@ -319,15 +326,15 @@ export function SettingsForm({ settings, onSave, isSaving }: SettingsFormProps) 
       <Card>
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Custom Settings</h2>
+            <h2 className="text-lg font-semibold text-dark-text">Parametres personnalises</h2>
             <Button variant="ghost" size="sm" onClick={addCustomSetting}>
               <Plus size={14} />
-              <span className="ml-1">Add Setting</span>
+              <span className="ml-1">Ajouter</span>
             </Button>
           </div>
 
           {customSettings.length === 0 ? (
-            <p className="text-gray-500 text-sm">No custom settings. Click "Add Setting" to create one.</p>
+            <p className="text-dark-muted text-sm">Aucun parametre personnalise. Cliquez sur "Ajouter" pour en creer un.</p>
           ) : (
             <div className="space-y-3">
               {customSettings.map((setting, index) => (
@@ -335,13 +342,13 @@ export function SettingsForm({ settings, onSave, isSaving }: SettingsFormProps) 
                   <Input
                     value={setting.key}
                     onChange={(e) => updateCustomSetting(index, 'key', e.target.value)}
-                    placeholder="Setting key"
+                    placeholder="Cle du parametre"
                     className="flex-1"
                   />
                   <Input
                     value={setting.value}
                     onChange={(e) => updateCustomSetting(index, 'value', e.target.value)}
-                    placeholder="Value (JSON or string)"
+                    placeholder="Valeur (JSON ou texte)"
                     className="flex-[2]"
                   />
                   <Button
@@ -359,28 +366,32 @@ export function SettingsForm({ settings, onSave, isSaving }: SettingsFormProps) 
         </div>
       </Card>
 
-      {/* Actions */}
-      <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg sticky bottom-4">
-        <div className="text-sm text-gray-400">
-          {hasChanges ? 'You have unsaved changes' : 'All changes saved'}
+      {/* Actions - render via prop or default footer */}
+      {renderActions ? (
+        renderActions({ hasChanges, onSave: handleSave, onReset: handleReset })
+      ) : (
+        <div className="flex items-center justify-between p-4 bg-dark-surface border border-dark-border rounded-lg sticky bottom-4">
+          <div className="text-sm text-dark-muted">
+            {hasChanges ? 'Modifications non enregistrees' : 'Tous les changements sont enregistres'}
+          </div>
+          <div className="flex gap-4">
+            <Button variant="ghost" onClick={handleReset} disabled={!hasChanges}>
+              <RefreshCw size={14} />
+              <span className="ml-1">Reinitialiser</span>
+            </Button>
+            <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
+              {isSaving ? (
+                'Enregistrement...'
+              ) : (
+                <>
+                  <Save size={14} />
+                  <span className="ml-1">Enregistrer</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-4">
-          <Button variant="ghost" onClick={handleReset} disabled={!hasChanges}>
-            <RefreshCw size={14} />
-            <span className="ml-1">Reset</span>
-          </Button>
-          <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
-            {isSaving ? (
-              'Saving...'
-            ) : (
-              <>
-                <Save size={14} />
-                <span className="ml-1">Save Settings</span>
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
