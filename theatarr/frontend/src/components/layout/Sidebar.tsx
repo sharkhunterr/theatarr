@@ -33,7 +33,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard', labelFr: 'Tableau de bord', icon: LayoutDashboard, path: '/' },
   { label: 'Sessions', labelFr: 'Sessions', icon: Play, path: '/sessions' },
-  { label: 'Movies', labelFr: 'Films', icon: Film, path: '/movies' },
   { label: 'Vote Sessions', labelFr: 'Sessions de vote', icon: Vote, path: '/votes' },
   { label: 'Trailers', labelFr: 'Bandes-annonces', icon: Video, path: '/trailers' },
   { label: 'Templates', labelFr: 'Modèles', icon: Palette, path: '/templates' },

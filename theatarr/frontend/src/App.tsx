@@ -16,7 +16,6 @@ import { VoteSessionManager } from './pages/VoteSessionManager';
 import { TrailersManager } from './pages/TrailersManager';
 import { ConfigPage } from './pages/ConfigPage';
 import { SessionHistory } from './pages/SessionHistory';
-import { MoviesPage } from './pages/MoviesPage';
 
 // Layout
 import { AdminLayout } from './components/layout';
@@ -154,15 +153,6 @@ function AppRoutes() {
           </RequireAuth>
         }
       />
-      <Route
-        path="/movies"
-        element={
-          <RequireAuth>
-            <MoviesPage />
-          </RequireAuth>
-        }
-      />
-
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
