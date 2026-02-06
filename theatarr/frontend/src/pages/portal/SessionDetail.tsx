@@ -3,8 +3,8 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote } from 'lucide-react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../../api/client';
 
@@ -22,11 +22,16 @@ interface SessionDetail {
   completed_at: string | null;
   invitation_status: string;
   responded_at: string | null;
+  movie_selection_mode: string | null;
+  movie_resolved: boolean;
+  linked_vote_session_id: string | null;
+  linked_vote_is_open: boolean | null;
 }
 
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: session, isLoading } = useQuery({
     queryKey: ['portal', 'sessions', id],
@@ -37,8 +42,12 @@ export function SessionDetail() {
   const respondMutation = useMutation({
     mutationFn: (accept: boolean) =>
       apiClient.post(`/portal/sessions/${id}/respond`, { accept }),
-    onSuccess: () => {
+    onSuccess: (_, accept) => {
       queryClient.invalidateQueries({ queryKey: ['portal', 'sessions'] });
+      // If accepted and there's an open vote, redirect to vote page
+      if (accept && session?.linked_vote_session_id && session?.linked_vote_is_open) {
+        navigate(`/portal/votes/${session.linked_vote_session_id}`);
+      }
     },
   });
 
@@ -261,6 +270,65 @@ export function SessionDetail() {
           </div>
         )}
       </div>
+
+      {/* Vote section - show if there's a linked vote */}
+      {session.movie_selection_mode === 'vote' && session.linked_vote_session_id && (
+        <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
+          <h2 className="font-medium text-dark-text mb-3">Vote pour le film</h2>
+
+          {session.movie_resolved ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                <Check className="text-green-400" size={20} />
+              </div>
+              <div>
+                <p className="font-medium text-dark-text">Vote termine</p>
+                <p className="text-sm text-dark-muted">
+                  Le film a ete choisi: {session.movie_title}
+                </p>
+              </div>
+            </div>
+          ) : session.linked_vote_is_open ? (
+            session.invitation_status === 'accepted' ? (
+              <Link
+                to={`/portal/votes/${session.linked_vote_session_id}`}
+                className="flex items-center justify-between p-3 bg-theatarr-500/10 border border-theatarr-500/30 rounded-lg hover:bg-theatarr-500/20 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-theatarr-500/20 flex items-center justify-center">
+                    <Vote className="text-theatarr-400" size={20} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-dark-text">Votez pour le film</p>
+                    <p className="text-sm text-dark-muted">Le vote est ouvert</p>
+                  </div>
+                </div>
+                <ArrowLeft size={18} className="text-dark-muted rotate-180" />
+              </Link>
+            ) : (
+              <div className="flex items-center gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                  <Clock className="text-yellow-400" size={20} />
+                </div>
+                <div>
+                  <p className="font-medium text-dark-text">Acceptez l'invitation pour voter</p>
+                  <p className="text-sm text-dark-muted">Le vote est ouvert mais vous devez d'abord accepter</p>
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-dark-border flex items-center justify-center">
+                <Clock className="text-dark-muted" size={20} />
+              </div>
+              <div>
+                <p className="font-medium text-dark-text">Vote en attente</p>
+                <p className="text-sm text-dark-muted">Le vote n'est pas encore ouvert</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
