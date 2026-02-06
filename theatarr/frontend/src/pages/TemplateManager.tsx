@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit2, Trash2, Check, Eye, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, Eye, RefreshCw, Monitor } from 'lucide-react';
 import { Button, Card, Modal, Spinner } from '../components/common';
 import { TemplateEditor } from '../components/templates/TemplateEditor';
 import { TemplatePreview } from '../components/templates/TemplatePreview';
@@ -99,7 +99,7 @@ export function TemplateManager() {
   };
 
   const handleDelete = async (template: Template) => {
-    if (window.confirm(`Delete template "${template.name}"?`)) {
+    if (window.confirm(`Supprimer le template "${template.name}" ?`)) {
       await deleteMutation.mutateAsync(template.id);
     }
   };
@@ -121,34 +121,17 @@ export function TemplateManager() {
     return true;
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-8">
-        <div className="text-red-500">Failed to load templates</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Templates</h1>
-          <p className="text-gray-500 mt-1">
-            Manage wallmount display templates
-          </p>
+          <h1 className="text-2xl font-bold text-dark-text">Templates</h1>
+          <p className="text-dark-muted text-sm mt-1">Gerez les templates d'affichage wallmount</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => initBuiltinsMutation.mutate()}
             disabled={initBuiltinsMutation.isPending}
           >
@@ -156,11 +139,10 @@ export function TemplateManager() {
               size={16}
               className={initBuiltinsMutation.isPending ? 'animate-spin' : ''}
             />
-            <span className="ml-2">Reset Builtins</span>
           </Button>
           <Button onClick={handleCreate}>
-            <Plus size={16} />
-            <span className="ml-2">Create Template</span>
+            <Plus size={16} className="mr-1" />
+            <span className="hidden sm:inline">Nouveau</span>
           </Button>
         </div>
       </div>
@@ -173,116 +155,127 @@ export function TemplateManager() {
             onClick={() => setFilter(f)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter === f
-                ? 'bg-indigo-500 text-white'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                ? 'bg-theatarr-500 text-white'
+                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
             }`}
           >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
+            {f === 'all' ? 'Tous' : f === 'builtin' ? 'Integres' : 'Personnalises'}
           </button>
         ))}
       </div>
 
-      {/* Template Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTemplates?.map((template) => (
-          <Card key={template.id} className="relative overflow-hidden">
-            {/* Active indicator */}
-            {template.is_active && (
-              <div className="absolute top-4 right-4 px-2 py-1 bg-green-500 text-white text-xs font-medium rounded">
-                Active
-              </div>
-            )}
-
-            {/* Builtin badge */}
-            {template.is_builtin && (
-              <div className="absolute top-4 left-4 px-2 py-1 bg-gray-700 text-gray-300 text-xs font-medium rounded">
-                Built-in
-              </div>
-            )}
-
-            <div className="p-6 pt-12">
-              <h3 className="text-xl font-semibold mb-2">{template.name}</h3>
-              <p className="text-gray-400 text-sm mb-4">
-                {template.description || `Type: ${template.template_type}`}
-              </p>
-
-              {/* Template type badge */}
-              <div className="mb-4">
-                <span className="px-2 py-1 bg-indigo-500/20 text-indigo-300 text-xs rounded">
-                  {template.template_type}
-                </span>
-              </div>
-
-              {/* Components preview */}
-              {template.layout?.components && (
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {template.layout.components.map((c, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-0.5 bg-gray-700 text-gray-400 text-xs rounded"
-                    >
-                      {c.type}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center gap-2 pt-4 border-t border-gray-700">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handlePreview(template)}
-                >
-                  <Eye size={14} />
-                  <span className="ml-1">Preview</span>
-                </Button>
-
-                {!template.is_active && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleActivate(template)}
-                    disabled={activateMutation.isPending}
-                  >
-                    <Check size={14} />
-                    <span className="ml-1">Activate</span>
-                  </Button>
-                )}
-
-                {!template.is_builtin && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(template)}
-                    >
-                      <Edit2 size={14} />
-                      <span className="ml-1">Edit</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(template)}
-                      disabled={deleteMutation.isPending}
-                      className="text-red-400 hover:text-red-300"
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {filteredTemplates?.length === 0 && (
+      {/* Templates List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Spinner size="lg" />
+        </div>
+      ) : error ? (
         <div className="text-center py-12">
-          <p className="text-gray-500">No templates found</p>
+          <p className="text-red-400">Erreur lors du chargement des templates</p>
+        </div>
+      ) : filteredTemplates && filteredTemplates.length > 0 ? (
+        <div className="space-y-3">
+          {filteredTemplates.map((template) => (
+            <Card key={template.id}>
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    {/* Icon */}
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      template.is_active ? 'bg-green-500/20' : 'bg-dark-border'
+                    }`}>
+                      <Monitor size={20} className={template.is_active ? 'text-green-400' : 'text-dark-muted'} />
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-dark-text">{template.name}</span>
+                        {template.is_active && (
+                          <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded">
+                            Actif
+                          </span>
+                        )}
+                        {template.is_builtin && (
+                          <span className="px-2 py-0.5 bg-dark-border text-dark-muted text-xs font-medium rounded">
+                            Integre
+                          </span>
+                        )}
+                      </div>
+                      {template.description && (
+                        <p className="text-sm text-dark-muted truncate mt-0.5">{template.description}</p>
+                      )}
+                    </div>
+
+                    {/* Type & Components */}
+                    <div className="hidden md:flex items-center gap-4 text-sm text-dark-muted">
+                      <span className="px-2 py-1 bg-theatarr-500/20 text-theatarr-400 text-xs rounded">
+                        {template.template_type}
+                      </span>
+                      {template.layout?.components && (
+                        <span>{template.layout.components.length} composants</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 ml-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePreview(template)}
+                      title="Apercu"
+                    >
+                      <Eye size={16} />
+                    </Button>
+
+                    {!template.is_active && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleActivate(template)}
+                        disabled={activateMutation.isPending}
+                        title="Activer"
+                      >
+                        <Check size={16} />
+                      </Button>
+                    )}
+
+                    {!template.is_builtin && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(template)}
+                          title="Modifier"
+                        >
+                          <Edit2 size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(template)}
+                          disabled={deleteMutation.isPending}
+                          className="text-red-400 hover:text-red-300"
+                          title="Supprimer"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Monitor size={48} className="mx-auto text-dark-muted mb-4" />
+          <p className="text-dark-muted">Aucun template trouve</p>
           {filter === 'custom' && (
             <Button className="mt-4" onClick={handleCreate}>
-              Create Your First Template
+              Creer votre premier template
             </Button>
           )}
         </div>
@@ -292,7 +285,7 @@ export function TemplateManager() {
       <Modal
         isOpen={isEditorOpen}
         onClose={handleEditorClose}
-        title={isCreateMode ? 'Create Template' : 'Edit Template'}
+        title={isCreateMode ? 'Creer un template' : 'Modifier le template'}
         size="xl"
       >
         <TemplateEditor
@@ -306,7 +299,7 @@ export function TemplateManager() {
       <Modal
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
-        title={`Preview: ${selectedTemplate?.name}`}
+        title={`Apercu : ${selectedTemplate?.name}`}
         size="full"
       >
         {selectedTemplate && (
