@@ -32,6 +32,7 @@ dependencies = [
     "websockets>=12.0",
     "aiofiles>=23.2.1",
     "pillow>=10.2.0",
+    "scikit-learn>=1.4.0",
     "colorthief>=0.2.1",
     "yt-dlp>=2024.1.0",
     "aiosqlite>=0.19.0",
@@ -96,7 +97,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["colorthief", "yt_dlp"]
+module = ["colorthief", "yt_dlp", "sklearn"]
 ignore_missing_imports = true
 
 [tool.coverage.run]
