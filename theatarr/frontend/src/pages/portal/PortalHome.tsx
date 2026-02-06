@@ -3,7 +3,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Calendar, Vote, CheckCircle, Film } from 'lucide-react';
+import { AlertCircle, Calendar, Vote, CheckCircle, Film, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
@@ -12,6 +12,7 @@ import { SessionCard } from '../../components/portal/SessionCard';
 
 interface PortalStats {
   pending_votes: number;
+  pending_invitations: number;
   upcoming_sessions: number;
   total_sessions_attended: number;
   total_votes_cast: number;
@@ -55,6 +56,11 @@ export function PortalHome() {
     queryFn: () => apiClient.get<{ items: PortalVote[]; total: number }>('/portal/votes/pending'),
   });
 
+  const { data: pendingInvitations } = useQuery({
+    queryKey: ['portal', 'sessions', 'pending'],
+    queryFn: () => apiClient.get<{ items: PortalSession[]; total: number }>('/portal/sessions/pending'),
+  });
+
   const { data: sessions } = useQuery({
     queryKey: ['portal', 'sessions'],
     queryFn: () => apiClient.get<{ items: PortalSession[]; total: number }>('/portal/sessions?limit=5'),
@@ -69,6 +75,31 @@ export function PortalHome() {
         </h1>
         <p className="text-dark-muted mt-1">Bienvenue sur votre portail cinema</p>
       </div>
+
+      {/* Pending invitations alert */}
+      {pendingInvitations && pendingInvitations.items.length > 0 && (
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <Mail className="text-blue-500" size={20} />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-dark-text">
+                {pendingInvitations.items.length} invitation{pendingInvitations.items.length > 1 ? 's' : ''} en attente
+              </p>
+              <p className="text-sm text-dark-muted">
+                Vous avez ete invite a des sessions cinema
+              </p>
+            </div>
+            <Link
+              to="/portal/sessions"
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+            >
+              Repondre
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Pending votes alert */}
       {pendingVotes && pendingVotes.items.length > 0 && (
@@ -153,6 +184,36 @@ export function PortalHome() {
           </div>
         </div>
       </div>
+
+      {/* Pending invitations */}
+      {pendingInvitations && pendingInvitations.items.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-dark-text">Invitations en attente</h2>
+            <Link to="/portal/sessions" className="text-sm text-theatarr-500 hover:underline">
+              Voir tout
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {pendingInvitations.items.slice(0, 3).map((session) => (
+              <SessionCard
+                key={session.id}
+                id={session.id}
+                name={session.name}
+                movieTitle={session.movie_title}
+                moviePosterUrl={session.movie_poster_url}
+                status={session.status}
+                scheduledAt={session.scheduled_at}
+                invitationStatus={session.invitation_status}
+                movieSelectionMode={session.movie_selection_mode}
+                movieResolved={session.movie_resolved}
+                linkedVoteSessionId={session.linked_vote_session_id}
+                linkedVoteIsOpen={session.linked_vote_is_open}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Pending votes */}
       {pendingVotes && pendingVotes.items.length > 0 && (

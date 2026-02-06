@@ -3,7 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Lock, Save, Eye, EyeOff, Shield } from 'lucide-react';
+import { Lock, Save, Eye, EyeOff, Shield, Bell } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../api/client';
@@ -16,6 +16,7 @@ interface ProfileData {
   last_name: string | null;
   email: string | null;
   role: string;
+  auto_accept_invitations: boolean;
   created_at: string;
 }
 
@@ -33,6 +34,7 @@ export function Profile() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [autoAcceptInvitations, setAutoAcceptInvitations] = useState(false);
 
   // Password form state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -51,15 +53,24 @@ export function Profile() {
       setFirstName(profile.first_name || '');
       setLastName(profile.last_name || '');
       setEmail(profile.email || '');
+      setAutoAcceptInvitations(profile.auto_accept_invitations);
     }
   }, [profile]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: (data: { first_name?: string; last_name?: string; email?: string }) =>
+    mutationFn: (data: { first_name?: string; last_name?: string; email?: string; auto_accept_invitations?: boolean }) =>
       apiClient.patch('/portal/me', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portal', 'me'] });
       setIsEditing(false);
+    },
+  });
+
+  const toggleAutoAcceptMutation = useMutation({
+    mutationFn: (value: boolean) =>
+      apiClient.patch('/portal/me', { auto_accept_invitations: value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['portal', 'me'] });
     },
   });
 
@@ -84,6 +95,12 @@ export function Profile() {
       last_name: lastName || undefined,
       email: email || undefined,
     });
+  };
+
+  const handleToggleAutoAccept = () => {
+    const newValue = !autoAcceptInvitations;
+    setAutoAcceptInvitations(newValue);
+    toggleAutoAcceptMutation.mutate(newValue);
   };
 
   const handleChangePassword = () => {
@@ -242,6 +259,38 @@ export function Profile() {
               {updateProfileMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Preferences */}
+      <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
+        <h3 className="font-medium text-dark-text flex items-center gap-2 mb-4">
+          <Bell size={18} />
+          Preferences
+        </h3>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-dark-text">Accepter automatiquement les invitations</p>
+              <p className="text-sm text-dark-muted">
+                Acceptez automatiquement les invitations aux sessions. Le vote reste requis si la session en comporte un.
+              </p>
+            </div>
+            <button
+              onClick={handleToggleAutoAccept}
+              disabled={toggleAutoAcceptMutation.isPending}
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                autoAcceptInvitations ? 'bg-theatarr-500' : 'bg-dark-border'
+              } ${toggleAutoAcceptMutation.isPending ? 'opacity-50' : ''}`}
+            >
+              <span
+                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                  autoAcceptInvitations ? 'left-7' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
         </div>
       </div>
 

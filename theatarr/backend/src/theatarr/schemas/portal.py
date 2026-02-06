@@ -119,6 +119,7 @@ class PortalProfileResponse(BaseSchema):
     last_name: str | None
     email: str | None
     role: str
+    auto_accept_invitations: bool
     created_at: datetime
 
 
@@ -126,6 +127,7 @@ class PortalStatsResponse(BaseSchema):
     """User statistics for portal home."""
 
     pending_votes: int
+    pending_invitations: int
     upcoming_sessions: int
     total_sessions_attended: int
     total_votes_cast: int

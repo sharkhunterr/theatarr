@@ -71,6 +71,7 @@ class UserSelfUpdate(BaseSchema):
     first_name: str | None = Field(default=None, max_length=100)
     last_name: str | None = Field(default=None, max_length=100)
     email: EmailStr | None = None
+    auto_accept_invitations: bool | None = None
 
 
 class PasswordChangeRequest(BaseSchema):

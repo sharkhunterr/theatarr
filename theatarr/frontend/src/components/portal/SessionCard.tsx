@@ -53,19 +53,42 @@ export function SessionCard({
     interrupted: 'bg-red-500/20 text-red-400',
   };
 
-  const invitationColors: Record<string, string> = {
-    pending: 'text-yellow-400',
-    accepted: 'text-green-400',
-    declined: 'text-red-400',
+  // Invitation status configuration
+  const invitationConfig: Record<string, {
+    borderColor: string;
+    bgColor: string;
+    textColor: string;
+    icon: typeof Check;
+    label: string;
+  }> = {
+    pending: {
+      borderColor: 'border-l-yellow-500',
+      bgColor: 'bg-yellow-500/20',
+      textColor: 'text-yellow-400',
+      icon: Clock,
+      label: 'En attente',
+    },
+    accepted: {
+      borderColor: 'border-l-green-500',
+      bgColor: 'bg-green-500/20',
+      textColor: 'text-green-400',
+      icon: Check,
+      label: 'Acceptee',
+    },
+    declined: {
+      borderColor: 'border-l-red-500',
+      bgColor: 'bg-red-500/20',
+      textColor: 'text-red-400',
+      icon: X,
+      label: 'Refusee',
+    },
   };
 
-  const invitationIcons: Record<string, typeof Check> = {
-    pending: Clock,
-    accepted: Check,
-    declined: X,
-  };
+  const invitation = invitationConfig[invitationStatus] || invitationConfig.pending;
+  const InvitationIcon = invitation.icon;
 
-  const InvitationIcon = invitationIcons[invitationStatus] || Clock;
+  // Only show vote link if invitation is accepted
+  const canVote = invitationStatus === 'accepted';
 
   // Get movie display info based on selection mode
   const getMovieDisplayInfo = () => {
@@ -82,7 +105,7 @@ export function SessionCard({
       return {
         text: 'En attente du vote',
         icon: <Vote size={14} className="text-blue-400" />,
-        showVoteLink: linkedVoteSessionId && linkedVoteIsOpen,
+        showVoteLink: canVote && linkedVoteSessionId && linkedVoteIsOpen,
       };
     }
 
@@ -95,7 +118,7 @@ export function SessionCard({
         };
       }
       return {
-        text: 'Film mystère',
+        text: 'Film mystere',
         icon: <Shuffle size={14} className="text-purple-400 animate-pulse" />,
         showVoteLink: false,
       };
@@ -103,7 +126,7 @@ export function SessionCard({
 
     // Fixed mode
     return {
-      text: movieTitle || 'Film non sélectionné',
+      text: movieTitle || 'Film non selectionne',
       icon: <Film size={14} className="text-dark-muted" />,
       showVoteLink: false,
     };
@@ -114,7 +137,11 @@ export function SessionCard({
   return (
     <Link
       to={`/portal/sessions/${id}`}
-      className="block bg-dark-surface rounded-xl border border-dark-border overflow-hidden hover:border-theatarr-500/50 transition-colors"
+      className={clsx(
+        'block bg-dark-surface rounded-xl border border-dark-border overflow-hidden hover:border-theatarr-500/50 transition-colors',
+        'border-l-4',
+        invitation.borderColor
+      )}
     >
       <div className="flex">
         {/* Poster */}
@@ -135,8 +162,19 @@ export function SessionCard({
         {/* Content */}
         <div className="flex-1 p-3 flex flex-col justify-between">
           <div>
-            <h3 className="font-medium text-dark-text line-clamp-1">{name}</h3>
-            <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-medium text-dark-text line-clamp-1">{name}</h3>
+              {/* Invitation badge */}
+              <span className={clsx(
+                'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0',
+                invitation.bgColor,
+                invitation.textColor
+              )}>
+                <InvitationIcon size={12} />
+                {invitation.label}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
               {movieInfo.icon}
               <p className="text-sm text-dark-muted line-clamp-1">{movieInfo.text}</p>
             </div>
@@ -150,22 +188,23 @@ export function SessionCard({
                 Voter maintenant
               </Link>
             )}
+            {/* Message if vote requires acceptance first */}
+            {!canVote && movieSelectionMode === 'vote' && !movieResolved && linkedVoteSessionId && linkedVoteIsOpen && (
+              <p className="text-xs text-yellow-400 mt-1.5">
+                Acceptez l'invitation pour voter
+              </p>
+            )}
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span
-                className={clsx(
-                  'text-xs px-2 py-0.5 rounded-full',
-                  statusColors[status] || statusColors.draft
-                )}
-              >
-                {status}
-              </span>
-              <span className={clsx('flex items-center gap-1', invitationColors[invitationStatus])}>
-                <InvitationIcon size={14} />
-              </span>
-            </div>
+          <div className="flex items-center justify-between gap-2 mt-2">
+            <span
+              className={clsx(
+                'text-xs px-2 py-0.5 rounded-full',
+                statusColors[status] || statusColors.draft
+              )}
+            >
+              {status}
+            </span>
 
             {scheduledAt && (
               <span className="text-xs text-dark-muted">

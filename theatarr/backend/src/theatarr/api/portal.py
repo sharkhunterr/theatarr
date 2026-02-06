@@ -55,6 +55,7 @@ async def get_my_profile(
         last_name=user.last_name,
         email=user.email,
         role=user.role,
+        auto_accept_invitations=user.auto_accept_invitations,
         created_at=user.created_at,
     )
 
@@ -96,6 +97,7 @@ async def update_my_profile(
         last_name=user.last_name,
         email=user.email,
         role=user.role,
+        auto_accept_invitations=user.auto_accept_invitations,
         created_at=user.created_at,
     )
 
@@ -171,6 +173,19 @@ async def get_my_stats(
         if vote_check.scalar_one_or_none() is None:
             pending_votes += 1
 
+    # Count pending invitations
+    pending_invitations_query = (
+        select(func.count(SessionParticipant.id))
+        .join(Session)
+        .where(
+            SessionParticipant.user_id == user.id,
+            SessionParticipant.invitation_status == InvitationStatus.PENDING.value,
+            Session.status.in_([SessionStatus.SCHEDULED.value, SessionStatus.DRAFT.value]),
+        )
+    )
+    pending_invitations_result = await db.execute(pending_invitations_query)
+    pending_invitations = pending_invitations_result.scalar() or 0
+
     # Count upcoming sessions
     upcoming_sessions_query = (
         select(func.count(SessionParticipant.id))
@@ -206,6 +221,7 @@ async def get_my_stats(
 
     return PortalStatsResponse(
         pending_votes=pending_votes,
+        pending_invitations=pending_invitations,
         upcoming_sessions=upcoming_sessions,
         total_sessions_attended=total_sessions_attended,
         total_votes_cast=total_votes_cast,
@@ -283,6 +299,63 @@ async def get_my_sessions(
     total = total_result.scalar() or 0
 
     return PortalSessionListResponse(items=items, total=total)
+
+
+@router.get(
+    "/sessions/pending",
+    response_model=PortalSessionListResponse,
+    summary="Get Pending Session Invitations",
+)
+async def get_pending_invitations(
+    db: DbSession,
+    user: CurrentUser,
+) -> PortalSessionListResponse:
+    """Get sessions where the user has a pending invitation."""
+    query = (
+        select(SessionParticipant)
+        .options(selectinload(SessionParticipant.session))
+        .join(Session)
+        .where(
+            SessionParticipant.user_id == user.id,
+            SessionParticipant.invitation_status == InvitationStatus.PENDING.value,
+            Session.status.in_([SessionStatus.SCHEDULED.value, SessionStatus.DRAFT.value]),
+        )
+        .order_by(Session.scheduled_at.asc())
+    )
+
+    result = await db.execute(query)
+    participations = result.scalars().all()
+
+    items = []
+    for p in participations:
+        session = p.session
+        # Check if linked vote session is open
+        linked_vote_is_open = None
+        if session.linked_vote_session_id:
+            vote_result = await db.execute(
+                select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
+            )
+            linked_vote = vote_result.scalar_one_or_none()
+            if linked_vote:
+                linked_vote_is_open = linked_vote.is_open
+
+        items.append(
+            PortalSessionSummary(
+                id=session.id,
+                name=session.name,
+                movie_title=session.movie_title,
+                movie_poster_url=session.movie_poster_url,
+                status=session.status.value if isinstance(session.status, SessionStatus) else session.status,
+                scheduled_at=session.scheduled_at,
+                invitation_status=p.invitation_status,
+                movie_selection_mode=session.movie_selection_mode,
+                movie_resolved=session.movie_resolved,
+                linked_vote_session_id=session.linked_vote_session_id,
+                linked_vote_is_open=linked_vote_is_open,
+            )
+        )
+
+    return PortalSessionListResponse(items=items, total=len(items))
 
 
 @router.get(

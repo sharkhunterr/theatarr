@@ -56,6 +56,11 @@ class User(UUIDMixin, TimestampMixin, Base):
         default=True,
         nullable=False,
     )
+    auto_accept_invitations: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
