@@ -14,9 +14,11 @@ import {
   Plug,
   History,
   Settings,
+  Users,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  UserCircle,
   type LucideIcon,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -34,6 +36,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', labelFr: 'Tableau de bord', icon: LayoutDashboard, path: '/' },
   { label: 'Sessions', labelFr: 'Sessions', icon: Play, path: '/sessions' },
   { label: 'Vote Sessions', labelFr: 'Sessions de vote', icon: Vote, path: '/votes' },
+  { label: 'Users', labelFr: 'Utilisateurs', icon: Users, path: '/users' },
   { label: 'Trailers', labelFr: 'Bandes-annonces', icon: Video, path: '/trailers' },
   { label: 'Templates', labelFr: 'Modèles', icon: Palette, path: '/templates' },
   { label: 'Services', labelFr: 'Services', icon: Plug, path: '/services' },
@@ -160,8 +163,20 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* Collapse toggle */}
-        <div className="p-3 border-t border-dark-border">
+        {/* Portal link + Collapse toggle */}
+        <div className="p-3 border-t border-dark-border space-y-1">
+          <Link
+            to="/portal"
+            className={clsx(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+              'hover:bg-theatarr-500/10 text-theatarr-500',
+              sidebarCollapsed && 'justify-center'
+            )}
+            title={sidebarCollapsed ? 'Portail Utilisateur' : undefined}
+          >
+            <UserCircle size={20} />
+            {!sidebarCollapsed && <span className="text-sm font-medium">Portail Utilisateur</span>}
+          </Link>
           <button
             onClick={toggleSidebar}
             className={clsx(
@@ -201,6 +216,18 @@ export function Sidebar() {
             </div>
           ))}
         </nav>
+
+        {/* Portal link */}
+        <div className="p-3 border-t border-dark-border">
+          <Link
+            to="/portal"
+            onClick={() => setSidebarOpen(false)}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-theatarr-500/10 text-theatarr-500"
+          >
+            <UserCircle size={20} />
+            <span className="text-sm font-medium">Portail Utilisateur</span>
+          </Link>
+        </div>
       </aside>
     </>
   );

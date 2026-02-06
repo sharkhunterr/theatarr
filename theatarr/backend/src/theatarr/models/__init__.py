@@ -1,7 +1,7 @@
 """SQLAlchemy models for Theatarr."""
 
 from theatarr.database import Base
-from theatarr.models.user import User
+from theatarr.models.user import User, UserRole
 from theatarr.models.settings import Settings
 from theatarr.models.session import Session
 from theatarr.models.sequence import Sequence
@@ -12,10 +12,13 @@ from theatarr.models.palette import ColorPalette
 from theatarr.models.template import Template
 from theatarr.models.vote import VoteSession, Vote, VoteToken
 from theatarr.models.trailer import Trailer, TrailerRule
+from theatarr.models.session_participant import SessionParticipant, InvitationStatus
+from theatarr.models.vote_session_participant import VoteSessionParticipant
 
 __all__ = [
     "Base",
     "User",
+    "UserRole",
     "Settings",
     "Session",
     "Sequence",
@@ -29,4 +32,7 @@ __all__ = [
     "VoteToken",
     "Trailer",
     "TrailerRule",
+    "SessionParticipant",
+    "InvitationStatus",
+    "VoteSessionParticipant",
 ]

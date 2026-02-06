@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 
 from theatarr.config import settings
 from theatarr.database import DbSession
-from theatarr.models.user import User
+from theatarr.models.user import User, UserRole
 from theatarr.services.auth import CurrentUser, get_current_user, oauth2_scheme
 
 
@@ -31,9 +31,12 @@ OptionalUser = Annotated[User | None, Depends(get_optional_current_user)]
 
 
 def require_admin(user: CurrentUser) -> User:
-    """Dependency that requires admin authentication."""
-    # For now, all authenticated users are admins
-    # Future: add role-based access control
+    """Dependency that requires admin role."""
+    if user.role != UserRole.ADMIN.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
     return user
 
 

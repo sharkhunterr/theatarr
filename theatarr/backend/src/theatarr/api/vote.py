@@ -444,6 +444,141 @@ async def delete_token(
 
 
 # ============================================================================
+# Vote Session Participants endpoints
+# ============================================================================
+
+
+@router.get(
+    "/vote-sessions/{session_id}/participants",
+    summary="List Vote Session Participants",
+)
+async def list_vote_participants(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+) -> dict:
+    """List all participants for a vote session."""
+    from theatarr.models.vote_session_participant import VoteSessionParticipant
+    from theatarr.models.user import User
+
+    # Check vote session exists
+    result = await db.execute(select(VoteSession).where(VoteSession.id == session_id))
+    vote_session = result.scalar_one_or_none()
+    if not vote_session:
+        raise NotFoundError("VoteSession", session_id)
+
+    # Get participants with user info
+    query = (
+        select(VoteSessionParticipant, User)
+        .join(User)
+        .where(VoteSessionParticipant.vote_session_id == session_id)
+        .order_by(VoteSessionParticipant.invited_at.desc())
+    )
+    result = await db.execute(query)
+    rows = result.all()
+
+    items = []
+    for participant, participant_user in rows:
+        items.append({
+            "id": participant.id,
+            "user_id": participant.user_id,
+            "username": participant_user.username,
+            "first_name": participant_user.first_name,
+            "last_name": participant_user.last_name,
+            "email": participant_user.email,
+            "has_voted": participant.has_voted,
+            "invited_at": participant.invited_at.isoformat() if participant.invited_at else None,
+            "voted_at": participant.voted_at.isoformat() if participant.voted_at else None,
+        })
+
+    return {"items": items, "total": len(items)}
+
+
+@router.post(
+    "/vote-sessions/{session_id}/participants",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add Vote Session Participants",
+)
+async def add_vote_participants(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+    user_ids: list[str],
+) -> dict:
+    """Add participants to a vote session."""
+    from datetime import datetime, timezone
+    from theatarr.models.vote_session_participant import VoteSessionParticipant
+    from theatarr.models.user import User
+
+    # Check vote session exists
+    result = await db.execute(select(VoteSession).where(VoteSession.id == session_id))
+    vote_session = result.scalar_one_or_none()
+    if not vote_session:
+        raise NotFoundError("VoteSession", session_id)
+
+    added = []
+    for uid in user_ids:
+        # Check user exists
+        user_result = await db.execute(select(User).where(User.id == uid))
+        target_user = user_result.scalar_one_or_none()
+        if not target_user:
+            continue
+
+        # Check if already a participant
+        existing = await db.execute(
+            select(VoteSessionParticipant).where(
+                VoteSessionParticipant.vote_session_id == session_id,
+                VoteSessionParticipant.user_id == uid,
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        # Create participant
+        participant = VoteSessionParticipant(
+            vote_session_id=session_id,
+            user_id=uid,
+            has_voted=False,
+            invited_at=datetime.now(timezone.utc),
+        )
+        db.add(participant)
+        added.append(uid)
+
+    await db.commit()
+
+    return {"added": added, "count": len(added)}
+
+
+@router.delete(
+    "/vote-sessions/{session_id}/participants/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove Vote Session Participant",
+)
+async def remove_vote_participant(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+    user_id: str,
+) -> None:
+    """Remove a participant from a vote session."""
+    from theatarr.models.vote_session_participant import VoteSessionParticipant
+
+    result = await db.execute(
+        select(VoteSessionParticipant).where(
+            VoteSessionParticipant.vote_session_id == session_id,
+            VoteSessionParticipant.user_id == user_id,
+        )
+    )
+    participant = result.scalar_one_or_none()
+
+    if not participant:
+        raise NotFoundError("Vote session participant", f"{session_id}/{user_id}")
+
+    await db.delete(participant)
+    await db.commit()
+
+
+# ============================================================================
 # Public Routes (for voters)
 # ============================================================================
 

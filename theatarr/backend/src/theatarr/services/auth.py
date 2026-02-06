@@ -32,6 +32,7 @@ class TokenData(BaseModel):
 
     user_id: str
     username: str
+    role: str = "user"
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -57,6 +58,7 @@ def create_access_token(user: User) -> Token:
     payload = {
         "sub": user.id,
         "username": user.username,
+        "role": user.role,
         "exp": expire,
         "iat": datetime.now(timezone.utc),
     }
@@ -140,6 +142,10 @@ async def create_user(
     db: AsyncSession,
     username: str,
     password: str,
+    role: str = "user",
+    first_name: str | None = None,
+    last_name: str | None = None,
+    email: str | None = None,
 ) -> User:
     """Create a new user account."""
     # Check if username already exists
@@ -150,9 +156,22 @@ async def create_user(
             detail="Username already exists",
         )
 
+    # Check if email already exists (if provided)
+    if email:
+        result = await db.execute(select(User).where(User.email == email))
+        if result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already in use",
+            )
+
     user = User(
         username=username,
         password_hash=hash_password(password),
+        role=role,
+        first_name=first_name,
+        last_name=last_name,
+        email=email,
     )
     db.add(user)
     await db.commit()

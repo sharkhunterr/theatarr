@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from theatarr import __version__
 from theatarr.adapters.registry import discover_adapters
-from theatarr.api import auth, config, logs, movies, services, sessions, sequences, templates, trailers, vote, wallmount
+from theatarr.api import auth, config, logs, movies, portal, services, sessions, sequences, templates, trailers, users, vote, wallmount
 from theatarr.api.errors import (
     AppException,
     app_exception_handler,
@@ -76,6 +76,8 @@ Query parameters:
     openapi_url="/openapi.json" if settings.debug else "/api/v1/openapi.json",
     openapi_tags=[
         {"name": "auth", "description": "Authentication and authorization"},
+        {"name": "users", "description": "User management (admin)"},
+        {"name": "portal", "description": "User portal for sessions and votes"},
         {"name": "sessions", "description": "Cinema session management"},
         {"name": "sequences", "description": "Sequence and action orchestration"},
         {"name": "services", "description": "External service configuration"},
@@ -114,6 +116,8 @@ if not settings.debug:
 
 # Include routers
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(portal.router, prefix="/api/v1")
 app.include_router(services.router, prefix="/api/v1")
 app.include_router(sessions.router, prefix="/api/v1")
 app.include_router(sequences.router, prefix="/api/v1")

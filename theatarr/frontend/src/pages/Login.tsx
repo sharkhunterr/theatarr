@@ -6,12 +6,12 @@ import { useAuthStore } from '../stores/authStore';
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, isLoading, error, clearError, user } = useAuthStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -19,7 +19,16 @@ export function Login() {
 
     try {
       await login(username, password);
-      navigate(from, { replace: true });
+      // Get updated user after login
+      const currentUser = useAuthStore.getState().user;
+      // Redirect based on role
+      if (from && !from.startsWith('/login')) {
+        navigate(from, { replace: true });
+      } else if (currentUser?.role === 'admin') {
+        navigate('/', { replace: true });
+      } else {
+        navigate('/portal', { replace: true });
+      }
     } catch {
       // Error is handled by the store
     }

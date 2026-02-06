@@ -9,6 +9,10 @@ import { apiClient, clearAuthToken, setAuthToken } from '../api/client';
 interface User {
   id: string;
   username: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  role: string;
   is_active: boolean;
 }
 

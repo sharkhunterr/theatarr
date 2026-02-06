@@ -149,7 +149,15 @@ export const apiClient = {
     return data as { access_token: string; token_type: string; expires_in: number };
   },
 
-  getMe: () => request<{ id: string; username: string; is_active: boolean }>('/auth/me'),
+  getMe: () => request<{
+    id: string;
+    username: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+    role: string;
+    is_active: boolean;
+  }>('/auth/me'),
 
   refreshToken: () =>
     request<{ access_token: string; token_type: string; expires_in: number }>(

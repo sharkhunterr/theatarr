@@ -473,3 +473,138 @@ async def extract_palette(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+
+# ============================================================================
+# Session Participants endpoints
+# ============================================================================
+
+
+@router.get(
+    "/{session_id}/participants",
+    summary="List Session Participants",
+)
+async def list_session_participants(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+) -> dict:
+    """List all participants for a session."""
+    from theatarr.models.session_participant import SessionParticipant
+    from theatarr.models.user import User
+
+    # Check session exists
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise NotFoundError("Session", session_id)
+
+    # Get participants with user info
+    query = (
+        select(SessionParticipant, User)
+        .join(User)
+        .where(SessionParticipant.session_id == session_id)
+        .order_by(SessionParticipant.invited_at.desc())
+    )
+    result = await db.execute(query)
+    rows = result.all()
+
+    items = []
+    for participant, participant_user in rows:
+        items.append({
+            "id": participant.id,
+            "user_id": participant.user_id,
+            "username": participant_user.username,
+            "first_name": participant_user.first_name,
+            "last_name": participant_user.last_name,
+            "email": participant_user.email,
+            "invitation_status": participant.invitation_status,
+            "invited_at": participant.invited_at.isoformat() if participant.invited_at else None,
+            "responded_at": participant.responded_at.isoformat() if participant.responded_at else None,
+        })
+
+    return {"items": items, "total": len(items)}
+
+
+@router.post(
+    "/{session_id}/participants",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add Session Participants",
+)
+async def add_session_participants(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+    user_ids: list[str],
+) -> dict:
+    """Add participants to a session."""
+    from datetime import datetime, timezone
+    from theatarr.models.session_participant import SessionParticipant, InvitationStatus
+    from theatarr.models.user import User
+
+    # Check session exists
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise NotFoundError("Session", session_id)
+
+    added = []
+    for uid in user_ids:
+        # Check user exists
+        user_result = await db.execute(select(User).where(User.id == uid))
+        target_user = user_result.scalar_one_or_none()
+        if not target_user:
+            continue
+
+        # Check if already a participant
+        existing = await db.execute(
+            select(SessionParticipant).where(
+                SessionParticipant.session_id == session_id,
+                SessionParticipant.user_id == uid,
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        # Create participant
+        participant = SessionParticipant(
+            session_id=session_id,
+            user_id=uid,
+            invitation_status=InvitationStatus.PENDING.value,
+            invited_at=datetime.now(timezone.utc),
+        )
+        db.add(participant)
+        added.append(uid)
+
+    await db.commit()
+
+    return {"added": added, "count": len(added)}
+
+
+@router.delete(
+    "/{session_id}/participants/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove Session Participant",
+)
+async def remove_session_participant(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+    user_id: str,
+) -> None:
+    """Remove a participant from a session."""
+    from theatarr.models.session_participant import SessionParticipant
+
+    result = await db.execute(
+        select(SessionParticipant).where(
+            SessionParticipant.session_id == session_id,
+            SessionParticipant.user_id == user_id,
+        )
+    )
+    participant = result.scalar_one_or_none()
+
+    if not participant:
+        raise NotFoundError("Session participant", f"{session_id}/{user_id}")
+
+    await db.delete(participant)
+    await db.commit()
