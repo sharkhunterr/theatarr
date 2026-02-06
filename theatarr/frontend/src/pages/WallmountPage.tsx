@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TemplateRenderer } from '../components/wallmount';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { API_BASE } from '../api/client';
 
 interface WallmountState {
   session_id: string | null;
@@ -74,7 +75,7 @@ export function WallmountPage() {
   useEffect(() => {
     const fetchState = async () => {
       try {
-        const response = await fetch('/api/v1/wallmount/state');
+        const response = await fetch(`${API_BASE}/api/v1/wallmount/state`);
         if (!response.ok) {
           throw new Error('Failed to fetch wallmount state');
         }

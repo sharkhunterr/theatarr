@@ -2,7 +2,8 @@
  * API client for Theatarr backend.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = `${API_BASE}/api/v1`;
 
 interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
@@ -89,11 +90,27 @@ async function request<T>(
   const data = await response.json();
 
   if (!response.ok) {
+    // FastAPI returns {"detail": "message"} or {"detail": [...validation errors...]}
+    // Our custom errors return {"error": {"code": "...", "message": "..."}}
     const error = data.error as ApiError | undefined;
+    let message = 'An error occurred';
+
+    if (data.detail) {
+      // FastAPI error format
+      if (typeof data.detail === 'string') {
+        message = data.detail;
+      } else if (Array.isArray(data.detail)) {
+        // Validation errors from Pydantic
+        message = data.detail.map((e: any) => `${e.loc?.join('.')}: ${e.msg}`).join(', ');
+      }
+    } else if (error?.message) {
+      message = error.message;
+    }
+
     throw new ApiClientError(
       response.status,
       error?.code || 'UNKNOWN_ERROR',
-      error?.message || 'An error occurred',
+      message,
       error?.field
     );
   }
@@ -111,7 +128,7 @@ export const apiClient = {
     formData.append('username', username);
     formData.append('password', password);
 
-    const response = await fetch(`${API_URL}/api/v1/auth/login`, {
+    const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -132,11 +149,11 @@ export const apiClient = {
     return data as { access_token: string; token_type: string; expires_in: number };
   },
 
-  getMe: () => request<{ id: string; username: string; is_active: boolean }>('/api/v1/auth/me'),
+  getMe: () => request<{ id: string; username: string; is_active: boolean }>('/auth/me'),
 
   refreshToken: () =>
     request<{ access_token: string; token_type: string; expires_in: number }>(
-      '/api/v1/auth/refresh',
+      '/auth/refresh',
       { method: 'POST' }
     ),
 
@@ -147,7 +164,7 @@ export const apiClient = {
       version: string;
       description: string;
       features: Record<string, boolean>;
-    }>('/api/v1/info', { skipAuth: true }),
+    }>('/info', { skipAuth: true }),
 
   // Generic CRUD helpers (will be expanded as APIs are implemented)
   get: <T>(endpoint: string) => request<T>(endpoint),

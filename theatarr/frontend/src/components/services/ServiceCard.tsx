@@ -1,5 +1,21 @@
-import { Settings, Trash2, Power, PowerOff, RefreshCw } from 'lucide-react';
-import { Button, Card, CardContent } from '../common';
+import {
+  Settings,
+  Trash2,
+  Power,
+  PowerOff,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  AlertCircle,
+  HelpCircle,
+  Lightbulb,
+  Monitor,
+  Film,
+  Cog,
+  Database,
+} from 'lucide-react';
+import { Button } from '../common';
+import { useLayoutStore } from '../../stores/layoutStore';
 
 export interface Service {
   id: string;
@@ -27,26 +43,43 @@ interface ServiceCardProps {
   isTestLoading?: boolean;
 }
 
-const categoryLabels: Record<string, string> = {
-  lighting: 'Lighting',
-  player: 'Media Player',
-  media_source: 'Media Source',
-  actuator: 'Actuator',
-  metadata: 'Metadata',
+const categoryIcons: Record<string, React.ReactNode> = {
+  lighting: <Lightbulb size={20} />,
+  player: <Monitor size={20} />,
+  media_source: <Film size={20} />,
+  actuator: <Cog size={20} />,
+  metadata: <Database size={20} />,
 };
 
-const statusColors: Record<string, string> = {
-  connected: 'bg-green-500',
-  disconnected: 'bg-gray-500',
-  error: 'bg-red-500',
-  unknown: 'bg-yellow-500',
+const categoryColors: Record<string, string> = {
+  lighting: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+  player: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  media_source: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  actuator: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  metadata: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
 };
 
-const statusLabels: Record<string, string> = {
-  connected: 'Connected',
-  disconnected: 'Disconnected',
-  error: 'Error',
-  unknown: 'Unknown',
+const statusConfig: Record<string, { icon: React.ReactNode; color: string; bgColor: string }> = {
+  connected: {
+    icon: <Wifi size={14} />,
+    color: 'text-green-400',
+    bgColor: 'bg-green-500',
+  },
+  disconnected: {
+    icon: <WifiOff size={14} />,
+    color: 'text-gray-400',
+    bgColor: 'bg-gray-500',
+  },
+  error: {
+    icon: <AlertCircle size={14} />,
+    color: 'text-red-400',
+    bgColor: 'bg-red-500',
+  },
+  unknown: {
+    icon: <HelpCircle size={14} />,
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500',
+  },
 };
 
 export function ServiceCard({
@@ -57,84 +90,138 @@ export function ServiceCard({
   onTest,
   isTestLoading,
 }: ServiceCardProps) {
+  const { language } = useLayoutStore();
+  const status = statusConfig[service.connection_status];
+
+  const t = {
+    enabled: language === 'fr' ? 'Activé' : 'Enabled',
+    disabled: language === 'fr' ? 'Désactivé' : 'Disabled',
+    lastSeen: language === 'fr' ? 'Vu le' : 'Last seen',
+    capabilities: language === 'fr' ? 'capacités' : 'capabilities',
+    test: language === 'fr' ? 'Tester' : 'Test',
+    edit: language === 'fr' ? 'Modifier' : 'Edit',
+    delete: language === 'fr' ? 'Supprimer' : 'Delete',
+    connected: language === 'fr' ? 'Connecté' : 'Connected',
+    disconnected: language === 'fr' ? 'Déconnecté' : 'Disconnected',
+    error: language === 'fr' ? 'Erreur' : 'Error',
+    unknown: language === 'fr' ? 'Inconnu' : 'Unknown',
+  };
+
+  const statusLabels: Record<string, string> = {
+    connected: t.connected,
+    disconnected: t.disconnected,
+    error: t.error,
+    unknown: t.unknown,
+  };
+
+  const categoryLabels: Record<string, string> = {
+    lighting: language === 'fr' ? 'Éclairage' : 'Lighting',
+    player: language === 'fr' ? 'Lecteur' : 'Player',
+    media_source: language === 'fr' ? 'Source média' : 'Media Source',
+    actuator: language === 'fr' ? 'Actionneur' : 'Actuator',
+    metadata: language === 'fr' ? 'Métadonnées' : 'Metadata',
+  };
+
   return (
-    <Card
-      className={`transition-all ${
+    <div
+      className={`bg-dark-surface border border-dark-border rounded-xl overflow-hidden transition-all hover:border-dark-muted/50 ${
         !service.is_enabled ? 'opacity-60' : ''
       }`}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            {/* Header */}
-            <div className="flex items-center gap-2 mb-2">
-              <div
-                className={`w-2.5 h-2.5 rounded-full ${statusColors[service.connection_status]}`}
-                title={statusLabels[service.connection_status]}
-              />
-              <h3 className="text-lg font-semibold text-dark-text truncate">
-                {service.name}
-              </h3>
+      <div className="p-4">
+        {/* Mobile: Stack layout, Desktop: Row layout */}
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+          {/* Icon + Status indicator */}
+          <div className="flex items-start gap-3 sm:gap-0">
+            <div
+              className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
+                categoryColors[service.category] || 'bg-dark-border text-dark-muted border-dark-border'
+              }`}
+            >
+              {categoryIcons[service.category] || <Cog size={20} />}
             </div>
 
-            {/* Meta */}
-            <div className="flex items-center gap-2 text-sm text-dark-muted mb-2">
-              <span className="px-2 py-0.5 bg-dark-bg rounded text-xs">
+            {/* Mobile: Show name next to icon */}
+            <div className="flex-1 sm:hidden">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-dark-text">{service.name}</h3>
+                <div className={`w-2 h-2 rounded-full ${status.bgColor}`} />
+              </div>
+              <span className="text-xs text-dark-muted">{service.adapter_type}</span>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            {/* Desktop: Name row */}
+            <div className="hidden sm:flex items-center gap-2 mb-1">
+              <h3 className="font-semibold text-dark-text truncate">{service.name}</h3>
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${status.bgColor}`} />
+            </div>
+
+            {/* Tags row */}
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="hidden sm:inline px-2 py-0.5 bg-dark-bg rounded text-xs text-dark-muted">
                 {service.adapter_type}
               </span>
-              <span>{categoryLabels[service.category] || service.category}</span>
+              <span className="px-2 py-0.5 bg-dark-bg rounded text-xs text-dark-muted">
+                {categoryLabels[service.category] || service.category}
+              </span>
+              <span className={`flex items-center gap-1 text-xs ${status.color}`}>
+                {status.icon}
+                <span className="hidden xs:inline">{statusLabels[service.connection_status]}</span>
+              </span>
             </div>
 
             {/* Description */}
             {service.description && (
-              <p className="text-sm text-dark-muted mb-2 line-clamp-2">
-                {service.description}
-              </p>
+              <p className="text-sm text-dark-muted mb-2 line-clamp-1">{service.description}</p>
             )}
 
             {/* Error message */}
             {service.error_message && service.connection_status === 'error' && (
-              <div className="text-sm text-red-400 bg-red-500/10 rounded px-2 py-1 mb-2">
+              <div className="text-xs text-red-400 bg-red-500/10 rounded-lg px-2 py-1.5 mb-2">
                 {service.error_message}
               </div>
             )}
 
-            {/* Status info */}
-            <div className="text-xs text-dark-muted">
+            {/* Status row */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-dark-muted">
               <span className={service.is_enabled ? 'text-green-400' : 'text-gray-400'}>
-                {service.is_enabled ? 'Enabled' : 'Disabled'}
+                {service.is_enabled ? t.enabled : t.disabled}
               </span>
               {service.last_seen_at && (
-                <span className="ml-2">
-                  • Last seen: {new Date(service.last_seen_at).toLocaleString()}
+                <span>
+                  {t.lastSeen} {new Date(service.last_seen_at).toLocaleDateString()}
+                </span>
+              )}
+              {service.capabilities && service.capabilities.length > 0 && (
+                <span>
+                  {service.capabilities.length} {t.capabilities}
                 </span>
               )}
             </div>
-
-            {/* Capabilities count */}
-            {service.capabilities && service.capabilities.length > 0 && (
-              <div className="mt-2 text-xs text-dark-muted">
-                {service.capabilities.length} capabilities discovered
-              </div>
-            )}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-1 ml-4">
+          {/* Actions - Always visible on mobile as row, column on desktop */}
+          <div className="flex items-center gap-1 sm:flex-col sm:items-end pt-2 sm:pt-0 border-t sm:border-t-0 border-dark-border mt-2 sm:mt-0">
             <Button
               variant="ghost"
               size="sm"
               onClick={onTest}
               disabled={isTestLoading}
-              title="Test connection"
+              title={t.test}
+              className="flex-1 sm:flex-none"
             >
               <RefreshCw size={14} className={isTestLoading ? 'animate-spin' : ''} />
+              <span className="ml-1 sm:hidden">{t.test}</span>
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={onToggle}
-              title={service.is_enabled ? 'Disable' : 'Enable'}
+              title={service.is_enabled ? t.disabled : t.enabled}
+              className="flex-1 sm:flex-none"
             >
               {service.is_enabled ? (
                 <PowerOff size={14} className="text-red-400" />
@@ -142,15 +229,28 @@ export function ServiceCard({
                 <Power size={14} className="text-green-400" />
               )}
             </Button>
-            <Button variant="ghost" size="sm" onClick={onEdit} title="Edit">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEdit}
+              title={t.edit}
+              className="flex-1 sm:flex-none"
+            >
               <Settings size={14} />
+              <span className="ml-1 sm:hidden">{t.edit}</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={onDelete} title="Delete">
-              <Trash2 size={14} className="text-red-400" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              title={t.delete}
+              className="flex-1 sm:flex-none text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              <Trash2 size={14} />
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

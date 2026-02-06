@@ -103,9 +103,20 @@ export function SessionPage() {
             </Button>
           </Link>
           <div className="flex items-start gap-4">
-            <div className="hidden sm:flex w-14 h-14 rounded-xl bg-theatarr-500/20 items-center justify-center flex-shrink-0">
-              <Film size={28} className="text-theatarr-500" />
-            </div>
+            {/* Movie Poster or default icon */}
+            {session.movie_poster_url ? (
+              <div className="hidden sm:block w-16 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-dark-border">
+                <img
+                  src={session.movie_poster_url}
+                  alt={session.movie_title || session.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="hidden sm:flex w-14 h-14 rounded-xl bg-theatarr-500/20 items-center justify-center flex-shrink-0">
+                <Film size={28} className="text-theatarr-500" />
+              </div>
+            )}
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h1 className="text-2xl font-bold text-dark-text">{session.name}</h1>
@@ -113,6 +124,14 @@ export function SessionPage() {
                   {statusInfo.label}
                 </span>
               </div>
+              {/* Movie title if different from session name */}
+              {session.movie_title && session.movie_title !== session.name && (
+                <p className="text-sm text-theatarr-400 mb-1 flex items-center gap-1">
+                  <Film size={12} />
+                  {session.movie_title}
+                  {session.movie_source && <span className="text-dark-muted">via {session.movie_source}</span>}
+                </p>
+              )}
               {session.description && (
                 <p className="text-sm text-dark-muted">{session.description}</p>
               )}

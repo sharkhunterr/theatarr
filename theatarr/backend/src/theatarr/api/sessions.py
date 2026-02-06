@@ -42,6 +42,11 @@ def _session_to_response(session: Session) -> SessionResponse:
         name=session.name,
         description=session.description,
         movie_id=session.movie_id,
+        movie_title=session.movie_title,
+        movie_poster_url=session.movie_poster_url,
+        movie_source_id=session.movie_source_id,
+        movie_source=session.movie_source,
+        color_palette=session.color_palette,
         status=SessionStatus(session.status),
         scheduled_at=session.scheduled_at,
         started_at=session.started_at,
@@ -118,6 +123,11 @@ async def create_session(
         name=data.name,
         description=data.description,
         movie_id=data.movie_id,
+        movie_title=data.movie_title,
+        movie_poster_url=data.movie_poster_url,
+        movie_source_id=data.movie_source_id,
+        movie_source=data.movie_source,
+        color_palette=data.color_palette,
         scheduled_at=data.scheduled_at,
         auto_resume_enabled=data.auto_resume_enabled,
         workflow=data.workflow,
@@ -188,6 +198,11 @@ async def get_session(
         name=session.name,
         description=session.description,
         movie_id=session.movie_id,
+        movie_title=session.movie_title,
+        movie_poster_url=session.movie_poster_url,
+        movie_source_id=session.movie_source_id,
+        movie_source=session.movie_source,
+        color_palette=session.color_palette,
         status=SessionStatus(session.status),
         scheduled_at=session.scheduled_at,
         started_at=session.started_at,
@@ -234,9 +249,11 @@ async def update_session(
     for field, value in update_data.items():
         setattr(session, field, value)
 
-    # Flag workflow as modified for SQLAlchemy to detect JSON changes
+    # Flag JSON fields as modified for SQLAlchemy to detect changes
     if "workflow" in update_data:
         flag_modified(session, "workflow")
+    if "color_palette" in update_data:
+        flag_modified(session, "color_palette")
 
     # Handle sequences update
     if data.sequences is not None:
@@ -432,3 +449,27 @@ async def get_session_state(
 
     except SessionNotFoundError:
         raise NotFoundError("Session", session_id)
+
+
+@router.post(
+    "/extract-palette",
+    summary="Extract Color Palette",
+)
+async def extract_palette(
+    user: AdminUser,
+    poster_url: str,
+) -> dict:
+    """Extract color palette from a movie poster URL."""
+    from theatarr.services.palette import (
+        extract_palette_from_url,
+        PaletteExtractionError,
+    )
+
+    try:
+        palette = await extract_palette_from_url(poster_url)
+        return palette
+    except PaletteExtractionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )

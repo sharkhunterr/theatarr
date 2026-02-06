@@ -66,7 +66,7 @@ function SortableActionItem({ action, isSelected, onSelect, onDelete }: Sortable
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 p-2 rounded-lg border transition-colors cursor-pointer ${
+      className={`flex items-center gap-1.5 p-1.5 rounded border transition-colors cursor-pointer ${
         isDragging
           ? 'bg-dark-surface/80 border-theatarr-500 opacity-50'
           : isSelected
@@ -77,36 +77,36 @@ function SortableActionItem({ action, isSelected, onSelect, onDelete }: Sortable
     >
       {/* Drag Handle */}
       <button
-        className="p-1 text-dark-muted hover:text-dark-text cursor-grab"
+        className="p-0.5 text-dark-muted hover:text-dark-text cursor-grab"
         {...attributes}
         {...listeners}
       >
-        <GripVertical size={14} />
+        <GripVertical size={12} />
       </button>
 
       {/* Icon */}
       <div className={`${actionColors[action.action_type]}`}>
-        <Icon size={16} />
+        <Icon size={14} />
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-dark-text truncate">{action.command}</div>
-        <div className="text-xs text-dark-muted truncate">
+        <div className="text-xs font-medium text-dark-text truncate">{action.command}</div>
+        <div className="text-[10px] text-dark-muted truncate">
           {action.action_type}
-          {action.delay_ms > 0 && ` • +${action.delay_ms}ms`}
+          {action.delay_ms > 0 && ` +${action.delay_ms}ms`}
         </div>
       </div>
 
       {/* Delete */}
       <button
-        className="p-1 text-dark-muted hover:text-red-500 transition-colors"
+        className="p-0.5 text-dark-muted hover:text-red-500 transition-colors"
         onClick={(e) => {
           e.stopPropagation();
           onDelete();
         }}
       >
-        <Trash2 size={14} />
+        <Trash2 size={12} />
       </button>
     </div>
   );
@@ -144,9 +144,8 @@ export function LinearEditor({
 
   if (actions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-32 text-dark-muted text-sm">
+      <div className="flex flex-col items-center justify-center h-24 text-dark-muted text-xs">
         <p>No actions yet</p>
-        <p className="text-xs">Click "Add" to create an action</p>
       </div>
     );
   }
@@ -154,7 +153,7 @@ export function LinearEditor({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={actionIds} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2">
+        <div className="space-y-1">
           {actions.map((action) => (
             <SortableActionItem
               key={action.id}

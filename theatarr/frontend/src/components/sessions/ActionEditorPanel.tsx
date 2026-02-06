@@ -41,11 +41,25 @@ interface ServiceResources {
   error?: string;
 }
 
+interface ColorPalette {
+  primary: string;
+  secondary: string;
+  accent: string;
+  vibrant: string;
+  vibrant_light: string;
+  vibrant_dark: string;
+  muted: string;
+  muted_light: string;
+  muted_dark: string;
+  raw_palette?: string[];
+}
+
 interface ActionEditorPanelProps {
   action: ActionItem;
   services: Service[];
   onChange: (updates: Partial<ActionItem>) => void;
   onDelete: () => void;
+  colorPalette?: ColorPalette | null;
 }
 
 // Action type configurations
@@ -63,7 +77,7 @@ const actionTypeConfig: Record<ActionType, {
   actuator: { icon: Zap, color: 'text-orange-400', bgColor: 'bg-orange-500/20', label: { en: 'Actuator', fr: 'Actionneur' }, category: 'actuator' },
 };
 
-export function ActionEditorPanel({ action, services, onChange, onDelete }: ActionEditorPanelProps) {
+export function ActionEditorPanel({ action, services, onChange, onDelete, colorPalette }: ActionEditorPanelProps) {
   const { language } = useLayoutStore();
   const config = actionTypeConfig[action.action_type];
   const Icon = config.icon;
@@ -128,6 +142,7 @@ export function ActionEditorPanel({ action, services, onChange, onDelete }: Acti
             action={action}
             onChange={onChange}
             language={language}
+            colorPalette={colorPalette}
           />
         )}
         {action.action_type === 'audio' && (
@@ -209,10 +224,12 @@ function LightingForm({
   action,
   onChange,
   language,
+  colorPalette,
 }: {
   action: ActionItem;
   onChange: (updates: Partial<ActionItem>) => void;
   language: string;
+  colorPalette?: ColorPalette | null;
 }) {
   const { parameters, command, service_id } = action;
 
@@ -236,6 +253,8 @@ function LightingForm({
     scene: language === 'fr' ? 'Scène' : 'Scene',
     noLights: language === 'fr' ? 'Aucune lumière disponible' : 'No lights available',
     refresh: language === 'fr' ? 'Actualiser' : 'Refresh',
+    moviePalette: language === 'fr' ? 'Palette du film' : 'Movie Palette',
+    noPalette: language === 'fr' ? 'Sélectionnez un film pour voir sa palette' : 'Select a movie to see its palette',
   };
 
   const commands = [
@@ -304,35 +323,88 @@ function LightingForm({
 
       {/* Color (for set_color) */}
       {(command === 'set_color' || command === 'turn_on') && (
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.color}</label>
-            <div className="flex items-center gap-2">
+        <div className="space-y-4">
+          {/* Movie Palette Swatches */}
+          {colorPalette && (
+            <div>
+              <label className="block text-sm font-medium text-dark-text mb-2">{t.moviePalette}</label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { color: colorPalette.primary, label: 'Primary' },
+                  { color: colorPalette.secondary, label: 'Secondary' },
+                  { color: colorPalette.accent, label: 'Accent' },
+                  { color: colorPalette.vibrant, label: 'Vibrant' },
+                  { color: colorPalette.vibrant_light, label: 'Light' },
+                  { color: colorPalette.vibrant_dark, label: 'Dark' },
+                  { color: colorPalette.muted, label: 'Muted' },
+                ].filter(item => item.color).map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleParametersChange({ color: item.color })}
+                    className="group relative w-10 h-10 rounded-lg border-2 border-dark-border hover:border-theatarr-500 transition-colors overflow-hidden"
+                    style={{ backgroundColor: item.color }}
+                    title={`${item.label}: ${item.color}`}
+                  >
+                    {(parameters.color as string) === item.color && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <div className="w-2 h-2 rounded-full bg-white" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+                {/* Raw palette colors */}
+                {colorPalette.raw_palette?.slice(0, 6).map((color, idx) => (
+                  <button
+                    key={`raw-${idx}`}
+                    type="button"
+                    onClick={() => handleParametersChange({ color })}
+                    className="group relative w-8 h-8 rounded border border-dark-border hover:border-theatarr-500 transition-colors"
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  >
+                    {(parameters.color as string) === color && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Color picker row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t.color}</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={(parameters.color as string) || '#ffffff'}
+                  onChange={(e) => handleParametersChange({ color: e.target.value })}
+                  className="w-10 h-10 rounded border border-dark-border cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={(parameters.color as string) || '#ffffff'}
+                  onChange={(e) => handleParametersChange({ color: e.target.value })}
+                  className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text text-sm"
+                  placeholder="#ffffff"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t.transition}</label>
               <input
-                type="color"
-                value={(parameters.color as string) || '#ffffff'}
-                onChange={(e) => handleParametersChange({ color: e.target.value })}
-                className="w-10 h-10 rounded border border-dark-border cursor-pointer"
-              />
-              <input
-                type="text"
-                value={(parameters.color as string) || '#ffffff'}
-                onChange={(e) => handleParametersChange({ color: e.target.value })}
-                className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text text-sm"
-                placeholder="#ffffff"
+                type="number"
+                value={(parameters.transition_ms as number) || 0}
+                onChange={(e) => handleParametersChange({ transition_ms: parseInt(e.target.value) || 0 })}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+                min="0"
+                step="100"
               />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.transition}</label>
-            <input
-              type="number"
-              value={(parameters.transition_ms as number) || 0}
-              onChange={(e) => handleParametersChange({ transition_ms: parseInt(e.target.value) || 0 })}
-              className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
-              min="0"
-              step="100"
-            />
           </div>
         </div>
       )}

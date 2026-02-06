@@ -13,8 +13,7 @@ import ReactFlow, {
   Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Lightbulb, Volume2, Monitor, Play, Zap, Plus } from 'lucide-react';
-import { Button } from '../common';
+import { Lightbulb, Volume2, Monitor, Play, Zap } from 'lucide-react';
 import type { Action } from './SequenceEditor';
 
 interface NodeEditorProps {
@@ -54,9 +53,9 @@ function ActionNode({ data }: { data: ActionNodeData }) {
 
   return (
     <div
-      className={`px-4 py-3 rounded-lg border-2 bg-dark-surface min-w-[150px] cursor-pointer transition-all ${
+      className={`px-2 py-1.5 rounded border-2 bg-dark-surface min-w-[120px] cursor-pointer transition-all ${
         isSelected
-          ? 'border-theatarr-500 shadow-lg shadow-theatarr-500/20'
+          ? 'border-theatarr-500 shadow-md shadow-theatarr-500/20'
           : 'border-dark-border hover:border-dark-muted'
       }`}
       onClick={onSelect}
@@ -64,36 +63,36 @@ function ActionNode({ data }: { data: ActionNodeData }) {
       <Handle
         type="target"
         position={Position.Top}
-        className="!bg-dark-muted !w-3 !h-3"
+        className="!bg-dark-muted !w-2 !h-2"
       />
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <div
-          className="p-1.5 rounded"
+          className="p-1 rounded"
           style={{ backgroundColor: `${color}20` }}
         >
-          <Icon size={16} style={{ color }} />
+          <Icon size={12} style={{ color }} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-dark-text truncate">
+          <div className="text-xs font-medium text-dark-text truncate">
             {action.command}
           </div>
-          <div className="text-xs text-dark-muted capitalize">
+          <div className="text-[10px] text-dark-muted capitalize">
             {action.action_type}
           </div>
         </div>
       </div>
 
       {action.delay_ms > 0 && (
-        <div className="mt-2 text-xs text-dark-muted">
-          Delay: {action.delay_ms}ms
+        <div className="mt-1 text-[10px] text-dark-muted">
+          +{action.delay_ms}ms
         </div>
       )}
 
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!bg-dark-muted !w-3 !h-3"
+        className="!bg-dark-muted !w-2 !h-2"
       />
     </div>
   );
@@ -101,11 +100,11 @@ function ActionNode({ data }: { data: ActionNodeData }) {
 
 function StartNode() {
   return (
-    <div className="px-4 py-2 rounded-full bg-green-500/20 border-2 border-green-500 text-green-400 text-sm font-medium">
+    <div className="px-3 py-1 rounded-full bg-green-500/20 border-2 border-green-500 text-green-400 text-xs font-medium">
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!bg-green-500 !w-3 !h-3"
+        className="!bg-green-500 !w-2 !h-2"
       />
       Start
     </div>
@@ -114,11 +113,11 @@ function StartNode() {
 
 function EndNode() {
   return (
-    <div className="px-4 py-2 rounded-full bg-red-500/20 border-2 border-red-500 text-red-400 text-sm font-medium">
+    <div className="px-3 py-1 rounded-full bg-red-500/20 border-2 border-red-500 text-red-400 text-xs font-medium">
       <Handle
         type="target"
         position={Position.Top}
-        className="!bg-red-500 !w-3 !h-3"
+        className="!bg-red-500 !w-2 !h-2"
       />
       End
     </div>
@@ -135,8 +134,8 @@ export function NodeEditor({
   actions,
   selectedActionId,
   onSelectAction,
-  onUpdateActions,
-  onDeleteAction,
+  onUpdateActions: _onUpdateActions,
+  onDeleteAction: _onDeleteAction,
 }: NodeEditorProps) {
   // Convert actions to nodes
   const initialNodes: Node[] = useMemo(() => {
@@ -144,7 +143,7 @@ export function NodeEditor({
       {
         id: 'start',
         type: 'start',
-        position: { x: 250, y: 0 },
+        position: { x: 150, y: 0 },
         data: {},
       },
     ];
@@ -154,7 +153,7 @@ export function NodeEditor({
       nodes.push({
         id: action.id,
         type: 'action',
-        position: { x: 200, y: 100 + index * 120 },
+        position: { x: 100, y: 60 + index * 80 },
         data: {
           action,
           isSelected: action.id === selectedActionId,
@@ -166,7 +165,7 @@ export function NodeEditor({
     nodes.push({
       id: 'end',
       type: 'end',
-      position: { x: 250, y: 100 + actions.length * 120 },
+      position: { x: 150, y: 60 + actions.length * 80 },
       data: {},
     });
 

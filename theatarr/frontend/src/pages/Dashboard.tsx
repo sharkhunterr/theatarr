@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Film, Lightbulb, Vote, Video, Settings, History, Palette, Clock } from 'lucide-react';
-import { Button, Card, CardContent, CardHeader } from '../components/common';
+import { Play, Film, Lightbulb, Vote, Video, History, Palette, Clock } from 'lucide-react';
+import { Card, CardContent } from '../components/common';
 import { SessionList } from '../components/sessions/SessionList';
-import { useAuthStore } from '../stores/authStore';
 import { apiClient } from '../api/client';
 
 interface DashboardStats {
@@ -16,7 +15,6 @@ interface DashboardStats {
 }
 
 export function Dashboard() {
-  const { user } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats>({
     totalSessions: 0,
     activeSessions: 0,
@@ -31,9 +29,9 @@ export function Dashboard() {
     const fetchStats = async () => {
       try {
         const [sessions, services, trailerStats] = await Promise.all([
-          apiClient.get<{ items: any[]; total: number }>('/api/v1/sessions'),
-          apiClient.get<{ items: any[]; total: number }>('/api/v1/services'),
-          apiClient.get<{ total_trailers: number; ready_trailers: number }>('/api/v1/trailers/stats').catch(() => ({ total_trailers: 0, ready_trailers: 0 })),
+          apiClient.get<{ items: any[]; total: number }>('/sessions'),
+          apiClient.get<{ items: any[]; total: number }>('/services'),
+          apiClient.get<{ total_trailers: number; ready_trailers: number }>('/trailers/stats').catch(() => ({ total_trailers: 0, ready_trailers: 0 })),
         ]);
 
         const activeSessions = sessions.items.filter(
@@ -61,27 +59,8 @@ export function Dashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-dark-bg">
-      {/* Header */}
-      <header className="bg-dark-surface border-b border-dark-border">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Film className="text-theatarr-500" size={32} />
-            <h1 className="text-2xl font-bold text-dark-text">Theatarr</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-dark-muted">Welcome, {user?.username}</span>
-            <Link to="/settings">
-              <Button variant="ghost" size="sm">
-                <Settings size={18} />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Quick Stats */}
+    <div className="max-w-7xl mx-auto">
+      {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardContent className="p-4">
@@ -217,9 +196,8 @@ export function Dashboard() {
           </Link>
         </div>
 
-        {/* Sessions */}
-        <SessionList />
-      </main>
+      {/* Sessions */}
+      <SessionList />
     </div>
   );
 }

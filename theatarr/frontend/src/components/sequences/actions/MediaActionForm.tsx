@@ -1,4 +1,20 @@
-import { Input } from '../../common';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Search, Film, X, Check } from 'lucide-react';
+import { Input, Spinner } from '../../common';
+import { apiClient } from '../../../api/client';
+import { useLayoutStore } from '../../../stores/layoutStore';
+
+interface Movie {
+  id: string;
+  title: string;
+  year?: number;
+  poster_url?: string;
+  backdrop_url?: string;
+  overview?: string;
+  rating?: number;
+  genres?: string[];
+}
 
 interface MediaActionFormProps {
   command: string;
@@ -8,13 +24,13 @@ interface MediaActionFormProps {
 }
 
 const mediaCommands = [
-  { value: 'play', label: 'Play Media' },
-  { value: 'pause', label: 'Pause' },
-  { value: 'resume', label: 'Resume' },
-  { value: 'stop', label: 'Stop' },
-  { value: 'seek', label: 'Seek' },
-  { value: 'next', label: 'Next Track/Chapter' },
-  { value: 'previous', label: 'Previous Track/Chapter' },
+  { value: 'play', label: 'Play Media', labelFr: 'Lire le média' },
+  { value: 'pause', label: 'Pause', labelFr: 'Pause' },
+  { value: 'resume', label: 'Resume', labelFr: 'Reprendre' },
+  { value: 'stop', label: 'Stop', labelFr: 'Arrêter' },
+  { value: 'seek', label: 'Seek', labelFr: 'Avancer/Reculer' },
+  { value: 'next', label: 'Next Track/Chapter', labelFr: 'Piste/Chapitre suivant' },
+  { value: 'previous', label: 'Previous Track/Chapter', labelFr: 'Piste/Chapitre précédent' },
 ];
 
 export function MediaActionForm({
@@ -23,11 +39,66 @@ export function MediaActionForm({
   onCommandChange,
   onParametersChange,
 }: MediaActionFormProps) {
+  const { language } = useLayoutStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  const t = {
+    command: language === 'fr' ? 'Commande' : 'Command',
+    selectMovie: language === 'fr' ? 'Sélectionner un film' : 'Select a movie',
+    searchPlaceholder: language === 'fr' ? 'Rechercher un film dans votre bibliothèque...' : 'Search for a movie in your library...',
+    noResults: language === 'fr' ? 'Aucun film trouvé' : 'No movies found',
+    selectedMovie: language === 'fr' ? 'Film sélectionné' : 'Selected Movie',
+    changeMovie: language === 'fr' ? 'Changer' : 'Change',
+    removeMovie: language === 'fr' ? 'Retirer' : 'Remove',
+    startPosition: language === 'fr' ? 'Position de départ (ms)' : 'Start Position (ms)',
+    playbackSpeed: language === 'fr' ? 'Vitesse de lecture' : 'Playback Speed',
+    seekPosition: language === 'fr' ? 'Position (ms)' : 'Seek Position (ms)',
+    targetPlayer: language === 'fr' ? 'Lecteur cible' : 'Target Player',
+    targetPlayerPlaceholder: language === 'fr' ? 'ex: plex, kodi, vlc (optionnel)' : 'e.g., plex, kodi, vlc (optional)',
+    enableSubtitles: language === 'fr' ? 'Activer les sous-titres' : 'Enable subtitles',
+  };
+
+  // Search movies from media sources
+  const { data: searchResults, isLoading: isSearchLoading } = useQuery<Movie[]>({
+    queryKey: ['movie-search', searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const response = await apiClient.get<Movie[]>(`/movies/search?query=${encodeURIComponent(searchQuery)}`);
+      return response || [];
+    },
+    enabled: searchQuery.length >= 2,
+  });
+
+  const handleSelectMovie = (movie: Movie) => {
+    onParametersChange({
+      ...parameters,
+      media_id: movie.id,
+      movie_title: movie.title,
+      movie_year: movie.year,
+      movie_poster: movie.poster_url,
+    });
+    setSearchQuery('');
+    setIsSearchOpen(false);
+  };
+
+  const handleRemoveMovie = () => {
+    const { media_id, movie_title, movie_year, movie_poster, ...rest } = parameters;
+    onParametersChange(rest);
+  };
+
+  const selectedMovie = parameters.media_id ? {
+    id: parameters.media_id as string,
+    title: parameters.movie_title as string,
+    year: parameters.movie_year as number | undefined,
+    poster_url: parameters.movie_poster as string | undefined,
+  } : null;
+
   return (
     <div className="space-y-4">
       {/* Command Select */}
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">Command</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
         <select
           value={command}
           onChange={(e) => onCommandChange(e.target.value)}
@@ -35,25 +106,162 @@ export function MediaActionForm({
         >
           {mediaCommands.map((cmd) => (
             <option key={cmd.value} value={cmd.value}>
-              {cmd.label}
+              {language === 'fr' ? cmd.labelFr : cmd.label}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Media ID (for play command) */}
+      {/* Movie Selection (for play command) */}
       {command === 'play' && (
         <>
-          <Input
-            label="Media ID"
-            value={(parameters.media_id as string) || ''}
-            onChange={(e) => onParametersChange({ ...parameters, media_id: e.target.value })}
-            placeholder="e.g., plex://movie/12345 or file path"
-          />
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-2">{t.selectMovie}</label>
+
+            {/* Selected Movie Display */}
+            {selectedMovie && !isSearchOpen ? (
+              <div className="flex items-center gap-3 p-3 bg-dark-bg border border-dark-border rounded-lg">
+                {/* Poster */}
+                <div className="w-12 h-16 bg-dark-border rounded flex-shrink-0 overflow-hidden">
+                  {selectedMovie.poster_url ? (
+                    <img
+                      src={selectedMovie.poster_url}
+                      alt={selectedMovie.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Film size={20} className="text-dark-muted" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-dark-text truncate">
+                    {selectedMovie.title}
+                  </div>
+                  {selectedMovie.year && (
+                    <div className="text-sm text-dark-muted">{selectedMovie.year}</div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSearchOpen(true)}
+                    className="px-2 py-1 text-xs bg-dark-border hover:bg-dark-muted/30 text-dark-text rounded transition-colors"
+                  >
+                    {t.changeMovie}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemoveMovie}
+                    className="p-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                {/* Search Input */}
+                <div className="relative flex gap-2">
+                  <div className="relative flex-1">
+                    <Search
+                      size={18}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted"
+                    />
+                    <Input
+                      placeholder={t.searchPlaceholder}
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setIsSearchOpen(true);
+                      }}
+                      onFocus={() => setIsSearchOpen(true)}
+                      className="pl-10"
+                    />
+                  </div>
+                  {selectedMovie && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSearchOpen(false);
+                        setSearchQuery('');
+                      }}
+                      className="px-3 py-2 text-sm bg-dark-border hover:bg-dark-muted/30 text-dark-text rounded-lg transition-colors"
+                    >
+                      {language === 'fr' ? 'Annuler' : 'Cancel'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Search Results Dropdown */}
+                {isSearchOpen && searchQuery.length >= 2 && (
+                  <div className="absolute z-30 w-full mt-2 bg-dark-surface border border-dark-border rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {isSearchLoading ? (
+                      <div className="p-4 text-center">
+                        <Spinner size="sm" />
+                      </div>
+                    ) : searchResults && searchResults.length > 0 ? (
+                      <div className="py-2">
+                        {searchResults.map((movie) => (
+                          <button
+                            key={movie.id}
+                            type="button"
+                            onClick={() => handleSelectMovie(movie)}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-dark-border/50 transition-colors"
+                          >
+                            {/* Poster */}
+                            <div className="w-8 h-12 bg-dark-border rounded flex-shrink-0 overflow-hidden">
+                              {movie.poster_url ? (
+                                <img
+                                  src={movie.poster_url}
+                                  alt={movie.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Film size={14} className="text-dark-muted" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-dark-text text-sm truncate">
+                                {movie.title}
+                              </div>
+                              <div className="text-xs text-dark-muted">
+                                {movie.year}
+                                {movie.rating && (
+                                  <span className="ml-2 text-yellow-500">
+                                    ★ {movie.rating.toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <Check size={16} className="text-theatarr-500 opacity-0" />
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-dark-muted text-sm">
+                        {t.noResults}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">Start Position</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t.startPosition}</label>
               <input
                 type="number"
                 value={(parameters.position_ms as number) || 0}
@@ -71,7 +279,7 @@ export function MediaActionForm({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">Playback Speed</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t.playbackSpeed}</label>
               <select
                 value={(parameters.speed as number) || 1}
                 onChange={(e) =>
@@ -94,7 +302,7 @@ export function MediaActionForm({
       {/* Seek Position */}
       {command === 'seek' && (
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">Seek Position (ms)</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t.seekPosition}</label>
           <input
             type="number"
             value={(parameters.position_ms as number) || 0}
@@ -110,10 +318,10 @@ export function MediaActionForm({
 
       {/* Target Player */}
       <Input
-        label="Target Player"
+        label={t.targetPlayer}
         value={(parameters.player as string) || ''}
         onChange={(e) => onParametersChange({ ...parameters, player: e.target.value })}
-        placeholder="e.g., plex, kodi, vlc (optional)"
+        placeholder={t.targetPlayerPlaceholder}
       />
 
       {/* Subtitles (for play) */}
@@ -127,7 +335,7 @@ export function MediaActionForm({
             className="w-4 h-4 accent-theatarr-500"
           />
           <label htmlFor="subtitles" className="text-sm text-dark-text">
-            Enable subtitles
+            {t.enableSubtitles}
           </label>
         </div>
       )}

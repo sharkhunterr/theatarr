@@ -81,8 +81,13 @@ class SessionBase(BaseSchema):
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
     movie_id: str | None = None
+    movie_title: str | None = None
+    movie_poster_url: str | None = None
+    movie_source_id: str | None = None
+    movie_source: str | None = None
     scheduled_at: datetime | None = None
     auto_resume_enabled: bool = True
+    color_palette: dict | None = None
 
 
 class SessionCreate(SessionBase):
@@ -98,10 +103,15 @@ class SessionUpdate(BaseSchema):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     movie_id: str | None = None
+    movie_title: str | None = None
+    movie_poster_url: str | None = None
+    movie_source_id: str | None = None
+    movie_source: str | None = None
     scheduled_at: datetime | None = None
     auto_resume_enabled: bool | None = None
     sequences: list[SequenceInput] | None = None
     workflow: dict | None = None  # JSON workflow data (nodes, edges)
+    color_palette: dict | None = None
 
 
 # ============================================================================

@@ -5,6 +5,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from theatarr.database import Base
@@ -80,6 +81,30 @@ class Session(UUIDMixin, TimestampMixin, Base):
     )
     workflow: Mapped[dict | None] = mapped_column(
         JSON,
+        nullable=True,
+    )
+
+    # Movie info (denormalized for quick access and external sources)
+    movie_title: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+    movie_poster_url: Mapped[str | None] = mapped_column(
+        String(1000),
+        nullable=True,
+    )
+    movie_source_id: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    movie_source: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    # Color palette extracted from movie poster
+    color_palette: Mapped[dict | None] = mapped_column(
+        SQLiteJSON,
         nullable=True,
     )
 

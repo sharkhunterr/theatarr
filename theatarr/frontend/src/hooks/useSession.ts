@@ -66,7 +66,7 @@ export function useSession(options: UseSessionOptions = {}): UseSessionReturn {
 
   const fetchSession = useCallback(async (id: string) => {
     try {
-      const session = await apiClient.get<any>(`/api/v1/sessions/${id}`);
+      const session = await apiClient.get<any>(`/sessions/${id}`);
       setCurrentSession(session);
     } catch (error) {
       console.error('Failed to fetch session:', error);
@@ -76,7 +76,7 @@ export function useSession(options: UseSessionOptions = {}): UseSessionReturn {
 
   const fetchSessions = useCallback(async () => {
     try {
-      const response = await apiClient.get<{ items: any[]; total: number }>('/api/v1/sessions');
+      const response = await apiClient.get<{ items: any[]; total: number }>('/sessions');
       setSessions(response.items);
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
@@ -91,7 +91,7 @@ export function useSession(options: UseSessionOptions = {}): UseSessionReturn {
       }
 
       const id = sessionId || currentSession?.id;
-      const response = await apiClient.post<any>(`/api/v1/sessions/${id}/control`, {
+      const response = await apiClient.post<any>(`/sessions/${id}/control`, {
         action,
       });
 

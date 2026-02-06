@@ -7,17 +7,20 @@ export interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+  showHeader?: boolean;
 }
 
-export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = 'md', showHeader = true }: ModalProps) {
   if (!isOpen) return null;
 
   const sizes = {
     sm: 'max-w-sm',
     md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
+    lg: 'max-w-2xl',
+    xl: 'max-w-5xl',
+    '2xl': 'max-w-6xl',
+    full: 'max-w-[95vw]',
   };
 
   return (
@@ -29,29 +32,32 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
         <div
           className={clsx(
-            'bg-dark-surface border border-dark-border rounded-xl w-full shadow-xl animate-slide-up',
+            'bg-dark-surface border border-dark-border rounded-xl w-full shadow-xl animate-slide-up flex flex-col max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)]',
             sizes[size]
           )}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          {title && (
-            <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
-              <h2 className="text-lg font-semibold text-dark-text">{title}</h2>
+          {/* Header - Fixed */}
+          {showHeader && title && (
+            <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border flex-shrink-0">
+              <h2 className="text-lg font-semibold text-dark-text truncate pr-2">{title}</h2>
               <button
                 onClick={onClose}
-                className="p-1 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border transition-colors"
+                className="p-1 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border transition-colors flex-shrink-0"
               >
                 <X size={20} />
               </button>
             </div>
           )}
 
-          {/* Content */}
-          <div className="p-4">{children}</div>
+          {/* Content - Scrollable */}
+          <div className={clsx(
+            'overflow-y-auto flex-1 min-h-0',
+            showHeader ? 'p-4' : 'p-0'
+          )}>{children}</div>
         </div>
       </div>
     </Fragment>

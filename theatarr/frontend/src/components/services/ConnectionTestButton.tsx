@@ -33,7 +33,7 @@ export function ConnectionTestButton({
 
     try {
       const response = await apiClient.post<ConnectionTestResult>(
-        `/api/v1/services/${serviceId}/test`
+        `/services/${serviceId}/test`
       );
       setResult(response);
       onResult?.(response);

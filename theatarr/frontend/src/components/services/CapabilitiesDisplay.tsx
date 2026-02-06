@@ -36,7 +36,7 @@ export function CapabilitiesDisplay({
     setIsLoading(true);
     try {
       const response = await apiClient.get<CapabilitiesResponse>(
-        `/api/v1/services/${serviceId}/capabilities`
+        `/services/${serviceId}/capabilities`
       );
       setCapabilities(response.capabilities);
       setLastDiscovered(response.discovered_at);

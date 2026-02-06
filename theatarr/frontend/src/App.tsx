@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // Pages
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
+import { SessionsPage } from './pages/SessionsPage';
 import { SessionPage } from './pages/SessionPage';
 import { SessionEditor } from './pages/SessionEditor';
 import { ServicesConfig } from './pages/ServicesConfig';
@@ -16,6 +17,9 @@ import { TrailersManager } from './pages/TrailersManager';
 import { ConfigPage } from './pages/ConfigPage';
 import { SessionHistory } from './pages/SessionHistory';
 import { MoviesPage } from './pages/MoviesPage';
+
+// Layout
+import { AdminLayout } from './components/layout';
 
 // Stores
 import { useAuthStore } from './stores/authStore';
@@ -40,7 +44,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-dark-bg">
         <div className="text-dark-muted">Loading...</div>
       </div>
     );
@@ -50,7 +54,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return children;
+  return <AdminLayout>{children}</AdminLayout>;
 }
 
 function AppRoutes() {
@@ -74,7 +78,7 @@ function AppRoutes() {
         path="/sessions"
         element={
           <RequireAuth>
-            <Dashboard />
+            <SessionsPage />
           </RequireAuth>
         }
       />
@@ -172,18 +176,6 @@ function App() {
         <AppRoutes />
       </BrowserRouter>
     </QueryClientProvider>
-  );
-}
-
-// Temporary placeholder component for unimplemented pages
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-theatarr-500 mb-4">Theatarr</h1>
-        <p className="text-dark-muted">{title} - Coming soon</p>
-      </div>
-    </div>
   );
 }
 

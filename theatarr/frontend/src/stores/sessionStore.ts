@@ -20,12 +20,28 @@ export interface Sequence {
   remaining_ms?: number;
 }
 
+export interface ColorPalette {
+  primary: string;
+  secondary: string;
+  accent: string;
+  vibrant: string;
+  vibrant_light: string;
+  vibrant_dark: string;
+  muted: string;
+  raw_palette?: string[];
+}
+
 export interface Session {
   id: string;
   name: string;
   description?: string;
   status: SessionStatus;
   movie_id?: string;
+  movie_title?: string;
+  movie_poster_url?: string;
+  movie_source_id?: string;
+  movie_source?: string;
+  color_palette?: ColorPalette;
   scheduled_at?: string;
   started_at?: string;
   completed_at?: string;
