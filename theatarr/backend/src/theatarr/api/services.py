@@ -406,3 +406,95 @@ async def disable_service(
     await db.refresh(service)
 
     return _service_to_response(service)
+
+
+@router.get(
+    "/{service_id}/resources",
+    summary="Get Service Resources",
+)
+async def get_service_resources(
+    db: DbSession,
+    user: AdminUser,
+    service_id: str,
+    resource_type: str | None = None,
+) -> dict:
+    """Get resources from a service (lights, devices, scenes, etc.)."""
+    from theatarr.adapters.base import Command
+
+    result = await db.execute(select(Service).where(Service.id == service_id))
+    service = result.scalar_one_or_none()
+
+    if not service:
+        raise NotFoundError("Service", service_id)
+
+    if not service.is_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Service is disabled",
+        )
+
+    # Get or create adapter instance
+    adapter = AdapterRegistry.get_instance(service_id)
+    if not adapter:
+        try:
+            adapter = AdapterRegistry.create_adapter(
+                service.adapter_type,
+                service.config,
+                instance_id=service_id,
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            )
+
+    # Determine what resources to fetch based on service category
+    resources = {
+        "service_id": service_id,
+        "service_name": service.name,
+        "category": service.category,
+        "items": [],
+    }
+
+    try:
+        if service.category == "lighting":
+            # Get lights
+            cmd = Command(action="get_lights", parameters={})
+            result = await adapter.execute(cmd)
+            if result.success and result.data:
+                resources["items"] = result.data.get("lights", [])
+
+            # Also get scenes if available
+            try:
+                scenes_cmd = Command(action="get_scenes", parameters={})
+                scenes_result = await adapter.execute(scenes_cmd)
+                if scenes_result.success and scenes_result.data:
+                    resources["scenes"] = scenes_result.data.get("scenes", [])
+            except Exception:
+                pass
+
+        elif service.category == "player":
+            # Get player status
+            cmd = Command(action="get_status", parameters={})
+            result = await adapter.execute(cmd)
+            if result.success and result.data:
+                resources["status"] = result.data
+
+        elif service.category == "media_source":
+            # Get libraries
+            cmd = Command(action="list_libraries", parameters={})
+            result = await adapter.execute(cmd)
+            if result.success and result.data:
+                resources["libraries"] = result.data.get("libraries", [])
+
+        elif service.category == "actuator":
+            # Get devices
+            cmd = Command(action="get_devices", parameters={})
+            result = await adapter.execute(cmd)
+            if result.success and result.data:
+                resources["items"] = result.data.get("devices", [])
+
+    except Exception as e:
+        resources["error"] = str(e)
+
+    return resources

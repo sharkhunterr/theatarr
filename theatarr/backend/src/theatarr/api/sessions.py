@@ -4,12 +4,14 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.orm.attributes import flag_modified
 
 from theatarr.api.deps import AdminUser
 from theatarr.api.errors import NotFoundError
 from theatarr.database import DbSession
+from theatarr.models.action import Action
 from theatarr.models.session import Session, SessionStatus
-from theatarr.models.sequence import Sequence
+from theatarr.models.sequence import DurationType, Sequence
 from theatarr.schemas.session import (
     SessionControlAction,
     SessionControlRequest,
@@ -118,9 +120,41 @@ async def create_session(
         movie_id=data.movie_id,
         scheduled_at=data.scheduled_at,
         auto_resume_enabled=data.auto_resume_enabled,
+        workflow=data.workflow,
         status=SessionStatus.SCHEDULED if data.scheduled_at else SessionStatus.DRAFT,
     )
     db.add(session)
+    await db.flush()  # Get session.id without committing
+
+    # Create sequences if provided
+    for order_index, seq_data in enumerate(data.sequences):
+        sequence = Sequence(
+            session_id=session.id,
+            name=seq_data.name,
+            description=seq_data.description,
+            order_index=order_index,
+            duration_type=DurationType(seq_data.duration_type),
+            duration_ms=seq_data.duration_ms,
+            duration_fallback_ms=seq_data.duration_fallback_ms,
+            transition_ms=seq_data.transition_ms,
+        )
+        db.add(sequence)
+        await db.flush()  # Get sequence.id
+
+        # Create actions for this sequence
+        for action_order, action_data in enumerate(seq_data.actions):
+            action = Action(
+                sequence_id=sequence.id,
+                action_type=action_data.action_type,
+                command=action_data.command,
+                parameters=action_data.parameters,
+                delay_ms=action_data.delay_ms,
+                on_failure=action_data.on_failure,
+                order_index=action_order,
+                service_id=action_data.service_id,
+            )
+            db.add(action)
+
     await db.commit()
     await db.refresh(session)
 
@@ -166,6 +200,7 @@ async def get_session(
         updated_at=session.updated_at,
         sequences=sequences,
         current_sequence=current_seq,
+        workflow=session.workflow,
     )
 
 
@@ -194,10 +229,49 @@ async def update_session(
             detail=f"Cannot update session in status: {session.status}",
         )
 
-    # Update fields
-    update_data = data.model_dump(exclude_unset=True)
+    # Update basic fields (exclude sequences)
+    update_data = data.model_dump(exclude_unset=True, exclude={"sequences"})
     for field, value in update_data.items():
         setattr(session, field, value)
+
+    # Flag workflow as modified for SQLAlchemy to detect JSON changes
+    if "workflow" in update_data:
+        flag_modified(session, "workflow")
+
+    # Handle sequences update
+    if data.sequences is not None:
+        # Delete existing sequences (cascade will delete actions)
+        for seq in session.sequences:
+            await db.delete(seq)
+
+        # Create new sequences
+        for order_index, seq_data in enumerate(data.sequences):
+            sequence = Sequence(
+                session_id=session.id,
+                name=seq_data.name,
+                description=seq_data.description,
+                order_index=order_index,
+                duration_type=DurationType(seq_data.duration_type),
+                duration_ms=seq_data.duration_ms,
+                duration_fallback_ms=seq_data.duration_fallback_ms,
+                transition_ms=seq_data.transition_ms,
+            )
+            db.add(sequence)
+            await db.flush()  # Get sequence.id
+
+            # Create actions for this sequence
+            for action_order, action_data in enumerate(seq_data.actions):
+                action = Action(
+                    sequence_id=sequence.id,
+                    action_type=action_data.action_type,
+                    command=action_data.command,
+                    parameters=action_data.parameters,
+                    delay_ms=action_data.delay_ms,
+                    on_failure=action_data.on_failure,
+                    order_index=action_order,
+                    service_id=action_data.service_id,
+                )
+                db.add(action)
 
     # Update status if scheduled_at changed
     if data.scheduled_at is not None:

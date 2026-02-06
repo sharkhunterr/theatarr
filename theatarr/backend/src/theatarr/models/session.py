@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from theatarr.database import Base
@@ -77,6 +77,10 @@ class Session(UUIDMixin, TimestampMixin, Base):
         Boolean,
         default=True,
         nullable=False,
+    )
+    workflow: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
     )
 
     # Relationships

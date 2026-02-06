@@ -45,6 +45,31 @@ class SequenceSummary(BaseSchema):
     transition_ms: int
 
 
+class ActionInput(BaseSchema):
+    """Schema for action input in sequence."""
+
+    id: str | None = None
+    action_type: str
+    command: str
+    parameters: dict = Field(default_factory=dict)
+    delay_ms: int = 0
+    on_failure: str = "warn"
+    service_id: str | None = None
+
+
+class SequenceInput(BaseSchema):
+    """Schema for sequence input when creating/updating sessions."""
+
+    id: str | None = None
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str | None = None
+    duration_type: str = "fixed"
+    duration_ms: int | None = None
+    duration_fallback_ms: int = 30000
+    transition_ms: int = 1000
+    actions: list[ActionInput] = Field(default_factory=list)
+
+
 # ============================================================================
 # Session Base & Create
 # ============================================================================
@@ -63,7 +88,8 @@ class SessionBase(BaseSchema):
 class SessionCreate(SessionBase):
     """Schema for creating a session."""
 
-    pass
+    sequences: list[SequenceInput] = Field(default_factory=list)
+    workflow: dict | None = None  # JSON workflow data (nodes, edges)
 
 
 class SessionUpdate(BaseSchema):
@@ -74,6 +100,8 @@ class SessionUpdate(BaseSchema):
     movie_id: str | None = None
     scheduled_at: datetime | None = None
     auto_resume_enabled: bool | None = None
+    sequences: list[SequenceInput] | None = None
+    workflow: dict | None = None  # JSON workflow data (nodes, edges)
 
 
 # ============================================================================
@@ -97,6 +125,7 @@ class SessionDetailResponse(SessionResponse):
 
     sequences: list[SequenceSummary] = []
     current_sequence: SequenceSummary | None = None
+    workflow: dict | None = None
 
 
 class SessionListResponse(BaseSchema):

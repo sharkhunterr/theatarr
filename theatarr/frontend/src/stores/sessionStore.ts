@@ -23,6 +23,7 @@ export interface Sequence {
 export interface Session {
   id: string;
   name: string;
+  description?: string;
   status: SessionStatus;
   movie_id?: string;
   scheduled_at?: string;
@@ -30,7 +31,9 @@ export interface Session {
   completed_at?: string;
   current_sequence_index: number;
   current_sequence_elapsed_ms: number;
+  total_sequences: number;
   sequences?: Sequence[];
+  workflow?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
