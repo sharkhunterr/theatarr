@@ -912,6 +912,9 @@ async def add_session_participants(
         raise NotFoundError("Session", session_id)
 
     added = []
+    auto_accepted = []
+    now = datetime.now(timezone.utc)
+
     for uid in user_ids:
         # Check user exists
         user_result = await db.execute(select(User).where(User.id == uid))
@@ -929,19 +932,29 @@ async def add_session_participants(
         if existing.scalar_one_or_none():
             continue
 
+        # Check if user has auto_accept_invitations enabled
+        if target_user.auto_accept_invitations:
+            invitation_status = InvitationStatus.ACCEPTED.value
+            responded_at = now
+            auto_accepted.append(uid)
+        else:
+            invitation_status = InvitationStatus.PENDING.value
+            responded_at = None
+
         # Create participant
         participant = SessionParticipant(
             session_id=session_id,
             user_id=uid,
-            invitation_status=InvitationStatus.PENDING.value,
-            invited_at=datetime.now(timezone.utc),
+            invitation_status=invitation_status,
+            invited_at=now,
+            responded_at=responded_at,
         )
         db.add(participant)
         added.append(uid)
 
     await db.commit()
 
-    return {"added": added, "count": len(added)}
+    return {"added": added, "auto_accepted": auto_accepted, "count": len(added)}
 
 
 @router.delete(

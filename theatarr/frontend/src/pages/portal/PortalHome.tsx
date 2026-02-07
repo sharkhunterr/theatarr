@@ -3,7 +3,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Calendar, Vote, CheckCircle, Film, Mail } from 'lucide-react';
+import { Calendar, Vote, CheckCircle, Film, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
@@ -76,120 +76,41 @@ export function PortalHome() {
         <p className="text-dark-muted mt-1">Bienvenue sur votre portail cinema</p>
       </div>
 
-      {/* Pending invitations alert */}
-      {pendingInvitations && pendingInvitations.items.length > 0 && (
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-              <Mail className="text-blue-500" size={20} />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium text-dark-text">
-                {pendingInvitations.items.length} invitation{pendingInvitations.items.length > 1 ? 's' : ''} en attente
-              </p>
-              <p className="text-sm text-dark-muted">
-                Vous avez ete invite a des sessions cinema
-              </p>
-            </div>
-            <Link
-              to="/portal/sessions"
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
-            >
-              Repondre
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Pending votes alert */}
-      {pendingVotes && pendingVotes.items.length > 0 && (
-        <div className="bg-theatarr-500/10 border border-theatarr-500/30 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-theatarr-500/20 flex items-center justify-center">
-              <AlertCircle className="text-theatarr-500" size={20} />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium text-dark-text">
-                {pendingVotes.items.length} vote{pendingVotes.items.length > 1 ? 's' : ''} en attente
-              </p>
-              <p className="text-sm text-dark-muted">
-                N'oubliez pas de voter pour les prochaines sessions
-              </p>
-            </div>
-            <Link
-              to="/portal/votes"
-              className="px-4 py-2 bg-theatarr-500 text-white rounded-lg text-sm font-medium hover:bg-theatarr-600 transition-colors"
-            >
-              Voter
-            </Link>
-          </div>
-        </div>
-      )}
-
       {/* Quick stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-              <Calendar className="text-blue-400" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-dark-text">
-                {stats?.upcoming_sessions ?? '-'}
-              </p>
-              <p className="text-xs text-dark-muted">Sessions a venir</p>
-            </div>
-          </div>
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-dark-surface rounded-lg border border-dark-border p-2 text-center">
+          <Calendar className="text-blue-400 mx-auto mb-1" size={16} />
+          <p className="text-lg font-bold text-dark-text">{stats?.upcoming_sessions ?? '-'}</p>
+          <p className="text-[10px] text-dark-muted">A venir</p>
         </div>
-
-        <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-theatarr-500/10 flex items-center justify-center">
-              <Vote className="text-theatarr-400" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-dark-text">
-                {stats?.pending_votes ?? '-'}
-              </p>
-              <p className="text-xs text-dark-muted">Votes en attente</p>
-            </div>
-          </div>
+        <div className="bg-dark-surface rounded-lg border border-dark-border p-2 text-center">
+          <Vote className="text-theatarr-400 mx-auto mb-1" size={16} />
+          <p className="text-lg font-bold text-dark-text">{stats?.pending_votes ?? '-'}</p>
+          <p className="text-[10px] text-dark-muted">Votes</p>
         </div>
-
-        <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-              <Film className="text-green-400" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-dark-text">
-                {stats?.total_sessions_attended ?? '-'}
-              </p>
-              <p className="text-xs text-dark-muted">Sessions vues</p>
-            </div>
-          </div>
+        <div className="bg-dark-surface rounded-lg border border-dark-border p-2 text-center">
+          <Film className="text-green-400 mx-auto mb-1" size={16} />
+          <p className="text-lg font-bold text-dark-text">{stats?.total_sessions_attended ?? '-'}</p>
+          <p className="text-[10px] text-dark-muted">Vues</p>
         </div>
-
-        <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-              <CheckCircle className="text-purple-400" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-dark-text">
-                {stats?.total_votes_cast ?? '-'}
-              </p>
-              <p className="text-xs text-dark-muted">Votes effectues</p>
-            </div>
-          </div>
+        <div className="bg-dark-surface rounded-lg border border-dark-border p-2 text-center">
+          <CheckCircle className="text-purple-400 mx-auto mb-1" size={16} />
+          <p className="text-lg font-bold text-dark-text">{stats?.total_votes_cast ?? '-'}</p>
+          <p className="text-[10px] text-dark-muted">Votes</p>
         </div>
       </div>
 
       {/* Pending invitations */}
       {pendingInvitations && pendingInvitations.items.length > 0 && (
-        <section>
+        <section className="animate-pulse-subtle">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-dark-text">Invitations en attente</h2>
+            <div className="flex items-center gap-2">
+              <Mail size={18} className="text-blue-400" />
+              <h2 className="text-lg font-semibold text-dark-text">Invitations en attente</h2>
+              <span className="px-2 py-0.5 text-xs font-bold bg-blue-500 text-white rounded-full animate-blink">
+                {pendingInvitations.items.length}
+              </span>
+            </div>
             <Link to="/portal/sessions" className="text-sm text-theatarr-500 hover:underline">
               Voir tout
             </Link>
@@ -217,9 +138,15 @@ export function PortalHome() {
 
       {/* Pending votes */}
       {pendingVotes && pendingVotes.items.length > 0 && (
-        <section>
+        <section className="animate-pulse-subtle">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-dark-text">Votes en attente</h2>
+            <div className="flex items-center gap-2">
+              <Vote size={18} className="text-theatarr-400" />
+              <h2 className="text-lg font-semibold text-dark-text">Votes en attente</h2>
+              <span className="px-2 py-0.5 text-xs font-bold bg-theatarr-500 text-white rounded-full animate-blink">
+                {pendingVotes.items.length}
+              </span>
+            </div>
             <Link to="/portal/votes" className="text-sm text-theatarr-500 hover:underline">
               Voir tout
             </Link>

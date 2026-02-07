@@ -168,7 +168,8 @@ export function SessionCard({
               <span className={clsx(
                 'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0',
                 invitation.bgColor,
-                invitation.textColor
+                invitation.textColor,
+                invitationStatus === 'pending' && 'animate-blink'
               )}>
                 <InvitationIcon size={12} />
                 {invitation.label}

@@ -313,6 +313,7 @@ export function SessionEditor() {
     require_token: true,
     show_results_during_voting: false,
     anonymous_voting: true,
+    open_immediately: true, // Default to open vote immediately
   });
 
   // Mystery mode config state
