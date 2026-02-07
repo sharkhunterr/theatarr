@@ -149,12 +149,14 @@ async def get_my_stats(
     pending_votes = direct_pending_result.scalar() or 0
 
     # Also count pending votes from session-linked vote sessions
+    # Only count if user has ACCEPTED the session invitation
     session_linked_query = (
         select(VoteSession.id)
         .join(Session, VoteSession.linked_session_id == Session.id)
         .join(SessionParticipant)
         .where(
             SessionParticipant.user_id == user.id,
+            SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value,
             VoteSession.linked_session_id.isnot(None),
             VoteSession.status == VoteSessionStatus.OPEN,
         )
@@ -589,12 +591,14 @@ async def get_pending_votes(
     direct_participations = direct_result.scalars().all()
 
     # Get pending from session-linked votes
+    # Only include if user has ACCEPTED the session invitation
     session_linked_query = (
         select(VoteSession)
         .join(Session, VoteSession.linked_session_id == Session.id)
         .join(SessionParticipant)
         .where(
             SessionParticipant.user_id == user.id,
+            SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value,
             VoteSession.linked_session_id.isnot(None),
             VoteSession.status == VoteSessionStatus.OPEN,
         )
