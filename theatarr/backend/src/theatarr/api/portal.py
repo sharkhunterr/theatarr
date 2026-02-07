@@ -852,7 +852,17 @@ async def cast_vote(
 
     # Check if we should auto-close when all have voted
     if vs.close_when_all_voted and vs.linked_session_id:
-        # Count expected voters from linked session participants
+        # Count pending invitations - don't close if any are pending
+        pending_count_result = await db.execute(
+            select(func.count(SessionParticipant.id))
+            .where(
+                SessionParticipant.session_id == vs.linked_session_id,
+                SessionParticipant.invitation_status == InvitationStatus.PENDING.value,
+            )
+        )
+        pending_invitations = pending_count_result.scalar() or 0
+
+        # Count expected voters from accepted participants
         participants_count_result = await db.execute(
             select(func.count(SessionParticipant.id))
             .where(
@@ -869,8 +879,8 @@ async def cast_vote(
         )
         actual_voters = votes_count_result.scalar() or 0
 
-        # Close if all have voted
-        if expected_voters > 0 and actual_voters >= expected_voters:
+        # Close only if: no pending invitations AND all accepted have voted
+        if pending_invitations == 0 and expected_voters > 0 and actual_voters >= expected_voters:
             vs.status = VoteSessionStatus.CLOSED
             vs.closed_at = datetime.now(timezone.utc)
             # Reload votes to determine winner
