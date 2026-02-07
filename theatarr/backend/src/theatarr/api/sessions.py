@@ -557,7 +557,7 @@ async def delete_session(
     user: AdminUser,
     session_id: str,
 ) -> None:
-    """Delete a session."""
+    """Delete a session and all associated data (vote session, participants, etc.)."""
     result = await db.execute(select(Session).where(Session.id == session_id))
     session = result.scalar_one_or_none()
 
@@ -571,6 +571,16 @@ async def delete_session(
             detail="Cannot delete an active session. Stop it first.",
         )
 
+    # Delete linked vote session if present
+    if session.linked_vote_session_id:
+        vote_result = await db.execute(
+            select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
+        )
+        linked_vote = vote_result.scalar_one_or_none()
+        if linked_vote:
+            await db.delete(linked_vote)
+
+    # Delete session (participants are deleted via CASCADE, sequences via cascade="all, delete-orphan")
     await db.delete(session)
     await db.commit()
 
