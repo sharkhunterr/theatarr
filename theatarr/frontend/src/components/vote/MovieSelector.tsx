@@ -70,8 +70,8 @@ export function MovieSelector({
 
     let enrichedMovie = movie;
 
-    // If movie is from external source and missing details, fetch them
-    if (movie.source && movie.source !== 'local' && !movie.overview) {
+    // Always fetch full details for external sources (Plex search doesn't return all metadata)
+    if (movie.source && movie.source !== 'local') {
       try {
         const details = await apiClient.get<Movie>(
           `/movies/details/${movie.source}/${movie.source_id || movie.id}`
