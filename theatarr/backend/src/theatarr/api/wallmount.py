@@ -128,7 +128,7 @@ async def get_wallmount_state(
                         "css_vars": palette.to_css_vars(),
                     }
 
-        # Fallback to session's denormalized movie fields
+        # Fallback to session's denormalized movie fields or vote session movie_options
         if not movie_data and session.movie_title:
             movie_data = {
                 "id": session.movie_source_id,
@@ -136,6 +136,32 @@ async def get_wallmount_state(
                 "poster_url": session.movie_poster_url,
                 "backdrop_url": session.movie_poster_url,  # Use poster as backdrop fallback
             }
+
+            # Try to get more details from vote session movie_options if available
+            if session.linked_vote_session_id:
+                vs_result = await db.execute(
+                    select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
+                )
+                vote_session = vs_result.scalar_one_or_none()
+                if vote_session and vote_session.winning_movie_index is not None and vote_session.movie_options:
+                    winner_idx = vote_session.winning_movie_index
+                    if 0 <= winner_idx < len(vote_session.movie_options):
+                        winning_movie = vote_session.movie_options[winner_idx]
+                        movie_data = {
+                            "id": winning_movie.get("movie_id") or winning_movie.get("source_id"),
+                            "title": winning_movie.get("title"),
+                            "year": winning_movie.get("year"),
+                            "runtime_minutes": winning_movie.get("runtime_minutes"),
+                            "overview": winning_movie.get("overview"),
+                            "tagline": winning_movie.get("tagline"),
+                            "poster_url": winning_movie.get("poster_url"),
+                            "backdrop_url": winning_movie.get("backdrop_url") or winning_movie.get("poster_url"),
+                            "rating": winning_movie.get("rating"),
+                            "genres": winning_movie.get("genres"),
+                            "directors": winning_movie.get("directors"),
+                            "cast": winning_movie.get("cast", [])[:5] if winning_movie.get("cast") else [],
+                        }
+
             # Use session's color palette if available
             if session.color_palette:
                 palette_data = {
@@ -278,7 +304,7 @@ async def get_wallmount_state(
                                 "css_vars": palette.to_css_vars(),
                             }
 
-                # Fallback to session's denormalized movie fields
+                # Fallback to session's denormalized movie fields or vote session movie_options
                 if not movie_data and scheduled_session.movie_title:
                     movie_data = {
                         "id": scheduled_session.movie_source_id,
@@ -286,6 +312,32 @@ async def get_wallmount_state(
                         "poster_url": scheduled_session.movie_poster_url,
                         "backdrop_url": scheduled_session.movie_poster_url,
                     }
+
+                    # Try to get more details from vote session movie_options if available
+                    if scheduled_session.linked_vote_session_id:
+                        vs_result = await db.execute(
+                            select(VoteSession).where(VoteSession.id == scheduled_session.linked_vote_session_id)
+                        )
+                        vote_session_data = vs_result.scalar_one_or_none()
+                        if vote_session_data and vote_session_data.winning_movie_index is not None and vote_session_data.movie_options:
+                            winner_idx = vote_session_data.winning_movie_index
+                            if 0 <= winner_idx < len(vote_session_data.movie_options):
+                                winning_movie = vote_session_data.movie_options[winner_idx]
+                                movie_data = {
+                                    "id": winning_movie.get("movie_id") or winning_movie.get("source_id"),
+                                    "title": winning_movie.get("title"),
+                                    "year": winning_movie.get("year"),
+                                    "runtime_minutes": winning_movie.get("runtime_minutes"),
+                                    "overview": winning_movie.get("overview"),
+                                    "tagline": winning_movie.get("tagline"),
+                                    "poster_url": winning_movie.get("poster_url"),
+                                    "backdrop_url": winning_movie.get("backdrop_url") or winning_movie.get("poster_url"),
+                                    "rating": winning_movie.get("rating"),
+                                    "genres": winning_movie.get("genres"),
+                                    "directors": winning_movie.get("directors"),
+                                    "cast": winning_movie.get("cast", [])[:5] if winning_movie.get("cast") else [],
+                                }
+
                     if scheduled_session.color_palette:
                         palette_data = {
                             "primary": scheduled_session.color_palette.get("primary"),
@@ -395,7 +447,7 @@ async def get_wallmount_state(
                     "css_vars": palette.to_css_vars(),
                 }
 
-    # Fallback to session's denormalized movie fields
+    # Fallback to session's denormalized movie fields or vote session movie_options
     if not movie_data and session.movie_title:
         movie_data = {
             "id": session.movie_source_id,
@@ -403,6 +455,32 @@ async def get_wallmount_state(
             "poster_url": session.movie_poster_url,
             "backdrop_url": session.movie_poster_url,
         }
+
+        # Try to get more details from vote session movie_options if available
+        if session.linked_vote_session_id:
+            vs_result = await db.execute(
+                select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
+            )
+            vote_session_data = vs_result.scalar_one_or_none()
+            if vote_session_data and vote_session_data.winning_movie_index is not None and vote_session_data.movie_options:
+                winner_idx = vote_session_data.winning_movie_index
+                if 0 <= winner_idx < len(vote_session_data.movie_options):
+                    winning_movie = vote_session_data.movie_options[winner_idx]
+                    movie_data = {
+                        "id": winning_movie.get("movie_id") or winning_movie.get("source_id"),
+                        "title": winning_movie.get("title"),
+                        "year": winning_movie.get("year"),
+                        "runtime_minutes": winning_movie.get("runtime_minutes"),
+                        "overview": winning_movie.get("overview"),
+                        "tagline": winning_movie.get("tagline"),
+                        "poster_url": winning_movie.get("poster_url"),
+                        "backdrop_url": winning_movie.get("backdrop_url") or winning_movie.get("poster_url"),
+                        "rating": winning_movie.get("rating"),
+                        "genres": winning_movie.get("genres"),
+                        "directors": winning_movie.get("directors"),
+                        "cast": winning_movie.get("cast", [])[:5] if winning_movie.get("cast") else [],
+                    }
+
         if session.color_palette:
             palette_data = {
                 "primary": session.color_palette.get("primary"),

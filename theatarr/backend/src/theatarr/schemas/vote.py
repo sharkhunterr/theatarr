@@ -18,7 +18,13 @@ class MovieOption(BaseSchema):
     overview: str | None = None
     rating: float | None = None
     genres: list[str] | None = None
+    runtime_minutes: int | None = None
+    directors: list[str] | None = None
+    cast: list[str] | None = None
+    tagline: str | None = None
     movie_id: str | None = None  # If linked to Movie model
+    source: str | None = None
+    source_id: str | None = None
 
 
 class VoteSessionCreate(BaseSchema):

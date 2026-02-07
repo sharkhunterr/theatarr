@@ -13,6 +13,12 @@ interface Movie {
   overview?: string;
   rating?: number;
   genres?: string[];
+  runtime_minutes?: number;
+  directors?: string[];
+  cast?: string[];
+  tagline?: string;
+  source?: string;
+  source_id?: string;
 }
 
 export interface MovieOption {
@@ -23,7 +29,13 @@ export interface MovieOption {
   overview?: string;
   rating?: number;
   genres?: string[];
+  runtime_minutes?: number;
+  directors?: string[];
+  cast?: string[];
+  tagline?: string;
   movie_id?: string;
+  source?: string;
+  source_id?: string;
 }
 
 interface MovieSelectorProps {
@@ -64,7 +76,13 @@ export function MovieSelector({
       overview: movie.overview,
       rating: movie.rating,
       genres: movie.genres,
+      runtime_minutes: movie.runtime_minutes,
+      directors: movie.directors,
+      cast: movie.cast,
+      tagline: movie.tagline,
       movie_id: movie.id,
+      source: movie.source,
+      source_id: movie.source_id || movie.id,
     };
 
     onSelect(movieOption);

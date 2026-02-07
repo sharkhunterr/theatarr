@@ -48,6 +48,14 @@ class MovieSearchResult(BaseModel):
     title: str
     year: int | None
     poster_url: str | None
+    backdrop_url: str | None = None
+    overview: str | None = None
+    rating: float | None = None
+    runtime_minutes: int | None = None
+    genres: list[str] | None = None
+    directors: list[str] | None = None
+    cast: list[str] | None = None
+    tagline: str | None = None
     source: str
     source_id: str | None
 
@@ -152,6 +160,14 @@ async def search_movies(
             title=m.title,
             year=m.year,
             poster_url=m.poster_url,
+            backdrop_url=m.backdrop_url,
+            overview=m.overview,
+            rating=m.rating,
+            runtime_minutes=m.runtime_minutes,
+            genres=m.genres,
+            directors=m.directors,
+            cast=m.cast[:5] if m.cast else None,
+            tagline=m.tagline,
             source="local",
             source_id=m.tmdb_id,
         ))
@@ -182,17 +198,38 @@ async def search_movies(
                 token = service.config.get("token", "")
 
                 for item in adapter_results[:limit - len(results)]:
-                    # Build full poster URL for Plex
+                    # Build full URLs for Plex
                     thumb = item.get("thumb")
+                    art = item.get("art")
                     poster_url = None
+                    backdrop_url = None
                     if thumb and server_url and token:
                         poster_url = f"{server_url}{thumb}?X-Plex-Token={token}"
+                    if art and server_url and token:
+                        backdrop_url = f"{server_url}{art}?X-Plex-Token={token}"
+
+                    # Extract runtime in minutes
+                    duration = item.get("duration")
+                    runtime_minutes = duration // 60000 if duration else None
+
+                    # Extract directors and cast
+                    directors = [d.get("tag") for d in item.get("Director", []) if d.get("tag")]
+                    cast = [r.get("tag") for r in item.get("Role", [])[:5] if r.get("tag")]
+                    genres = [g.get("tag") for g in item.get("Genre", []) if g.get("tag")]
 
                     results.append(MovieSearchResult(
                         id=str(item.get("id", "")),
                         title=item.get("title", ""),
                         year=item.get("year"),
                         poster_url=poster_url,
+                        backdrop_url=backdrop_url,
+                        overview=item.get("summary"),
+                        rating=item.get("rating"),
+                        runtime_minutes=runtime_minutes,
+                        genres=genres if genres else None,
+                        directors=directors if directors else None,
+                        cast=cast if cast else None,
+                        tagline=item.get("tagline"),
                         source=service.adapter_type,
                         source_id=str(item.get("id", "")),
                     ))
