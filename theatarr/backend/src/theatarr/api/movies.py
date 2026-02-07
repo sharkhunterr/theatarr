@@ -328,6 +328,57 @@ async def get_movies_from_service(
         raise HTTPException(status_code=500, detail=f"Failed to fetch movies: {str(e)}")
 
 
+@router.get("/details/{source}/{source_id}")
+async def get_movie_details_from_source(
+    source: str,
+    source_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MovieSearchResult:
+    """Get detailed movie info from an external source (plex, jellyfin)."""
+    # Find the service for this source
+    services_result = await db.execute(
+        select(Service)
+        .where(Service.adapter_type == source)
+        .where(Service.category == ServiceCategory.MEDIA_SOURCE)
+        .where(Service.is_enabled == True)
+    )
+    service = services_result.scalar_one_or_none()
+
+    if not service:
+        raise HTTPException(status_code=404, detail=f"No {source} service configured")
+
+    try:
+        adapter = get_adapter(service.adapter_type, service.config)
+        command = Command(action="get_movie", parameters={"movie_id": source_id})
+        result = await adapter.execute(command)
+
+        if not result.success or not result.data:
+            raise HTTPException(status_code=404, detail="Movie not found")
+
+        movie_data = result.data
+        return MovieSearchResult(
+            id=str(movie_data.get("id", source_id)),
+            title=movie_data.get("title", ""),
+            year=movie_data.get("year"),
+            poster_url=movie_data.get("thumb"),
+            backdrop_url=movie_data.get("art"),
+            overview=movie_data.get("summary"),
+            rating=movie_data.get("rating"),
+            runtime_minutes=movie_data.get("duration") // 60000 if movie_data.get("duration") else None,
+            genres=movie_data.get("genres"),
+            directors=movie_data.get("directors"),
+            cast=movie_data.get("actors", [])[:5] if movie_data.get("actors") else None,
+            tagline=None,
+            source=source,
+            source_id=source_id,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch movie details: {str(e)}")
+
+
 @router.get("/{movie_id}")
 async def get_movie(
     movie_id: str,

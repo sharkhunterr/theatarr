@@ -65,24 +65,38 @@ export function MovieSelector({
     enabled: searchQuery.length >= 2,
   });
 
-  const handleSelectMovie = (movie: Movie) => {
+  const handleSelectMovie = async (movie: Movie) => {
     if (selectedMovies.length >= maxSelections) return;
 
+    let enrichedMovie = movie;
+
+    // If movie is from external source and missing details, fetch them
+    if (movie.source && movie.source !== 'local' && !movie.overview) {
+      try {
+        const details = await apiClient.get<Movie>(
+          `/movies/details/${movie.source}/${movie.source_id || movie.id}`
+        );
+        enrichedMovie = { ...movie, ...details };
+      } catch (error) {
+        console.warn('Failed to fetch movie details, using basic info:', error);
+      }
+    }
+
     const movieOption: MovieOption = {
-      title: movie.title,
-      year: movie.year,
-      poster_url: movie.poster_url,
-      backdrop_url: movie.backdrop_url,
-      overview: movie.overview,
-      rating: movie.rating,
-      genres: movie.genres,
-      runtime_minutes: movie.runtime_minutes,
-      directors: movie.directors,
-      cast: movie.cast,
-      tagline: movie.tagline,
-      movie_id: movie.id,
-      source: movie.source,
-      source_id: movie.source_id || movie.id,
+      title: enrichedMovie.title,
+      year: enrichedMovie.year,
+      poster_url: enrichedMovie.poster_url,
+      backdrop_url: enrichedMovie.backdrop_url,
+      overview: enrichedMovie.overview,
+      rating: enrichedMovie.rating,
+      genres: enrichedMovie.genres,
+      runtime_minutes: enrichedMovie.runtime_minutes,
+      directors: enrichedMovie.directors,
+      cast: enrichedMovie.cast,
+      tagline: enrichedMovie.tagline,
+      movie_id: enrichedMovie.id,
+      source: enrichedMovie.source,
+      source_id: enrichedMovie.source_id || enrichedMovie.id,
     };
 
     onSelect(movieOption);
