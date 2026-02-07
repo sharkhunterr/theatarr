@@ -571,16 +571,38 @@ async def delete_session(
             detail="Cannot delete an active session. Stop it first.",
         )
 
+    # Store linked vote session id before clearing reference
+    linked_vote_session_id = session.linked_vote_session_id
+
+    # Delete participants first (to avoid FK constraint issues)
+    from theatarr.models.session_participant import SessionParticipant
+    await db.execute(
+        select(SessionParticipant).where(SessionParticipant.session_id == session_id)
+    )
+    participants_result = await db.execute(
+        select(SessionParticipant).where(SessionParticipant.session_id == session_id)
+    )
+    for participant in participants_result.scalars().all():
+        await db.delete(participant)
+
+    # Clear the session's reference to vote session
+    session.linked_vote_session_id = None
+    await db.flush()
+
     # Delete linked vote session if present
-    if session.linked_vote_session_id:
+    if linked_vote_session_id:
         vote_result = await db.execute(
-            select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
+            select(VoteSession).where(VoteSession.id == linked_vote_session_id)
         )
         linked_vote = vote_result.scalar_one_or_none()
         if linked_vote:
+            # Clear vote session's reference to this session
+            linked_vote.linked_session_id = None
+            await db.flush()
+            # Now delete the vote session
             await db.delete(linked_vote)
 
-    # Delete session (participants are deleted via CASCADE, sequences via cascade="all, delete-orphan")
+    # Delete session (sequences deleted via cascade="all, delete-orphan")
     await db.delete(session)
     await db.commit()
 

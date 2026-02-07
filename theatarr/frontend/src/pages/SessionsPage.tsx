@@ -31,6 +31,7 @@ export function SessionsPage() {
   const { fetchSessions, play, pause, stop } = useSession();
   const [deleteSession, setDeleteSession] = useState<Session | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [voteResultsSession, setVoteResultsSession] = useState<VoteSessionSummary | null>(null);
 
   const t = {
@@ -89,12 +90,14 @@ export function SessionsPage() {
   const handleDelete = async () => {
     if (!deleteSession) return;
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       await apiClient.delete(`/sessions/${deleteSession.id}`);
       fetchSessions();
       setDeleteSession(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete session:', error);
+      setDeleteError(error?.message || 'Erreur lors de la suppression');
     } finally {
       setIsDeleting(false);
     }
@@ -432,15 +435,20 @@ export function SessionsPage() {
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={!!deleteSession}
-        onClose={() => setDeleteSession(null)}
+        onClose={() => { setDeleteSession(null); setDeleteError(null); }}
         title={t.deleteConfirm}
         size="sm"
       >
         <div className="space-y-4">
           <p className="text-dark-text">{t.deleteWarning}</p>
           <p className="text-sm text-dark-muted font-medium">"{deleteSession?.name}"</p>
+          {deleteError && (
+            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+              {deleteError}
+            </div>
+          )}
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
-            <Button variant="secondary" onClick={() => setDeleteSession(null)}>
+            <Button variant="secondary" onClick={() => { setDeleteSession(null); setDeleteError(null); }}>
               {t.cancel}
             </Button>
             <Button variant="danger" onClick={handleDelete} disabled={isDeleting}>
