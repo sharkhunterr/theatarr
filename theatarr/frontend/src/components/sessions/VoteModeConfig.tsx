@@ -10,6 +10,13 @@ interface MovieOption {
   title: string;
   year?: number;
   poster_url?: string;
+  backdrop_url?: string;
+  overview?: string;
+  rating?: number;
+  runtime_minutes?: number;
+  genres?: string[];
+  directors?: string[];
+  cast?: string[];
   movie_id?: string;
   source?: string;
   source_id?: string;
@@ -113,7 +120,7 @@ export function VoteModeConfig({
     enabled: showLinkExisting,
   });
 
-  const addMovie = (movie: {
+  const addMovie = async (movie: {
     id: string;
     title: string;
     year?: number;
@@ -127,17 +134,37 @@ export function VoteModeConfig({
     );
     if (exists) return;
 
+    // Fetch full details from external source
+    let enrichedMovie: any = movie;
+    if (movie.source && movie.source !== 'local') {
+      try {
+        const details = await apiClient.get<any>(
+          `/movies/details/${movie.source}/${movie.source_id || movie.id}`
+        );
+        enrichedMovie = { ...movie, ...details };
+      } catch (error) {
+        console.warn('Failed to fetch movie details:', error);
+      }
+    }
+
     onChange({
       ...config,
       movie_options: [
         ...config.movie_options,
         {
-          title: movie.title,
-          year: movie.year,
-          poster_url: movie.poster_url,
-          movie_id: movie.id,
-          source: movie.source,
-          source_id: movie.source_id || movie.id,
+          title: enrichedMovie.title,
+          year: enrichedMovie.year,
+          poster_url: enrichedMovie.poster_url,
+          backdrop_url: enrichedMovie.backdrop_url,
+          overview: enrichedMovie.overview,
+          rating: enrichedMovie.rating,
+          runtime_minutes: enrichedMovie.runtime_minutes,
+          genres: enrichedMovie.genres,
+          directors: enrichedMovie.directors,
+          cast: enrichedMovie.cast,
+          movie_id: enrichedMovie.id,
+          source: enrichedMovie.source,
+          source_id: enrichedMovie.source_id || enrichedMovie.id,
         },
       ],
     });
