@@ -319,6 +319,7 @@ async def create_session(
                 require_token=vote_config.get("require_token", True),
                 show_results_during_voting=vote_config.get("show_results_during_voting", False),
                 anonymous_voting=vote_config.get("anonymous_voting", True),
+                close_when_all_voted=vote_config.get("close_when_all_voted", False),
                 opens_at=vote_config.get("opens_at"),
                 closes_at=vote_config.get("closes_at"),
                 linked_session_id=session.id,

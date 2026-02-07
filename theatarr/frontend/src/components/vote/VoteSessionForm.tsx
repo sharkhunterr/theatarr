@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { Zap, Eye, EyeOff, UserCheck, Lock, Users, Vote } from 'lucide-react';
+import clsx from 'clsx';
 import { Button, Input } from '../common';
 import { MovieSelector, MovieOption } from './MovieSelector';
 import { apiClient } from '../../api/client';
@@ -16,6 +18,10 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
   const [maxVotesPerUser, setMaxVotesPerUser] = useState(1);
   const [allowMultipleVotes, setAllowMultipleVotes] = useState(false);
   const [showResultsDuringVoting, setShowResultsDuringVoting] = useState(false);
+  const [anonymousVoting, setAnonymousVoting] = useState(true);
+  const [requireToken, setRequireToken] = useState(true);
+  const [openImmediately, setOpenImmediately] = useState(true);
+  const [closeWhenAllVoted, setCloseWhenAllVoted] = useState(false);
   const [closesAt, setClosesAt] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -64,8 +70,10 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
       max_votes_per_user: maxVotesPerUser,
       allow_multiple_votes: allowMultipleVotes,
       show_results_during_voting: showResultsDuringVoting,
-      require_token: true,
-      anonymous_voting: true,
+      require_token: requireToken,
+      anonymous_voting: anonymousVoting,
+      open_immediately: openImmediately,
+      close_when_all_voted: closeWhenAllVoted,
       closes_at: closesAt || undefined,
     });
   };
@@ -119,70 +127,176 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
       {/* Voting Options */}
       <div className="border-t border-dark-border pt-6">
         <h3 className="text-lg font-semibold text-dark-text mb-4">Options de vote</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 bg-dark-surface rounded-lg">
-            <div>
-              <label className="text-sm font-medium text-dark-text">
-                Votes max par utilisateur
-              </label>
-              <p className="text-xs text-dark-muted">
-                Combien de films chaque personne peut voter
-              </p>
+
+        {/* Options grid */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {/* Open Immediately */}
+          <button
+            type="button"
+            onClick={() => setOpenImmediately(!openImmediately)}
+            className={clsx(
+              'p-3 rounded-lg border text-left transition-all',
+              openImmediately
+                ? 'bg-green-500/10 border-green-500/50'
+                : 'bg-dark-bg border-dark-border hover:border-dark-muted'
+            )}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <Zap size={16} className={openImmediately ? 'text-green-400' : 'text-dark-muted'} />
+              <div className={clsx(
+                'w-8 h-4 rounded-full transition-colors relative',
+                openImmediately ? 'bg-green-500' : 'bg-dark-border'
+              )}>
+                <div className={clsx(
+                  'absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform',
+                  openImmediately ? 'left-4' : 'left-0.5'
+                )} />
+              </div>
             </div>
-            <Input
-              type="number"
-              min={1}
-              max={10}
-              value={maxVotesPerUser}
-              onChange={(e) => setMaxVotesPerUser(parseInt(e.target.value) || 1)}
-              className="w-20 text-center"
-            />
+            <div className="text-xs font-medium text-dark-text">Ouvrir immediatement</div>
+            <div className="text-[10px] text-dark-muted">Le vote demarre des la creation</div>
+          </button>
+
+          {/* Close when all voted */}
+          <button
+            type="button"
+            onClick={() => setCloseWhenAllVoted(!closeWhenAllVoted)}
+            className={clsx(
+              'p-3 rounded-lg border text-left transition-all',
+              closeWhenAllVoted
+                ? 'bg-blue-500/10 border-blue-500/50'
+                : 'bg-dark-bg border-dark-border hover:border-dark-muted'
+            )}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <Users size={16} className={closeWhenAllVoted ? 'text-blue-400' : 'text-dark-muted'} />
+              <div className={clsx(
+                'w-8 h-4 rounded-full transition-colors relative',
+                closeWhenAllVoted ? 'bg-blue-500' : 'bg-dark-border'
+              )}>
+                <div className={clsx(
+                  'absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform',
+                  closeWhenAllVoted ? 'left-4' : 'left-0.5'
+                )} />
+              </div>
+            </div>
+            <div className="text-xs font-medium text-dark-text">Cloture automatique</div>
+            <div className="text-[10px] text-dark-muted">Fermer quand tous ont vote</div>
+          </button>
+
+          {/* Show Results */}
+          <button
+            type="button"
+            onClick={() => setShowResultsDuringVoting(!showResultsDuringVoting)}
+            className={clsx(
+              'p-3 rounded-lg border text-left transition-all',
+              showResultsDuringVoting
+                ? 'bg-purple-500/10 border-purple-500/50'
+                : 'bg-dark-bg border-dark-border hover:border-dark-muted'
+            )}
+          >
+            <div className="flex items-center justify-between mb-1">
+              {showResultsDuringVoting ? (
+                <Eye size={16} className="text-purple-400" />
+              ) : (
+                <EyeOff size={16} className="text-dark-muted" />
+              )}
+              <div className={clsx(
+                'w-8 h-4 rounded-full transition-colors relative',
+                showResultsDuringVoting ? 'bg-purple-500' : 'bg-dark-border'
+              )}>
+                <div className={clsx(
+                  'absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform',
+                  showResultsDuringVoting ? 'left-4' : 'left-0.5'
+                )} />
+              </div>
+            </div>
+            <div className="text-xs font-medium text-dark-text">Resultats visibles</div>
+            <div className="text-[10px] text-dark-muted">Afficher pendant le vote</div>
+          </button>
+
+          {/* Anonymous */}
+          <button
+            type="button"
+            onClick={() => setAnonymousVoting(!anonymousVoting)}
+            className={clsx(
+              'p-3 rounded-lg border text-left transition-all',
+              anonymousVoting
+                ? 'bg-yellow-500/10 border-yellow-500/50'
+                : 'bg-dark-bg border-dark-border hover:border-dark-muted'
+            )}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <UserCheck size={16} className={anonymousVoting ? 'text-yellow-400' : 'text-dark-muted'} />
+              <div className={clsx(
+                'w-8 h-4 rounded-full transition-colors relative',
+                anonymousVoting ? 'bg-yellow-500' : 'bg-dark-border'
+              )}>
+                <div className={clsx(
+                  'absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform',
+                  anonymousVoting ? 'left-4' : 'left-0.5'
+                )} />
+              </div>
+            </div>
+            <div className="text-xs font-medium text-dark-text">Vote anonyme</div>
+            <div className="text-[10px] text-dark-muted">Les votes sont anonymises</div>
+          </button>
+
+          {/* Require Token */}
+          <button
+            type="button"
+            onClick={() => setRequireToken(!requireToken)}
+            className={clsx(
+              'p-3 rounded-lg border text-left transition-all',
+              requireToken
+                ? 'bg-theatarr-500/10 border-theatarr-500/50'
+                : 'bg-dark-bg border-dark-border hover:border-dark-muted'
+            )}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <Lock size={16} className={requireToken ? 'text-theatarr-400' : 'text-dark-muted'} />
+              <div className={clsx(
+                'w-8 h-4 rounded-full transition-colors relative',
+                requireToken ? 'bg-theatarr-500' : 'bg-dark-border'
+              )}>
+                <div className={clsx(
+                  'absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform',
+                  requireToken ? 'left-4' : 'left-0.5'
+                )} />
+              </div>
+            </div>
+            <div className="text-xs font-medium text-dark-text">Acces restreint</div>
+            <div className="text-[10px] text-dark-muted">Les votants doivent etre invites</div>
+          </button>
+
+          {/* Max Votes */}
+          <div className="p-3 rounded-lg border bg-dark-bg border-dark-border">
+            <div className="flex items-center justify-between mb-1">
+              <Vote size={16} className="text-dark-muted" />
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={maxVotesPerUser}
+                onChange={(e) => setMaxVotesPerUser(parseInt(e.target.value) || 1)}
+                className="w-12 bg-dark-surface border border-dark-border rounded px-2 py-0.5 text-xs text-dark-text text-center"
+              />
+            </div>
+            <div className="text-xs font-medium text-dark-text">Votes max</div>
+            <div className="text-[10px] text-dark-muted">Par participant</div>
           </div>
+        </div>
 
-          <label className="flex items-center gap-3 p-3 bg-dark-surface rounded-lg cursor-pointer hover:bg-dark-border/30 transition-colors">
-            <input
-              type="checkbox"
-              checked={allowMultipleVotes}
-              onChange={(e) => setAllowMultipleVotes(e.target.checked)}
-              className="w-5 h-5 rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500"
-            />
-            <div>
-              <span className="text-sm font-medium text-dark-text">
-                Autoriser les votes multiples
-              </span>
-              <p className="text-xs text-dark-muted">
-                Les utilisateurs peuvent voter pour plusieurs films différents
-              </p>
-            </div>
+        {/* Closing date */}
+        <div className="p-3 bg-dark-surface rounded-lg">
+          <label className="block text-sm font-medium text-dark-text mb-2">
+            Date de fermeture (optionnel)
           </label>
-
-          <label className="flex items-center gap-3 p-3 bg-dark-surface rounded-lg cursor-pointer hover:bg-dark-border/30 transition-colors">
-            <input
-              type="checkbox"
-              checked={showResultsDuringVoting}
-              onChange={(e) => setShowResultsDuringVoting(e.target.checked)}
-              className="w-5 h-5 rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500"
-            />
-            <div>
-              <span className="text-sm font-medium text-dark-text">
-                Afficher les résultats en temps réel
-              </span>
-              <p className="text-xs text-dark-muted">
-                Les votants peuvent voir les résultats actuels
-              </p>
-            </div>
-          </label>
-
-          <div className="p-3 bg-dark-surface rounded-lg">
-            <label className="block text-sm font-medium text-dark-text mb-2">
-              Date de fermeture (optionnel)
-            </label>
-            <Input
-              type="datetime-local"
-              value={closesAt}
-              onChange={(e) => setClosesAt(e.target.value)}
-            />
-          </div>
+          <Input
+            type="datetime-local"
+            value={closesAt}
+            onChange={(e) => setClosesAt(e.target.value)}
+          />
         </div>
       </div>
 

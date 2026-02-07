@@ -52,6 +52,7 @@ class VoteSession(Base, UUIDMixin, TimestampMixin):
     require_token: Mapped[bool] = mapped_column(Boolean, default=True)
     show_results_during_voting: Mapped[bool] = mapped_column(Boolean, default=False)
     anonymous_voting: Mapped[bool] = mapped_column(Boolean, default=True)
+    close_when_all_voted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Timing
     opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

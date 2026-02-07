@@ -12,6 +12,7 @@ from theatarr.api.ws import ws_manager, Channel
 from theatarr.config import settings
 from theatarr.database import DbSession
 from theatarr.models.session import Session
+from theatarr.models.session_participant import InvitationStatus, SessionParticipant
 from theatarr.models.vote import Vote, VoteSession, VoteSessionStatus, VoteToken
 from theatarr.schemas.vote import (
     VoteCast,
@@ -55,6 +56,7 @@ def _vote_session_to_response(
         require_token=vs.require_token,
         show_results_during_voting=vs.show_results_during_voting,
         anonymous_voting=vs.anonymous_voting,
+        close_when_all_voted=vs.close_when_all_voted,
         opens_at=vs.opens_at,
         closes_at=vs.closes_at,
         closed_at=vs.closed_at,
@@ -149,15 +151,20 @@ async def create_vote_session(
     data: VoteSessionCreate,
 ) -> VoteSessionResponse:
     """Create a new vote session (admin only)."""
+    # Determine initial status based on open_immediately
+    initial_status = VoteSessionStatus.OPEN if data.open_immediately else VoteSessionStatus.DRAFT
+
     vote_session = VoteSession(
         name=data.name,
         description=data.description,
+        status=initial_status,
         movie_options=[opt.model_dump() for opt in data.movie_options],
         max_votes_per_user=data.max_votes_per_user,
         allow_multiple_votes=data.allow_multiple_votes,
         require_token=data.require_token,
         show_results_during_voting=data.show_results_during_voting,
         anonymous_voting=data.anonymous_voting,
+        close_when_all_voted=data.close_when_all_voted,
         opens_at=data.opens_at,
         closes_at=data.closes_at,
         target_session_id=data.target_session_id,
@@ -371,6 +378,81 @@ async def close_vote_session(
                     },
                 },
             )
+
+    return _vote_session_to_response(vote_session)
+
+
+@router.post(
+    "/vote-sessions/{session_id}/check-close",
+    response_model=VoteSessionResponse,
+    summary="Check and Close Vote Session",
+)
+async def check_and_close_vote_session(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+) -> VoteSessionResponse:
+    """Check if all participants have voted and close if so (admin only)."""
+    result = await db.execute(
+        select(VoteSession)
+        .options(selectinload(VoteSession.votes))
+        .where(VoteSession.id == session_id)
+    )
+    vote_session = result.scalar_one_or_none()
+
+    if not vote_session:
+        raise NotFoundError("VoteSession", session_id)
+
+    if vote_session.status != VoteSessionStatus.OPEN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Vote session is not open (status: {vote_session.status})",
+        )
+
+    if not vote_session.linked_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vote session is not linked to a cinema session",
+        )
+
+    # Count expected voters from linked session participants
+    participants_count_result = await db.execute(
+        select(func.count(SessionParticipant.id))
+        .where(
+            SessionParticipant.session_id == vote_session.linked_session_id,
+            SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value,
+        )
+    )
+    expected_voters = participants_count_result.scalar() or 0
+
+    # Count actual votes (unique voters)
+    votes_count_result = await db.execute(
+        select(func.count(func.distinct(Vote.voter_identifier)))
+        .where(Vote.vote_session_id == session_id)
+    )
+    actual_voters = votes_count_result.scalar() or 0
+
+    if actual_voters < expected_voters:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not all participants have voted ({actual_voters}/{expected_voters})",
+        )
+
+    # Close the vote
+    vote_session = await close_voting(db, vote_session, assign_winner=True)
+
+    # Broadcast vote closed results
+    results = await get_vote_results(db, vote_session)
+    await ws_manager.broadcast(
+        Channel.VOTE.value,
+        {
+            "type": "vote_closed",
+            "payload": {
+                "vote_session_id": vote_session.id,
+                "results": results,
+            },
+        },
+    )
 
     return _vote_session_to_response(vote_session)
 

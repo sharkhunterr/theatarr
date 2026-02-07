@@ -76,6 +76,7 @@ interface VoteSessionConfig {
   opens_at?: string;
   closes_at?: string;
   open_immediately?: boolean;
+  close_when_all_voted?: boolean;
 }
 
 interface Session {
@@ -314,6 +315,7 @@ export function SessionEditor() {
     show_results_during_voting: false,
     anonymous_voting: true,
     open_immediately: true, // Default to open vote immediately
+    close_when_all_voted: true, // Default to close when all voted
   });
 
   // Mystery mode config state
@@ -491,6 +493,7 @@ export function SessionEditor() {
             show_results_during_voting: voteConfig.show_results_during_voting,
             anonymous_voting: voteConfig.anonymous_voting,
             open_immediately: voteConfig.open_immediately,
+            close_when_all_voted: voteConfig.close_when_all_voted,
           };
         }
       } else if (mode === 'mystery') {

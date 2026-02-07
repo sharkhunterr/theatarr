@@ -843,6 +843,58 @@ async def cast_vote(
 
     await db.commit()
 
+    # Refresh vote session to get latest state
+    await db.refresh(vs)
+
+    # Check if we should auto-close when all have voted
+    if vs.close_when_all_voted and vs.linked_session_id:
+        # Count expected voters from linked session participants
+        participants_count_result = await db.execute(
+            select(func.count(SessionParticipant.id))
+            .where(
+                SessionParticipant.session_id == vs.linked_session_id,
+                SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value,
+            )
+        )
+        expected_voters = participants_count_result.scalar() or 0
+
+        # Count actual votes (unique voters)
+        votes_count_result = await db.execute(
+            select(func.count(func.distinct(Vote.voter_identifier)))
+            .where(Vote.vote_session_id == vote_session_id)
+        )
+        actual_voters = votes_count_result.scalar() or 0
+
+        # Close if all have voted
+        if expected_voters > 0 and actual_voters >= expected_voters:
+            vs.status = VoteSessionStatus.CLOSED
+            vs.closed_at = datetime.now(timezone.utc)
+            # Reload votes to determine winner
+            votes_result = await db.execute(
+                select(Vote).where(Vote.vote_session_id == vote_session_id)
+            )
+            votes = votes_result.scalars().all()
+            # Calculate winner
+            vote_counts: dict[int, int] = {}
+            for v in votes:
+                vote_counts[v.movie_index] = vote_counts.get(v.movie_index, 0) + 1
+            if vote_counts:
+                vs.winning_movie_index = max(vote_counts, key=lambda k: vote_counts[k])
+            await db.commit()
+
+            # Resolve movie for linked session
+            from theatarr.services.movie_resolution import resolve_vote_winner, MovieResolutionError
+
+            session_result = await db.execute(
+                select(Session).where(Session.id == vs.linked_session_id)
+            )
+            linked_session = session_result.scalar_one_or_none()
+            if linked_session and not linked_session.movie_resolved:
+                try:
+                    await resolve_vote_winner(db, linked_session, vs)
+                except MovieResolutionError:
+                    pass  # Ignore resolution errors
+
     return PortalVoteResponse(
         success=True,
         movie_index=data.movie_index,

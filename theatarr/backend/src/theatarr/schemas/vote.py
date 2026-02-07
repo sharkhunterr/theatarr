@@ -32,6 +32,8 @@ class VoteSessionCreate(BaseSchema):
     require_token: bool = True
     show_results_during_voting: bool = False
     anonymous_voting: bool = True
+    open_immediately: bool = False
+    close_when_all_voted: bool = False
     opens_at: datetime | None = None
     closes_at: datetime | None = None
     target_session_id: str | None = None
@@ -66,6 +68,7 @@ class VoteSessionResponse(BaseSchema):
     require_token: bool
     show_results_during_voting: bool
     anonymous_voting: bool
+    close_when_all_voted: bool = False
     opens_at: datetime | None
     closes_at: datetime | None
     closed_at: datetime | None
