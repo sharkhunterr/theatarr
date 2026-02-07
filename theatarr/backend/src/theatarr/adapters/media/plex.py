@@ -315,6 +315,14 @@ class PlexAdapter(ServiceAdapter):
                 "type": item.get("type"),
                 "year": item.get("year"),
                 "thumb": item.get("thumb"),
+                "art": item.get("art"),
+                "summary": item.get("summary"),
+                "tagline": item.get("tagline"),
+                "rating": item.get("audienceRating") or item.get("rating"),
+                "duration": item.get("duration"),
+                "Genre": item.get("Genre", []),
+                "Director": item.get("Director", []),
+                "Role": item.get("Role", []),
             })
 
         return CommandResult(
