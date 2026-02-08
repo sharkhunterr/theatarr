@@ -506,6 +506,8 @@ async def update_session(
         flag_modified(session, "color_palette")
     if "enrichment_options" in update_data:
         flag_modified(session, "enrichment_options")
+    if "mystery_config" in update_data:
+        flag_modified(session, "mystery_config")
 
     # Handle sequences update
     if data.sequences is not None:

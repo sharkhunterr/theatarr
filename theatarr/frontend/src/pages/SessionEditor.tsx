@@ -428,6 +428,11 @@ export function SessionEditor() {
       }
       setSession(data);
 
+      // Load mystery config from session (for mystery mode editing)
+      if (data.mystery_config) {
+        setMysteryConfig(data.mystery_config);
+      }
+
       // Load enrichment options from session (for vote/mystery deferred enrichment)
       if (data.enrichment_options) {
         setEnrichmentOptions({
