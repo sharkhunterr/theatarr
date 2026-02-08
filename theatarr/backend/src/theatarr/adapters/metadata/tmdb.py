@@ -184,6 +184,7 @@ class TMDBAdapter(ServiceAdapter):
             params={
                 "language": self.language,
                 "append_to_response": "credits,videos,images",
+                "include_image_language": f"{self.language[:2]},en,null",
             },
         )
 
@@ -348,6 +349,31 @@ class TMDBAdapter(ServiceAdapter):
                     "youtube_url": f"https://www.youtube.com/watch?v={video.get('key')}",
                 })
 
+        # Extract alternative images (already returned by append_to_response=images)
+        images = movie.get("images", {})
+        extra_backdrops = [
+            self._get_image_url(img.get("file_path"), "original")
+            for img in sorted(
+                images.get("backdrops", []),
+                key=lambda x: x.get("vote_average", 0),
+                reverse=True,
+            )[:10]
+            if img.get("file_path") != movie.get("backdrop_path")
+        ]
+        extra_posters = [
+            self._get_image_url(img.get("file_path"), "w780")
+            for img in sorted(
+                images.get("posters", []),
+                key=lambda x: x.get("vote_average", 0),
+                reverse=True,
+            )[:10]
+            if img.get("file_path") != movie.get("poster_path")
+        ]
+        logos = [
+            self._get_image_url(img.get("file_path"), "w500")
+            for img in images.get("logos", [])[:5]
+        ]
+
         return {
             "tmdb_id": str(movie.get("id")),
             "imdb_id": movie.get("imdb_id"),
@@ -363,6 +389,9 @@ class TMDBAdapter(ServiceAdapter):
             "popularity": movie.get("popularity"),
             "poster_url": self._get_image_url(movie.get("poster_path"), "w500"),
             "backdrop_url": self._get_image_url(movie.get("backdrop_path"), "original"),
+            "extra_backdrops": extra_backdrops,
+            "extra_posters": extra_posters,
+            "logos": logos,
             "genres": genres,
             "cast": cast,
             "directors": directors,

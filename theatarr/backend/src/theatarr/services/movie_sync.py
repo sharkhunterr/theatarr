@@ -97,6 +97,19 @@ async def sync_movie_from_source(
     thumb_url = movie_data.get("thumb") or poster_url
     art_url = movie_data.get("art")
 
+    # Fetch alternative images from Plex
+    extra_posters = []
+    extra_backdrops = []
+    if source == "plex":
+        try:
+            images_command = Command(action="get_movie_images", parameters={"movie_id": source_id})
+            images_result = await adapter.execute(images_command)
+            if images_result.success and images_result.data:
+                extra_posters = images_result.data.get("extra_posters", [])
+                extra_backdrops = images_result.data.get("extra_backdrops", [])
+        except Exception as e:
+            logger.warning(f"Failed to fetch alternative images from Plex: {e}")
+
     # Create movie object
     movie = Movie(
         title=movie_data.get("title", "Unknown"),
@@ -107,6 +120,8 @@ async def sync_movie_from_source(
         tagline=movie_data.get("tagline"),
         poster_url=thumb_url,
         backdrop_url=art_url or thumb_url,
+        extra_backdrops=extra_backdrops,
+        extra_posters=extra_posters,
         rating=movie_data.get("rating"),
         genres=movie_data.get("genres", []),
         directors=movie_data.get("directors", []),

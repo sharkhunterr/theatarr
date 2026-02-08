@@ -151,6 +151,11 @@ class PlexAdapter(ServiceAdapter):
                 description="Get movie details",
             ),
             Capability(
+                name="get_movie_images",
+                parameters=["movie_id"],
+                description="Get all available images for a movie",
+            ),
+            Capability(
                 name="search",
                 parameters=["query", "type"],
                 description="Search for media",
@@ -184,6 +189,8 @@ class PlexAdapter(ServiceAdapter):
                 return await self._list_movies(command.parameters)
             elif command.action == "get_movie":
                 return await self._get_movie(command.parameters)
+            elif command.action == "get_movie_images":
+                return await self._get_movie_images(command.parameters)
             elif command.action == "search":
                 return await self._search(command.parameters)
             elif command.action == "get_playback_url":
@@ -287,6 +294,58 @@ class PlexAdapter(ServiceAdapter):
                 "genres": [g.get("tag") for g in movie.get("Genre", [])],
                 "directors": [d.get("tag") for d in movie.get("Director", [])],
                 "actors": [a.get("tag") for a in movie.get("Role", [])[:5]],
+            },
+        )
+
+    async def _get_movie_images(self, parameters: dict[str, Any]) -> CommandResult:
+        """Get all available posters and arts for a movie."""
+        if not self._client:
+            return CommandResult(success=False, message="Not connected")
+
+        movie_id = parameters.get("movie_id")
+        if not movie_id:
+            return CommandResult(success=False, message="movie_id is required")
+
+        extra_posters = []
+        extra_backdrops = []
+
+        # Fetch all available posters
+        try:
+            response = await self._client.get(
+                f"{self.server_url}/library/metadata/{movie_id}/posters"
+            )
+            if response.status_code == 200:
+                data = response.json()
+                for img in data.get("MediaContainer", {}).get("Metadata", []):
+                    thumb = img.get("key") or img.get("ratingKey")
+                    if thumb and not img.get("selected"):
+                        separator = "&" if "?" in thumb else "?"
+                        url = thumb if thumb.startswith("http") else f"{self.server_url}{thumb}{separator}X-Plex-Token={self.token}"
+                        extra_posters.append(url)
+        except Exception:
+            pass
+
+        # Fetch all available arts/backgrounds
+        try:
+            response = await self._client.get(
+                f"{self.server_url}/library/metadata/{movie_id}/arts"
+            )
+            if response.status_code == 200:
+                data = response.json()
+                for img in data.get("MediaContainer", {}).get("Metadata", []):
+                    thumb = img.get("key") or img.get("ratingKey")
+                    if thumb and not img.get("selected"):
+                        separator = "&" if "?" in thumb else "?"
+                        url = thumb if thumb.startswith("http") else f"{self.server_url}{thumb}{separator}X-Plex-Token={self.token}"
+                        extra_backdrops.append(url)
+        except Exception:
+            pass
+
+        return CommandResult(
+            success=True,
+            data={
+                "extra_posters": extra_posters[:10],
+                "extra_backdrops": extra_backdrops[:10],
             },
         )
 

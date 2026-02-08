@@ -43,6 +43,11 @@ class Movie(UUIDMixin, TimestampMixin, Base):
     rating: Mapped[float | None] = mapped_column(Float)
     vote_count: Mapped[int | None] = mapped_column(Integer)
 
+    # Alternative images
+    extra_backdrops: Mapped[list | None] = mapped_column(JSON, default=list)
+    extra_posters: Mapped[list | None] = mapped_column(JSON, default=list)
+    logos: Mapped[list | None] = mapped_column(JSON, default=list)
+
     # Metadata (genres, cast, crew, etc.)
     genres: Mapped[list | None] = mapped_column(JSON, default=list)
     directors: Mapped[list | None] = mapped_column(JSON, default=list)
