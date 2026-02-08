@@ -5,6 +5,8 @@
 import { Calendar, Check, X, Clock, Vote, Shuffle, Trophy, Sparkles, Film } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
+import { getMysteryRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
+import { MysteryPoster } from '../common/MysteryPoster';
 
 interface SessionCardProps {
   id: string;
@@ -16,6 +18,7 @@ interface SessionCardProps {
   invitationStatus: string;
   movieSelectionMode?: string | null;
   movieResolved?: boolean;
+  mysteryRevealAt?: string | null;
   linkedVoteSessionId?: string | null;
   linkedVoteIsOpen?: boolean | null;
 }
@@ -30,6 +33,7 @@ export function SessionCard({
   invitationStatus,
   movieSelectionMode,
   movieResolved,
+  mysteryRevealAt,
   linkedVoteSessionId,
   linkedVoteIsOpen,
 }: SessionCardProps) {
@@ -117,8 +121,9 @@ export function SessionCard({
           showVoteLink: false,
         };
       }
+      const revealText = mysteryRevealAt ? getMysteryRevealCountdown(mysteryRevealAt).text : null;
       return {
-        text: 'Film mystere',
+        text: revealText ? `Mystere \u00b7 ${revealText}` : 'Film mystere',
         icon: <Shuffle size={14} className="text-purple-400 animate-pulse" />,
         showVoteLink: false,
       };
@@ -145,15 +150,17 @@ export function SessionCard({
     >
       <div className="flex">
         {/* Poster */}
-        <div className="w-20 h-28 flex-shrink-0 bg-dark-border">
-          {moviePosterUrl ? (
+        <div className="w-20 h-28 flex-shrink-0">
+          {movieSelectionMode === 'mystery' && !movieResolved ? (
+            <MysteryPoster className="w-full h-full rounded-none" particles={6} questionMarkSize="text-2xl" />
+          ) : moviePosterUrl ? (
             <img
               src={moviePosterUrl}
               alt={movieTitle || name}
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-dark-muted">
+            <div className="w-full h-full flex items-center justify-center text-dark-muted bg-dark-border">
               <Calendar size={24} />
             </div>
           )}
@@ -198,14 +205,32 @@ export function SessionCard({
           </div>
 
           <div className="flex items-center justify-between gap-2 mt-2">
-            <span
-              className={clsx(
-                'text-xs px-2 py-0.5 rounded-full',
-                statusColors[status] || statusColors.draft
-              )}
-            >
-              {status}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className={clsx(
+                  'text-xs px-2 py-0.5 rounded-full',
+                  statusColors[status] || statusColors.draft
+                )}
+              >
+                {status}
+              </span>
+              {/* Session start countdown badge */}
+              {scheduledAt && (status === 'scheduled' || status === 'draft') && (() => {
+                const countdown = getSessionStartCountdown(scheduledAt);
+                if (countdown.urgency === 'low') return null;
+                return (
+                  <span
+                    className={clsx(
+                      'text-xs px-2 py-0.5 rounded-full font-medium',
+                      countdown.pulse && 'animate-pulse'
+                    )}
+                    style={{ backgroundColor: `${countdown.color}20`, color: countdown.color }}
+                  >
+                    {countdown.text}
+                  </span>
+                );
+              })()}
+            </div>
 
             {scheduledAt && (
               <span className="text-xs text-dark-muted">

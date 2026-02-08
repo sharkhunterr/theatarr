@@ -3,10 +3,13 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote } from 'lucide-react';
+import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote, Shuffle, Sparkles, Eye } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../../api/client';
+import { getMysteryRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
+import { useCountdown } from '../../hooks/useCountdown';
+import { MysteryPoster } from '../../components/common/MysteryPoster';
 
 interface SessionDetail {
   id: string;
@@ -24,11 +27,13 @@ interface SessionDetail {
   responded_at: string | null;
   movie_selection_mode: string | null;
   movie_resolved: boolean;
+  mystery_reveal_at: string | null;
   linked_vote_session_id: string | null;
   linked_vote_is_open: boolean | null;
 }
 
 export function SessionDetail() {
+  useCountdown();
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -109,6 +114,8 @@ export function SessionDetail() {
   }
 
   const bgColor = session.color_palette?.dominant || '#1a1a1a';
+  const isMysteryHidden = session.movie_selection_mode === 'mystery' && !session.movie_resolved;
+  const isMysteryRevealed = session.movie_selection_mode === 'mystery' && session.movie_resolved;
 
   return (
     <div className="space-y-4">
@@ -124,9 +131,11 @@ export function SessionDetail() {
       {/* Hero */}
       <div
         className="relative rounded-xl overflow-hidden"
-        style={{ backgroundColor: bgColor }}
+        style={{ backgroundColor: isMysteryHidden ? '#1a0a2e' : bgColor }}
       >
-        {session.movie_poster_url && (
+        {isMysteryHidden ? (
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-transparent to-purple-900/20" />
+        ) : session.movie_poster_url && (
           <div className="absolute inset-0">
             <img
               src={session.movie_poster_url}
@@ -138,35 +147,78 @@ export function SessionDetail() {
         )}
 
         <div className="relative p-4 flex gap-4">
-          {/* Poster */}
-          <div className="w-24 h-36 flex-shrink-0 rounded-lg overflow-hidden bg-dark-border shadow-lg">
-            {session.movie_poster_url ? (
-              <img
-                src={session.movie_poster_url}
-                alt={session.movie_title || session.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-dark-muted">
-                <Film size={32} />
-              </div>
-            )}
-          </div>
+          {/* Poster / Mystery poster */}
+          {isMysteryHidden ? (
+            <MysteryPoster className="w-24 h-36 flex-shrink-0 rounded-lg shadow-lg" />
+          ) : (
+            <div className="w-24 h-36 flex-shrink-0 rounded-lg overflow-hidden bg-dark-border shadow-lg">
+              {session.movie_poster_url ? (
+                <img
+                  src={session.movie_poster_url}
+                  alt={session.movie_title || session.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-dark-muted">
+                  <Film size={32} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Info */}
           <div className="flex-1 flex flex-col justify-end">
-            <span
-              className={clsx(
-                'inline-block self-start px-2 py-0.5 rounded-full text-xs font-medium mb-2',
-                statusColors[session.status] || statusColors.draft
-              )}
-            >
-              {statusLabels[session.status] || session.status}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span
+                className={clsx(
+                  'inline-block px-2 py-0.5 rounded-full text-xs font-medium',
+                  statusColors[session.status] || statusColors.draft
+                )}
+              >
+                {statusLabels[session.status] || session.status}
+              </span>
+              {/* Session start countdown */}
+              {session.scheduled_at && (session.status === 'scheduled' || session.status === 'draft') && (() => {
+                const countdown = getSessionStartCountdown(session.scheduled_at);
+                if (countdown.urgency === 'low') return null;
+                return (
+                  <span
+                    className={clsx('px-2 py-0.5 rounded-full text-xs font-medium', countdown.pulse && 'animate-pulse')}
+                    style={{ backgroundColor: `${countdown.color}20`, color: countdown.color }}
+                  >
+                    {countdown.text}
+                  </span>
+                );
+              })()}
+            </div>
             <h1 className="text-xl font-bold text-white">{session.name}</h1>
-            {session.movie_title && (
+            {isMysteryHidden ? (
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <Shuffle size={14} className="text-purple-400" />
+                  <span className="text-purple-300 font-medium">Film mystere</span>
+                </div>
+                {session.mystery_reveal_at && (() => {
+                  const reveal = getMysteryRevealCountdown(session.mystery_reveal_at);
+                  return (
+                    <span
+                      className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', reveal.pulse && 'animate-pulse')}
+                      style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
+                    >
+                      <Eye size={10} />
+                      {reveal.text}
+                    </span>
+                  );
+                })()}
+              </div>
+            ) : isMysteryRevealed ? (
+              <div className="flex items-center gap-1.5 mt-1">
+                <Sparkles size={14} className="text-purple-400" />
+                <p className="text-white/80">{session.movie_title}</p>
+              </div>
+            ) : session.movie_title ? (
               <p className="text-white/80">{session.movie_title}</p>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

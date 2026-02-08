@@ -95,6 +95,10 @@ class WebSocketManager:
             },
         )
 
+        # Auto-subscribe wallmount clients to WALLMOUNT channel
+        if wallmount:
+            await self.subscribe(websocket, Channel.WALLMOUNT.value)
+
         return client
 
     async def disconnect(self, websocket: WebSocket) -> None:

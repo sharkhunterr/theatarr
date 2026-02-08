@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { TemplateRenderer } from '../components/wallmount';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -51,6 +51,11 @@ interface WallmountState {
     config?: any;
   } | null;
   countdown_to: string | null;
+  mystery_info?: {
+    reveal_at: string | null;
+    is_revealed: boolean;
+    selection_mode: string;
+  } | null;
 }
 
 export function WallmountPage() {
@@ -59,22 +64,45 @@ export function WallmountPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchState = useCallback(async () => {
+    try {
+      const url = sessionId
+        ? `${API_BASE}/api/v1/wallmount/state?session_id=${sessionId}`
+        : `${API_BASE}/api/v1/wallmount/state`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to fetch wallmount state');
+      }
+      const data = await response.json();
+      setState(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
   // Connect to WebSocket for real-time updates (only for global wallmount)
-  const { lastMessage, isConnected } = useWebSocket({
+  const { isConnected, send } = useWebSocket({
+    wallmount: true,
     autoConnect: !sessionId, // Only auto-connect if no specific session
     onMessage: (message) => {
       if (sessionId) return; // Ignore WebSocket updates for specific session view
       if (message.type === 'wallmount_state' && message.payload) {
-        setState(message.payload as WallmountState);
+        setState(message.payload as unknown as WallmountState);
+      } else if (message.type === 'movie_resolved') {
+        // Mystery movie revealed — re-fetch full state to get movie, palette, etc.
+        fetchState();
       } else if (message.type === 'session_state' && message.payload) {
         // Update session-related fields
+        const p = message.payload;
         setState((prev) =>
           prev
             ? {
                 ...prev,
-                session_status: message.payload.status,
-                current_sequence_index: message.payload.current_sequence_index ?? prev.current_sequence_index,
-                current_sequence_elapsed_ms: message.payload.current_sequence_elapsed_ms ?? prev.current_sequence_elapsed_ms,
+                session_status: p.status as string,
+                current_sequence_index: (p.current_sequence_index as number) ?? prev.current_sequence_index,
+                current_sequence_elapsed_ms: (p.current_sequence_elapsed_ms as number) ?? prev.current_sequence_elapsed_ms,
               }
             : null
         );
@@ -84,37 +112,19 @@ export function WallmountPage() {
 
   // Fetch initial state
   useEffect(() => {
-    const fetchState = async () => {
-      try {
-        const url = sessionId
-          ? `${API_BASE}/api/v1/wallmount/state?session_id=${sessionId}`
-          : `${API_BASE}/api/v1/wallmount/state`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error('Failed to fetch wallmount state');
-        }
-        const data = await response.json();
-        setState(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchState();
 
     // Poll for updates as backup to WebSocket
     const pollInterval = setInterval(fetchState, sessionId ? 30000 : 10000);
     return () => clearInterval(pollInterval);
-  }, [sessionId]);
+  }, [fetchState]);
 
   // Subscribe to wallmount channel when connected
   useEffect(() => {
     if (isConnected) {
-      // The WebSocket manager should auto-subscribe wallmount clients
+      send({ type: 'subscribe_wallmount' });
     }
-  }, [isConnected]);
+  }, [isConnected, send]);
 
   if (isLoading) {
     return (
@@ -155,15 +165,21 @@ export function WallmountPage() {
     );
   }
 
-  // Scheduled session with countdown
-  if (state.session_status === 'scheduled' && state.countdown_to) {
+  // Mystery info for template data
+  const mysteryData = state.mystery_info || undefined;
+
+  // Scheduled session with countdown (or mystery mode awaiting reveal)
+  if (state.session_status === 'scheduled' && (state.countdown_to || mysteryData)) {
     const template = state.template || {
       name: 'Countdown',
       template_type: 'countdown',
       layout: {
         components: [
           { type: 'backdrop', opacity: 0.3 },
-          { type: 'countdown', position: 'center' },
+          ...(mysteryData && !mysteryData.is_revealed
+            ? [{ type: 'mystery_countdown' as const }]
+            : [{ type: 'countdown' as const, position: 'center' as const }]
+          ),
           { type: 'title', position: 'bottom' },
         ],
       },
@@ -183,8 +199,9 @@ export function WallmountPage() {
               name: state.session_name || undefined,
               status: state.session_status || undefined,
             },
-            countdown_to: state.countdown_to,
+            countdown_to: state.countdown_to || undefined,
             palette: state.palette || undefined,
+            mystery_info: mysteryData,
           }}
         />
       </div>
@@ -227,6 +244,7 @@ export function WallmountPage() {
             current_sequence_duration_ms: state.current_sequence_duration_ms || undefined,
           },
           palette: state.palette || undefined,
+          mystery_info: mysteryData,
         }}
       />
 

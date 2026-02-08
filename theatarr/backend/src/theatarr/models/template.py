@@ -736,4 +736,43 @@ BUILTIN_TEMPLATES = {
             "show_participant_count": True,
         },
     },
+    "cinematic_mystery": {
+        "name": "Cinema Mystere",
+        "description": "Template immersif pour sessions mystere : affiche un '?' anime avec countdown de revelation, puis revele le film avec effet spectaculaire",
+        "template_type": TemplateType.MOVIE_INFO,
+        "is_builtin": True,
+        "layout": {
+            "style": "cinematic-mystery",
+            "components": [
+                {"type": "backdrop", "opacity": 1, "blur": 0},
+                {"type": "mystery_countdown"},
+                {"type": "logo", "position": "bottom-left", "size": "large"},
+                {"type": "title", "size": "xlarge"},
+                {"type": "metadata", "fields": ["year", "runtime", "rating"]},
+                {"type": "countdown", "size": "xl"},
+            ]
+        },
+        "config": {
+            "theme": "dark",
+            "use_palette_colors": True,
+            "use_logo_image": True,
+            "rotate_backdrops": True,
+            "rotate_interval": 25,
+            "badge": {
+                "text": "{{mystery_status}}",
+                "show_when": "always",
+                "style": "glass-pill",
+                "color": "palette.accent",
+                "colors": {
+                    "mystery": "#8b5cf6",
+                    "mystery_revealed": "#22c55e",
+                    "vote_open": "#f59e0b",
+                    "vote_closed": "#22c55e",
+                    "scheduled": "#6366f1",
+                    "running": "#ef4444",
+                    "default": "#6b7280",
+                },
+            },
+        },
+    },
 }

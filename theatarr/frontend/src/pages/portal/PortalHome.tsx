@@ -9,6 +9,7 @@ import { apiClient } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { VoteCard } from '../../components/portal/VoteCard';
 import { SessionCard } from '../../components/portal/SessionCard';
+import { useCountdown } from '../../hooks/useCountdown';
 
 interface PortalStats {
   pending_votes: number;
@@ -28,6 +29,7 @@ interface PortalSession {
   invitation_status: string;
   movie_selection_mode?: string | null;
   movie_resolved?: boolean;
+  mystery_reveal_at?: string | null;
   linked_vote_session_id?: string | null;
   linked_vote_is_open?: boolean | null;
 }
@@ -43,6 +45,7 @@ interface PortalVote {
 }
 
 export function PortalHome() {
+  useCountdown();
   const { user } = useAuthStore();
   const displayName = user?.first_name || user?.username || 'User';
 
@@ -128,6 +131,7 @@ export function PortalHome() {
                 invitationStatus={session.invitation_status}
                 movieSelectionMode={session.movie_selection_mode}
                 movieResolved={session.movie_resolved}
+                mysteryRevealAt={session.mystery_reveal_at}
                 linkedVoteSessionId={session.linked_vote_session_id}
                 linkedVoteIsOpen={session.linked_vote_is_open}
               />
@@ -190,6 +194,7 @@ export function PortalHome() {
                 invitationStatus={session.invitation_status}
                 movieSelectionMode={session.movie_selection_mode}
                 movieResolved={session.movie_resolved}
+                mysteryRevealAt={session.mystery_reveal_at}
                 linkedVoteSessionId={session.linked_vote_session_id}
                 linkedVoteIsOpen={session.linked_vote_is_open}
               />

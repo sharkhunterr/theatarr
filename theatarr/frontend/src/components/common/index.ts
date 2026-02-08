@@ -15,3 +15,5 @@ export type { SelectProps, SelectOption } from './Select';
 
 export { Spinner } from './Spinner';
 export type { SpinnerProps } from './Spinner';
+
+export { MysteryPoster } from './MysteryPoster';

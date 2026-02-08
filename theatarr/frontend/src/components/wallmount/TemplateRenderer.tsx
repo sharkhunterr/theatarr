@@ -1,23 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MovieInfo } from './MovieInfo';
 import { CountdownTimer } from './CountdownTimer';
-
-// Helper function to format countdown as short string
-function formatCountdownShort(targetDate: string): string {
-  const target = new Date(targetDate).getTime();
-  const now = Date.now();
-  const diff = target - now;
-
-  if (diff <= 0) return 'NOW';
-
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-  if (days > 0) return `${days}j ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
+import { formatCountdownShort } from '../../utils/countdown';
 
 // CSS keyframes for animations
 const animationStyles = `
@@ -129,7 +113,8 @@ function resolveDynamicText(
   movie?: { title: string; year?: number; runtime_minutes?: number; rating?: number },
   session?: { name?: string; status?: string },
   countdown_to?: string,
-  vote_info?: { total_votes?: number; is_open?: boolean; status?: string }
+  vote_info?: { total_votes?: number; is_open?: boolean; status?: string },
+  mystery_info?: { reveal_at: string | null; is_revealed: boolean; selection_mode: string }
 ): string {
   if (!text) return '';
 
@@ -161,8 +146,29 @@ function resolveDynamicText(
     resolved = resolved.replace(/\{\{time\}\}/g, targetDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
   }
 
+  // Mystery variables
+  if (mystery_info) {
+    if (mystery_info.reveal_at && !mystery_info.is_revealed) {
+      resolved = resolved.replace(/\{\{mystery_countdown\}\}/g, formatCountdownShort(mystery_info.reveal_at));
+      resolved = resolved.replace(/\{\{mystery_status\}\}/g, 'Film mystere');
+    } else if (mystery_info.is_revealed) {
+      resolved = resolved.replace(/\{\{mystery_countdown\}\}/g, '');
+      resolved = resolved.replace(/\{\{mystery_status\}\}/g, 'Film revele');
+    } else {
+      resolved = resolved.replace(/\{\{mystery_countdown\}\}/g, '');
+      resolved = resolved.replace(/\{\{mystery_status\}\}/g, 'Film mystere');
+    }
+  } else {
+    resolved = resolved.replace(/\{\{mystery_countdown\}\}/g, '');
+    resolved = resolved.replace(/\{\{mystery_status\}\}/g, '');
+  }
+
   // Status text for dynamic badge
-  if (vote_info) {
+  if (mystery_info && !mystery_info.is_revealed) {
+    resolved = resolved.replace(/\{\{status_text\}\}/g, 'Film mystere');
+  } else if (mystery_info?.is_revealed && movie) {
+    resolved = resolved.replace(/\{\{status_text\}\}/g, 'Film revele');
+  } else if (vote_info) {
     let statusText = 'A venir';
     if (vote_info.is_open) statusText = 'Vote en cours';
     else if (vote_info.status === 'closed') statusText = 'Film choisi';
@@ -181,13 +187,16 @@ function getBadgeColor(
   config: any,
   vote_info?: { is_open?: boolean; status?: string },
   session_status?: string,
-  palette?: { vibrant?: string; accent?: string; primary?: string }
+  palette?: { vibrant?: string; accent?: string; primary?: string },
+  mystery_info?: { is_revealed: boolean }
 ): string {
   const badgeConfig = config?.badge;
-  if (!badgeConfig) return palette?.vibrant || '#ef4444';
+  if (!badgeConfig) return mystery_info && !mystery_info.is_revealed ? '#8b5cf6' : palette?.vibrant || '#ef4444';
 
   // Check for dynamic colors
   if (badgeConfig.colors) {
+    if (mystery_info && !mystery_info.is_revealed) return badgeConfig.colors.mystery || '#8b5cf6';
+    if (mystery_info?.is_revealed) return badgeConfig.colors.mystery_revealed || '#22c55e';
     if (vote_info?.is_open) return badgeConfig.colors.vote_open || '#f59e0b';
     if (vote_info?.status === 'closed') return badgeConfig.colors.vote_closed || '#22c55e';
     if (session_status === 'running') return badgeConfig.colors.running || '#ef4444';
@@ -349,12 +358,17 @@ interface TemplateRendererProps {
       status?: string;
       winning_movie_index?: number;
     };
+    mystery_info?: {
+      reveal_at: string | null;
+      is_revealed: boolean;
+      selection_mode: string;
+    };
   };
 }
 
 export function TemplateRenderer({ template, data }: TemplateRendererProps) {
   const { layout, config } = template;
-  const { movie, session, countdown_to, palette, vote_info } = data;
+  const { movie, session, countdown_to, palette, vote_info, mystery_info } = data;
 
   // Apply CSS variables from palette
   const cssVars = useMemo(() => {
@@ -459,7 +473,47 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
           </div>
         );
 
-      case 'poster':
+      case 'poster': {
+        const isMysteryHidden = mystery_info && !mystery_info.is_revealed;
+        const sizeClass = component.size === 'large' ? 'w-80' :
+          component.size === 'small' ? 'w-48' :
+          component.size === 'full-height' ? 'h-full w-auto max-w-[45vw] object-contain' :
+          'w-64';
+
+        if (isMysteryHidden) {
+          return (
+            <div
+              key={index}
+              className={`flex-shrink-0 ${
+                component.position === 'left' ? 'order-first' :
+                component.position === 'right' ? 'order-last' :
+                component.position === 'center' ? 'mx-auto' : ''
+              } ${component.size === 'full-height' ? 'h-full flex items-center' : ''}`}
+            >
+              <div
+                className={`rounded-lg ${sizeClass} flex items-center justify-center`}
+                style={{
+                  aspectRatio: component.size === 'full-height' ? undefined : '2/3',
+                  background: `linear-gradient(135deg, ${palette?.primary || '#1a1a2e'}, ${palette?.accent || '#8b5cf6'}40)`,
+                  border: `2px solid ${palette?.accent || '#8b5cf6'}60`,
+                  boxShadow: `0 0 30px ${palette?.accent || '#8b5cf6'}20`,
+                }}
+              >
+                <span
+                  className="text-8xl font-bold"
+                  style={{
+                    color: palette?.accent || '#8b5cf6',
+                    textShadow: `0 0 20px ${palette?.accent || '#8b5cf6'}80`,
+                    animation: 'pulse-glow 2s ease-in-out infinite',
+                  }}
+                >
+                  ?
+                </span>
+              </div>
+            </div>
+          );
+        }
+
         return (effectivePoster || movie?.poster_url) ? (
           <div
             key={index}
@@ -472,12 +526,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
             <img
               src={effectivePoster || movie?.poster_url}
               alt={movie?.title || ''}
-              className={`rounded-lg ${
-                component.size === 'large' ? 'w-80' :
-                component.size === 'small' ? 'w-48' :
-                component.size === 'full-height' ? 'h-full w-auto max-w-[45vw] object-contain' :
-                'w-64'
-              }`}
+              className={`rounded-lg ${sizeClass}`}
               style={{
                 boxShadow: component.shadow || palette?.primary
                   ? `0 25px 50px -12px ${palette?.primary || '#000000'}60, 0 10px 20px -5px rgba(0,0,0,0.5)`
@@ -486,6 +535,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
             />
           </div>
         ) : null;
+      }
 
       case 'countdown':
         return countdown_to ? (
@@ -500,8 +550,35 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
           </div>
         ) : null;
 
-      case 'title':
-        return movie ? (
+      case 'mystery_countdown':
+        if (!mystery_info || mystery_info.is_revealed) return null;
+        return (
+          <div key={index} className="flex flex-col items-center justify-center p-8 gap-4">
+            <div className="text-2xl font-bold opacity-80" style={{ color: palette?.accent || '#8b5cf6' }}>
+              Film mystere
+            </div>
+            {mystery_info.reveal_at && (
+              <>
+                <div className="text-lg opacity-60">Revelation dans</div>
+                <CountdownTimer
+                  targetDate={mystery_info.reveal_at}
+                  palette={{ primary: palette?.accent || '#8b5cf6', accent: palette?.accent, text: palette?.text }}
+                  size="xl"
+                  showSeconds
+                  animate
+                />
+              </>
+            )}
+            {!mystery_info.reveal_at && (
+              <div className="text-lg opacity-60">Revelation imminente...</div>
+            )}
+          </div>
+        );
+
+      case 'title': {
+        const isTitleHidden = mystery_info && !mystery_info.is_revealed;
+        if (!movie && !isTitleHidden) return null;
+        return (
           <h1
             key={index}
             className={`mb-4 ${
@@ -511,16 +588,20 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
               'text-5xl'
             } ${component.weight === 'bold' ? 'font-bold' : 'font-semibold'}`}
             style={{
-              color: palette?.text || '#ffffff',
-              textShadow: config?.text_shadow ? '0 4px 8px rgba(0,0,0,0.5)' : undefined,
+              color: isTitleHidden ? palette?.accent || '#8b5cf6' : palette?.text || '#ffffff',
+              textShadow: isTitleHidden
+                ? `0 0 20px ${palette?.accent || '#8b5cf6'}60`
+                : config?.text_shadow ? '0 4px 8px rgba(0,0,0,0.5)' : undefined,
             }}
           >
-            {movie.title}
-            {movie.year && <span className="opacity-60 ml-3">({movie.year})</span>}
+            {isTitleHidden ? 'Film mystere' : movie!.title}
+            {!isTitleHidden && movie?.year && <span className="opacity-60 ml-3">({movie.year})</span>}
           </h1>
-        ) : null;
+        );
+      }
 
       case 'metadata':
+        if (mystery_info && !mystery_info.is_revealed) return null;
         return movie ? (
           <div key={index} className="flex items-center gap-6 text-lg opacity-80">
             {movie.year && (
@@ -538,6 +619,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
         ) : null;
 
       case 'overview':
+        if (mystery_info && !mystery_info.is_revealed) return null;
         return movie?.overview ? (
           <p
             key={index}
@@ -551,6 +633,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
         ) : null;
 
       case 'cast':
+        if (mystery_info && !mystery_info.is_revealed) return null;
         return movie?.cast && movie.cast.length > 0 ? (
           <div key={index} className="opacity-80">
             <span className="opacity-60">Starring </span>
@@ -755,6 +838,102 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
       backgroundColor: palette?.background || '#0a0a0f',
       color: palette?.text || '#ffffff',
     };
+
+    // MYSTERY MODE — Show mystery overlay instead of regular template when movie not revealed
+    // (skip for templates that handle mystery mode themselves)
+    if (mystery_info && !mystery_info.is_revealed && layoutStyle !== 'cinematic-mystery') {
+      const mysteryAccent = palette?.accent || '#8b5cf6';
+      return (
+        <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+          <style>{animationStyles}</style>
+          {/* Subtle animated background */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `radial-gradient(ellipse at 50% 50%, ${mysteryAccent}15 0%, transparent 70%)`,
+            }}
+          />
+
+          {/* Content */}
+          <div className="relative z-10 w-full h-full flex flex-col items-center justify-center gap-8">
+            {/* Mystery question mark */}
+            <div
+              className="w-64 h-96 rounded-2xl flex items-center justify-center"
+              style={{
+                background: `linear-gradient(135deg, ${palette?.background || '#1a1a2e'}, ${mysteryAccent}25)`,
+                border: `2px solid ${mysteryAccent}50`,
+                boxShadow: `0 0 60px ${mysteryAccent}15, inset 0 0 30px ${mysteryAccent}08`,
+              }}
+            >
+              <span
+                className="text-[12rem] font-bold leading-none"
+                style={{
+                  color: mysteryAccent,
+                  textShadow: `0 0 40px ${mysteryAccent}60, 0 0 80px ${mysteryAccent}30`,
+                  animation: 'pulse-glow 3s ease-in-out infinite',
+                }}
+              >
+                ?
+              </span>
+            </div>
+
+            {/* Session name */}
+            {session?.name && (
+              <div className="text-2xl font-light opacity-60">{session.name}</div>
+            )}
+
+            {/* Mystery label */}
+            <div
+              className="text-4xl font-bold tracking-wider"
+              style={{ color: mysteryAccent }}
+            >
+              FILM MYSTERE
+            </div>
+
+            {/* Countdown to reveal */}
+            {mystery_info.reveal_at && (
+              <div className="flex flex-col items-center gap-3">
+                <div className="text-lg opacity-50">Revelation dans</div>
+                <CountdownTimer
+                  targetDate={mystery_info.reveal_at}
+                  palette={{ primary: mysteryAccent, accent: palette?.accent, text: palette?.text }}
+                  size="xl"
+                  showSeconds
+                  animate
+                />
+              </div>
+            )}
+
+            {/* Session countdown (start time) */}
+            {!mystery_info.reveal_at && countdown_to && (
+              <div className="flex flex-col items-center gap-3">
+                <div className="text-lg opacity-50">Seance dans</div>
+                <CountdownTimer
+                  targetDate={countdown_to}
+                  palette={palette}
+                  size="xl"
+                  showSeconds
+                  animate
+                />
+              </div>
+            )}
+
+            {/* Badge */}
+            <div
+              className="px-5 py-2 rounded-full text-sm font-semibold tracking-wide"
+              style={{
+                backgroundColor: `${mysteryAccent}30`,
+                color: mysteryAccent,
+                border: `1px solid ${mysteryAccent}50`,
+                animation: 'badge-pulse 3s ease-in-out infinite',
+              }}
+            >
+              Film mystere
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     // POSTER FULLSCREEN - Full screen poster with overlay (uses backdrop if available, falls back to poster)
     if (layoutStyle === 'poster-fullscreen') {
@@ -1544,7 +1723,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
                 clipPath: 'polygon(0 0, 100% 0, 95% 100%, 5% 100%)',
               }}
             >
-              {resolveDynamicText(config?.badge?.text || 'AVANT-PREMIERE', movie, session, countdown_to, vote_info)}
+              {resolveDynamicText(config?.badge?.text || 'AVANT-PREMIERE', movie, session, countdown_to, vote_info, mystery_info)}
             </div>
           </div>
 
@@ -1688,12 +1867,12 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
           <div
             className="absolute top-6 right-6 px-4 py-2 rounded-full font-bold"
             style={{
-              backgroundColor: getBadgeColor(config, vote_info, session?.status, palette),
+              backgroundColor: getBadgeColor(config, vote_info, session?.status, palette, mystery_info),
               color: '#ffffff',
               animation: 'badge-glow 2s ease-in-out infinite',
             }}
           >
-            {resolveDynamicText(config?.badge?.text || 'Ce Soir', movie, session, countdown_to, vote_info)}
+            {resolveDynamicText(config?.badge?.text || 'Ce Soir', movie, session, countdown_to, vote_info, mystery_info)}
           </div>
 
           {/* Center poster with spotlight */}
@@ -1783,7 +1962,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
                 color: palette?.text || '#ffffff',
               }}
             >
-              {resolveDynamicText(config?.badge?.text || 'Nouveau', movie, session, countdown_to, vote_info)}
+              {resolveDynamicText(config?.badge?.text || 'Nouveau', movie, session, countdown_to, vote_info, mystery_info)}
             </div>
 
             {/* Content */}
@@ -2161,8 +2340,8 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
 
     // DYNAMIC INFO - Context-aware display with vote progress
     if (layoutStyle === 'dynamic-info') {
-      const badgeColor = getBadgeColor(config, vote_info, session?.status, palette);
-      const badgeText = resolveDynamicText(config?.badge?.text || '{{status_text}}', movie, session, countdown_to, vote_info);
+      const badgeColor = getBadgeColor(config, vote_info, session?.status, palette, mystery_info);
+      const badgeText = resolveDynamicText(config?.badge?.text || '{{status_text}}', movie, session, countdown_to, vote_info, mystery_info);
 
       return (
         <div className="relative w-full h-full overflow-hidden flex" style={baseStyles}>
@@ -2583,10 +2762,321 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
                   border: `1px solid ${palette?.vibrant || '#6366f1'}50`,
                 }}
               >
-                {resolveDynamicText(config?.badge?.text || '{{status_text}}', movie, session, countdown_to, vote_info)}
+                {resolveDynamicText(config?.badge?.text || '{{status_text}}', movie, session, countdown_to, vote_info, mystery_info)}
               </span>
             </div>
           )}
+        </div>
+      );
+    }
+
+    // CINEMATIC MYSTERY - Immersive mystery variant with reveal countdown and hidden movie info
+    if (layoutStyle === 'cinematic-mystery') {
+      const mysteryAccent = palette?.accent || '#8b5cf6';
+      const isRevealed = mystery_info?.is_revealed ?? false;
+
+      return (
+        <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+          <style>{animationStyles}{`
+            @keyframes ken-burns {
+              0% { transform: scale(1) translate(0, 0); }
+              50% { transform: scale(1.08) translate(-1%, -0.5%); }
+              100% { transform: scale(1) translate(0, 0); }
+            }
+            @keyframes fade-in-up {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes gradient-shift {
+              0%, 100% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+            }
+            @keyframes mystery-pulse {
+              0%, 100% { opacity: 0.6; transform: scale(1); }
+              50% { opacity: 1; transform: scale(1.02); }
+            }
+            @keyframes mystery-glow {
+              0%, 100% { text-shadow: 0 0 20px ${mysteryAccent}40, 0 0 60px ${mysteryAccent}20; }
+              50% { text-shadow: 0 0 40px ${mysteryAccent}80, 0 0 80px ${mysteryAccent}40, 0 0 120px ${mysteryAccent}20; }
+            }
+            @keyframes particle-float {
+              0% { transform: translateY(100vh) scale(0); opacity: 0; }
+              10% { opacity: 0.6; }
+              90% { opacity: 0.6; }
+              100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+            }
+            @keyframes reveal-burst {
+              0% { transform: scale(0.8); opacity: 0; filter: blur(10px); }
+              60% { transform: scale(1.05); opacity: 1; filter: blur(0); }
+              100% { transform: scale(1); opacity: 1; filter: blur(0); }
+            }
+            .cinematic-backdrop {
+              animation: ken-burns ${config?.rotate_backdrops ? (config.rotate_interval ?? 30) : 60}s ease-in-out infinite;
+              transition: opacity 1.5s ease-in-out;
+            }
+            .cinematic-info {
+              animation: fade-in-up 1s ease-out both;
+            }
+            .mystery-gradient-bar {
+              background: linear-gradient(90deg,
+                ${mysteryAccent}60,
+                ${palette?.vibrant || '#a855f7'}60,
+                ${mysteryAccent}60
+              );
+              background-size: 200% 100%;
+              animation: gradient-shift 6s ease-in-out infinite;
+            }
+            .mystery-question {
+              animation: mystery-glow 3s ease-in-out infinite;
+            }
+            .mystery-particle {
+              position: absolute;
+              width: 4px;
+              height: 4px;
+              border-radius: 50%;
+              background: ${mysteryAccent};
+              animation: particle-float linear infinite;
+            }
+            .reveal-anim {
+              animation: reveal-burst 1.2s ease-out both;
+            }
+          `}</style>
+
+          {/* Backdrop: blur heavy when hidden, clear when revealed */}
+          {isRevealed && effectiveBackdrop ? (
+            config?.rotate_backdrops && allBackdrops.length > 1 ? (
+              allBackdrops.map((url, i) => (
+                <div
+                  key={`backdrop-${i}`}
+                  className="absolute inset-0 bg-cover bg-center cinematic-backdrop"
+                  style={{
+                    backgroundImage: `url(${url})`,
+                    opacity: i === rotatingIndex % allBackdrops.length ? 1 : 0,
+                  }}
+                />
+              ))
+            ) : (
+              <div
+                className="absolute inset-0 bg-cover bg-center cinematic-backdrop"
+                style={{ backgroundImage: `url(${effectiveBackdrop})` }}
+              />
+            )
+          ) : effectiveBackdrop ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center cinematic-backdrop"
+              style={{
+                backgroundImage: `url(${effectiveBackdrop})`,
+                filter: 'blur(30px) brightness(0.3)',
+                transform: 'scale(1.1)',
+              }}
+            />
+          ) : null}
+
+          {/* Cinematic gradient overlays */}
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to top, ${palette?.background || '#0a0a0f'} 0%, transparent 40%, transparent 70%, ${palette?.background || '#0a0a0f'}90 100%)`,
+          }} />
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to right, ${palette?.background || '#0a0a0f'}cc 0%, transparent 30%, transparent 70%, ${palette?.background || '#0a0a0f'}cc 100%)`,
+          }} />
+
+          {/* Floating particles (mystery only) */}
+          {!isRevealed && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <div
+                  key={`particle-${i}`}
+                  className="mystery-particle"
+                  style={{
+                    left: `${5 + Math.random() * 90}%`,
+                    animationDuration: `${6 + Math.random() * 10}s`,
+                    animationDelay: `${Math.random() * 8}s`,
+                    opacity: 0.3 + Math.random() * 0.4,
+                    width: `${2 + Math.random() * 4}px`,
+                    height: `${2 + Math.random() * 4}px`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Accent gradient bar at top */}
+          <div className="absolute top-0 left-0 right-0 h-1 mystery-gradient-bar" />
+
+          {/* Content */}
+          <div className="relative z-10 w-full h-full flex flex-col justify-end p-12">
+
+            {isRevealed ? (
+              <>
+                {/* REVEALED STATE — show movie info like cinematic-immersive */}
+                <div className="reveal-anim" style={{ animationDelay: '0.2s' }}>
+                  {config?.use_logo_image && effectiveLogo ? (
+                    <img
+                      src={effectiveLogo}
+                      alt={movie?.title || ''}
+                      className="max-w-[350px] max-h-[120px] object-contain mb-6 drop-shadow-2xl"
+                    />
+                  ) : (
+                    <h1
+                      className="text-6xl font-bold mb-2 tracking-tight"
+                      style={{
+                        color: palette?.text || '#ffffff',
+                        textShadow: '0 4px 30px rgba(0,0,0,0.8)',
+                      }}
+                    >
+                      {movie?.title}
+                      {movie?.year && (
+                        <span className="ml-4 text-3xl font-light opacity-60">({movie.year})</span>
+                      )}
+                    </h1>
+                  )}
+                </div>
+
+                {movie?.tagline && (
+                  <div className="reveal-anim text-xl italic opacity-70 mb-6" style={{ animationDelay: '0.4s' }}>
+                    {movie.tagline}
+                  </div>
+                )}
+
+                <div className="reveal-anim flex items-center gap-6 mb-8" style={{ animationDelay: '0.6s' }}>
+                  {movie?.runtime_minutes && (
+                    <span className="text-lg opacity-80">
+                      {Math.floor(movie.runtime_minutes / 60)}h{String(movie.runtime_minutes % 60).padStart(2, '0')}
+                    </span>
+                  )}
+                  {movie?.rating && (
+                    <span className="flex items-center gap-1.5 text-lg">
+                      <span style={{ color: palette?.accent || '#fbbf24' }}>★</span>
+                      <span className="opacity-90">{movie.rating.toFixed(1)}</span>
+                    </span>
+                  )}
+                  {movie?.genres?.slice(0, 3).map((genre, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1 rounded-full text-sm border"
+                      style={{
+                        borderColor: `${palette?.vibrant || '#ffffff'}40`,
+                        color: palette?.text || '#ffffff',
+                        backgroundColor: `${palette?.vibrant || '#ffffff'}15`,
+                      }}
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+
+                {countdown_to && (
+                  <div className="reveal-anim" style={{ animationDelay: '0.8s' }}>
+                    <CountdownTimer targetDate={countdown_to} palette={palette} size="xl" showSeconds animate />
+                  </div>
+                )}
+
+                {session?.name && (
+                  <div className="reveal-anim mt-6 text-sm uppercase tracking-[0.3em] opacity-50" style={{ animationDelay: '1s' }}>
+                    {session.name}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* MYSTERY STATE — hidden movie, show countdown to reveal */}
+                <div className="flex-1 flex flex-col items-center justify-center -mb-12">
+                  {/* Mystery poster placeholder */}
+                  <div
+                    className="w-56 h-80 rounded-2xl flex items-center justify-center mb-10"
+                    style={{
+                      background: `linear-gradient(135deg, ${palette?.background || '#1a1a2e'}, ${mysteryAccent}20)`,
+                      border: `2px solid ${mysteryAccent}40`,
+                      boxShadow: `0 0 80px ${mysteryAccent}15, inset 0 0 40px ${mysteryAccent}05`,
+                      animation: 'mystery-pulse 4s ease-in-out infinite',
+                    }}
+                  >
+                    <span
+                      className="text-[10rem] font-bold leading-none mystery-question"
+                      style={{ color: mysteryAccent }}
+                    >
+                      ?
+                    </span>
+                  </div>
+
+                  {/* Mystery label */}
+                  <h1
+                    className="text-5xl font-bold tracking-wider mb-4 mystery-question"
+                    style={{ color: mysteryAccent }}
+                  >
+                    FILM MYSTERE
+                  </h1>
+
+                  {/* Reveal countdown */}
+                  {mystery_info?.reveal_at && (
+                    <div className="flex flex-col items-center gap-3 mt-4">
+                      <div className="text-lg opacity-50 uppercase tracking-widest">Revelation dans</div>
+                      <CountdownTimer
+                        targetDate={mystery_info.reveal_at}
+                        palette={{ primary: mysteryAccent, accent: mysteryAccent, text: palette?.text }}
+                        size="xl"
+                        showSeconds
+                        animate
+                      />
+                    </div>
+                  )}
+
+                  {/* Session start countdown (if different from reveal) */}
+                  {countdown_to && countdown_to !== mystery_info?.reveal_at && (
+                    <div className="flex flex-col items-center gap-2 mt-6">
+                      <div className="text-sm opacity-40 uppercase tracking-widest">Seance dans</div>
+                      <CountdownTimer
+                        targetDate={countdown_to}
+                        palette={palette}
+                        size="lg"
+                        showSeconds
+                        animate
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Session name at bottom */}
+                {session?.name && (
+                  <div className="cinematic-info text-sm uppercase tracking-[0.3em] opacity-50" style={{ animationDelay: '0.5s' }}>
+                    {session.name}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Poster in corner (revealed only) */}
+          {isRevealed && effectivePoster && (
+            <div className="absolute top-8 right-8 z-20 reveal-anim" style={{ animationDelay: '1.2s' }}>
+              <img
+                src={effectivePoster}
+                alt={movie?.title || ''}
+                className="w-32 rounded-lg shadow-2xl"
+                style={{
+                  boxShadow: `0 25px 50px -12px ${palette?.primary || '#000'}80`,
+                }}
+              />
+            </div>
+          )}
+
+          {/* Badge */}
+          <div className="absolute top-8 left-8 z-20 cinematic-info" style={{ animationDelay: '0.3s' }}>
+            <span
+              className="px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md"
+              style={{
+                backgroundColor: isRevealed
+                  ? `${palette?.vibrant || '#22c55e'}30`
+                  : `${mysteryAccent}30`,
+                color: palette?.text || '#ffffff',
+                border: `1px solid ${isRevealed ? (palette?.vibrant || '#22c55e') : mysteryAccent}50`,
+              }}
+            >
+              {isRevealed
+                ? resolveDynamicText(config?.badge?.text || '{{status_text}}', movie, session, countdown_to, vote_info, mystery_info)
+                : 'Film mystere'}
+            </span>
+          </div>
         </div>
       );
     }
@@ -3251,10 +3741,10 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
       const currentPoster = allPosters.length > 0
         ? allPosters[posterRotatingIndex % allPosters.length]
         : movie?.poster_url;
-      const badgeColor = getBadgeColor(config, vote_info, session?.status, palette);
+      const badgeColor = getBadgeColor(config, vote_info, session?.status, palette, mystery_info);
       const badgeText = resolveDynamicText(
         config?.badge?.text || 'Prochainement',
-        movie, session, countdown_to, vote_info
+        movie, session, countdown_to, vote_info, mystery_info
       );
 
       return (

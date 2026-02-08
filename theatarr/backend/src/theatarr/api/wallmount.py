@@ -35,6 +35,7 @@ class WallmountStateResponse(BaseSchema):
     template: dict | None = None
     countdown_to: str | None = None
     vote_info: dict | None = None  # Vote session info if session uses vote mode
+    mystery_info: dict | None = None  # Mystery mode info: reveal_at, is_revealed
 
 
 class PaletteResponse(BaseSchema):
@@ -51,6 +52,20 @@ class PaletteResponse(BaseSchema):
     vibrant_light: str | None
     vibrant_dark: str | None
     css_vars: dict | None = None
+
+
+def _build_mystery_info(session: Session) -> dict | None:
+    """Build mystery_info dict if session uses mystery mode."""
+    mode = session.movie_selection_mode
+    if hasattr(mode, 'value'):
+        mode = mode.value
+    if mode != MovieSelectionMode.MYSTERY.value:
+        return None
+    return {
+        "reveal_at": session.mystery_reveal_at.isoformat() if session.mystery_reveal_at else None,
+        "is_revealed": bool(session.movie_resolved),
+        "selection_mode": "mystery",
+    }
 
 
 @router.get(
@@ -244,6 +259,7 @@ async def get_wallmount_state(
             palette=palette_data,
             template=template_data,
             vote_info=vote_info,
+            mystery_info=_build_mystery_info(session),
         )
 
     # No specific session - find current active/scheduled session
@@ -411,6 +427,7 @@ async def get_wallmount_state(
                     palette=palette_data,
                     template=template_data,
                     vote_info=vote_info,
+                    mystery_info=_build_mystery_info(scheduled_session),
                 )
 
             return WallmountStateResponse()
@@ -567,6 +584,7 @@ async def get_wallmount_state(
         palette=palette_data,
         template=template_data,
         vote_info=vote_info,
+        mystery_info=_build_mystery_info(session),
     )
 
 

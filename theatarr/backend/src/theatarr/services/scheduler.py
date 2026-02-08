@@ -148,18 +148,18 @@ class SessionScheduler:
                     await resolve_mystery_movie(db, session)
 
                     # Broadcast movie resolved event via WebSocket
-                    await ws_manager.broadcast(
-                        Channel.SESSION.value,
-                        {
-                            "type": "movie_resolved",
-                            "payload": {
-                                "session_id": session.id,
-                                "movie_title": session.movie_title,
-                                "movie_poster_url": session.movie_poster_url,
-                                "selection_mode": "mystery",
-                            },
+                    resolved_payload = {
+                        "type": "movie_resolved",
+                        "payload": {
+                            "session_id": session.id,
+                            "movie_title": session.movie_title,
+                            "movie_poster_url": session.movie_poster_url,
+                            "selection_mode": "mystery",
                         },
-                    )
+                    }
+                    await ws_manager.broadcast(Channel.SESSION.value, resolved_payload)
+                    # Also broadcast to wallmount channel so wallmount displays refresh
+                    await ws_manager.broadcast(Channel.WALLMOUNT.value, resolved_payload)
                     logger.info(f"Mystery movie revealed for session {session.id}: {session.movie_title}")
 
                 except MovieResolutionError as e:

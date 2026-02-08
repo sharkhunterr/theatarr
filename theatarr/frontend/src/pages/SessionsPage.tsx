@@ -18,6 +18,9 @@ import {
   Monitor,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { getMysteryRevealCountdown } from '../utils/countdown';
+import { useCountdown } from '../hooks/useCountdown';
+import { MysteryPoster } from '../components/common/MysteryPoster';
 import { Button, Card, Spinner, Modal } from '../components/common';
 import { useSessionStore, Session, VoteSessionSummary } from '../stores/sessionStore';
 import { useSession } from '../hooks/useSession';
@@ -25,6 +28,7 @@ import { useLayoutStore } from '../stores/layoutStore';
 import { apiClient } from '../api/client';
 
 export function SessionsPage() {
+  useCountdown();
   const navigate = useNavigate();
   const { language } = useLayoutStore();
   const { sessions, isLoading } = useSessionStore();
@@ -250,7 +254,9 @@ export function SessionsPage() {
                 <div className="flex">
                   {/* Movie Poster / Placeholder */}
                   <div className="w-20 sm:w-24 flex-shrink-0">
-                    {movieDisplay.poster ? (
+                    {movieDisplay.type === 'mystery' ? (
+                      <MysteryPoster className="w-full h-full" particles={6} questionMarkSize="text-2xl" />
+                    ) : movieDisplay.poster ? (
                       <img
                         src={movieDisplay.poster}
                         alt={movieDisplay.title}
@@ -259,7 +265,6 @@ export function SessionsPage() {
                     ) : (
                       <div className={clsx(
                         'w-full h-full flex items-center justify-center',
-                        movieDisplay.type === 'mystery' ? 'bg-purple-500/20' :
                         movieDisplay.type === 'vote' ? 'bg-blue-500/20' :
                         'bg-dark-border'
                       )}>
@@ -288,6 +293,19 @@ export function SessionsPage() {
                       <div className="flex items-center gap-1.5 text-sm text-dark-muted mb-2">
                         <MovieIcon size={14} className={movieDisplay.iconColor} />
                         <span className="truncate">{movieDisplay.title}</span>
+                        {/* Mystery reveal countdown */}
+                        {session.movie_selection_mode === 'mystery' && !session.movie_resolved && session.mystery_reveal_at && (() => {
+                          const reveal = getMysteryRevealCountdown(session.mystery_reveal_at);
+                          return (
+                            <span
+                              className={clsx('flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium', reveal.pulse && 'animate-pulse')}
+                              style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
+                            >
+                              <Eye size={10} />
+                              {reveal.text}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       {/* Vote badge */}

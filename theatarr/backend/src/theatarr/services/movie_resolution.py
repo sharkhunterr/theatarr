@@ -296,8 +296,9 @@ async def resolve_mystery_movie(
     # Apply enrichment options if configured on the session
     if session.enrichment_options and session.movie_id:
         await _apply_enrichment(db, session, session.movie_id)
-    elif session.movie_poster_url:
-        # Fallback: extract palette even without enrichment options
+
+    # Always extract palette if we have a poster (even without enrichment options)
+    if not session.color_palette and session.movie_poster_url:
         try:
             palette = await extract_palette_from_url(session.movie_poster_url)
             session.color_palette = palette
@@ -315,8 +316,84 @@ async def resolve_mystery_movie(
     return session
 
 
+async def _get_movies_from_service(db: AsyncSession) -> tuple[list[dict], str, str, str]:
+    """Fetch all movies from the first enabled media source service (Plex/Jellyfin).
+
+    Returns:
+        Tuple of (movies_list, adapter_type, server_url, token).
+
+    Raises:
+        MovieResolutionError: If no media service is available.
+    """
+    from theatarr.adapters.base import Command
+    from theatarr.adapters.registry import get_adapter
+    from theatarr.models.service import Service, ServiceCategory
+
+    result = await db.execute(
+        select(Service)
+        .where(Service.category == ServiceCategory.MEDIA_SOURCE)
+        .where(Service.is_enabled == True)
+    )
+    service = result.scalars().first()
+
+    if not service:
+        raise MovieResolutionError("No enabled media source service found")
+
+    adapter = get_adapter(service.adapter_type, service.config)
+
+    # List libraries to find a movie library
+    libs_result = await adapter.execute(
+        Command(action="list_libraries", parameters={})
+    )
+    if not libs_result.success or not libs_result.data:
+        raise MovieResolutionError("Failed to list libraries from media service")
+
+    libraries = libs_result.data.get("libraries", [])
+    movie_library = next(
+        (lib for lib in libraries if lib.get("type") == "movie"), None
+    )
+    if not movie_library:
+        raise MovieResolutionError("No movie library found in media service")
+
+    # List all movies from the library
+    movies_result = await adapter.execute(
+        Command(
+            action="list_movies",
+            parameters={"library_id": movie_library.get("id")},
+        )
+    )
+    if not movies_result.success or not movies_result.data:
+        raise MovieResolutionError("Failed to list movies from media service")
+
+    movies = movies_result.data.get("movies", [])
+    server_url = service.config.get("server_url", "").rstrip("/")
+    token = service.config.get("token", "")
+
+    return movies, service.adapter_type, server_url, token
+
+
+def _build_movie_dict(
+    movie: dict, adapter_type: str, server_url: str, token: str
+) -> dict:
+    """Build a standard movie info dict from a raw service movie entry."""
+    thumb = movie.get("thumb")
+    poster_url = f"{server_url}{thumb}?X-Plex-Token={token}" if thumb else None
+
+    return {
+        "title": movie.get("title"),
+        "poster_url": poster_url,
+        "movie_id": str(movie.get("id", "")),
+        "source": adapter_type,
+        "source_id": str(movie.get("id", "")),
+        "year": movie.get("year"),
+    }
+
+
 async def _get_random_movie(db: AsyncSession) -> dict | None:
-    """Get a random movie from the library.
+    """Get a random movie from the media service (Plex/Jellyfin).
+
+    Fetches the full movie list from the connected media service,
+    same pattern as vote and fixed modes.
 
     Args:
         db: Database session.
@@ -324,30 +401,27 @@ async def _get_random_movie(db: AsyncSession) -> dict | None:
     Returns:
         Movie info dict or None if no movies available.
     """
-    from theatarr.models.movie import Movie
-
-    result = await db.execute(select(Movie))
-    movies = result.scalars().all()
+    try:
+        movies, adapter_type, server_url, token = await _get_movies_from_service(db)
+    except MovieResolutionError:
+        logger.warning("No media service available for random movie selection")
+        return None
 
     if not movies:
         return None
 
     movie = random.choice(movies)
-    return {
-        "title": movie.title,
-        "poster_url": movie.poster_url,
-        "movie_id": movie.id,
-        "source": movie.source,
-        "source_id": movie.plex_key or movie.jellyfin_id,
-        "year": movie.year,
-    }
+    return _build_movie_dict(movie, adapter_type, server_url, token)
 
 
 async def _get_filtered_random_movie(
     db: AsyncSession,
     filters: dict,
 ) -> dict | None:
-    """Get a random movie matching filters.
+    """Get a random movie from the media service matching filters.
+
+    Fetches movies from the connected media service (Plex/Jellyfin)
+    and applies filters, same pattern as vote and fixed modes.
 
     Args:
         db: Database session.
@@ -356,9 +430,11 @@ async def _get_filtered_random_movie(
     Returns:
         Movie info dict or None if no movies match.
     """
-    from theatarr.models.movie import Movie
-
-    query = select(Movie)
+    try:
+        movies, adapter_type, server_url, token = await _get_movies_from_service(db)
+    except MovieResolutionError:
+        logger.warning("No media service available for filtered movie selection")
+        return None
 
     # Apply filters
     year_min = filters.get("year_min")
@@ -366,35 +442,27 @@ async def _get_filtered_random_movie(
     rating_min = filters.get("rating_min")
     genres = filters.get("genres", [])
 
+    filtered = movies
     if year_min:
-        query = query.where(Movie.year >= year_min)
+        filtered = [m for m in filtered if m.get("year") and m["year"] >= year_min]
     if year_max:
-        query = query.where(Movie.year <= year_max)
+        filtered = [m for m in filtered if m.get("year") and m["year"] <= year_max]
     if rating_min:
-        query = query.where(Movie.rating >= rating_min)
-
-    result = await db.execute(query)
-    movies = result.scalars().all()
-
-    # Filter by genres if specified
+        filtered = [m for m in filtered if m.get("rating") and m["rating"] >= rating_min]
     if genres:
-        movies = [
-            m for m in movies
-            if m.genres and any(g.lower() in [mg.lower() for mg in m.genres] for g in genres)
+        filtered = [
+            m for m in filtered
+            if m.get("genres") and any(
+                g.lower() in [mg.lower() for mg in m["genres"]]
+                for g in genres
+            )
         ]
 
-    if not movies:
+    if not filtered:
         return None
 
-    movie = random.choice(movies)
-    return {
-        "title": movie.title,
-        "poster_url": movie.poster_url,
-        "movie_id": movie.id,
-        "source": movie.source,
-        "source_id": movie.plex_key or movie.jellyfin_id,
-        "year": movie.year,
-    }
+    movie = random.choice(filtered)
+    return _build_movie_dict(movie, adapter_type, server_url, token)
 
 
 def get_movie_display_status(session: Session) -> dict:

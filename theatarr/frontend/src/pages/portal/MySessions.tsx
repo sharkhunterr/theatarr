@@ -8,6 +8,7 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { apiClient } from '../../api/client';
 import { SessionCard } from '../../components/portal/SessionCard';
+import { useCountdown } from '../../hooks/useCountdown';
 
 interface PortalSession {
   id: string;
@@ -19,6 +20,7 @@ interface PortalSession {
   invitation_status: string;
   movie_selection_mode?: string | null;
   movie_resolved?: boolean;
+  mystery_reveal_at?: string | null;
   linked_vote_session_id?: string | null;
   linked_vote_is_open?: boolean | null;
 }
@@ -31,6 +33,7 @@ const statusFilters = [
 ];
 
 export function MySessions() {
+  useCountdown();
   const [statusFilter, setStatusFilter] = useState('');
 
   const { data, isLoading } = useQuery({
@@ -97,6 +100,7 @@ export function MySessions() {
               invitationStatus={session.invitation_status}
               movieSelectionMode={session.movie_selection_mode}
               movieResolved={session.movie_resolved}
+              mysteryRevealAt={session.mystery_reveal_at}
               linkedVoteSessionId={session.linked_vote_session_id}
               linkedVoteIsOpen={session.linked_vote_is_open}
             />

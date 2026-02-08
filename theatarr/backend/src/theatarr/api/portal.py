@@ -286,6 +286,7 @@ async def get_my_sessions(
                 invitation_status=p.invitation_status,
                 movie_selection_mode=session.movie_selection_mode,
                 movie_resolved=session.movie_resolved,
+                mystery_reveal_at=session.mystery_reveal_at,
                 linked_vote_session_id=session.linked_vote_session_id,
                 linked_vote_is_open=linked_vote_is_open,
             )
@@ -352,6 +353,7 @@ async def get_pending_invitations(
                 invitation_status=p.invitation_status,
                 movie_selection_mode=session.movie_selection_mode,
                 movie_resolved=session.movie_resolved,
+                mystery_reveal_at=session.mystery_reveal_at,
                 linked_vote_session_id=session.linked_vote_session_id,
                 linked_vote_is_open=linked_vote_is_open,
             )
@@ -413,6 +415,7 @@ async def get_session_detail(
         responded_at=participation.responded_at,
         movie_selection_mode=session.movie_selection_mode,
         movie_resolved=session.movie_resolved,
+        mystery_reveal_at=session.mystery_reveal_at,
         linked_vote_session_id=session.linked_vote_session_id,
         linked_vote_is_open=linked_vote_is_open,
     )
