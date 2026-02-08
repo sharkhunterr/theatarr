@@ -17,6 +17,95 @@ from theatarr.services.palette import extract_palette_from_url, PaletteExtractio
 logger = logging.getLogger(__name__)
 
 
+async def _ensure_movie_in_db(
+    db: AsyncSession,
+    movie_id: str | None,
+    movie_source: str,
+    movie_source_id: str,
+    movie_poster_url: str | None = None,
+) -> str | None:
+    """Ensure the movie exists in the local database.
+
+    The movie_id from vote/mystery options may be a source key (e.g. Plex ratingKey)
+    rather than a DB UUID. This checks if it's a valid DB movie, and if not,
+    syncs the movie from source.
+
+    Returns:
+        Valid DB movie ID, or None if sync fails.
+    """
+    from theatarr.models.movie import Movie
+    from theatarr.services.movie_sync import ensure_movie_synced
+
+    # Check if movie_id is a valid DB movie
+    if movie_id:
+        result = await db.execute(
+            select(Movie).where(Movie.id == movie_id)
+        )
+        if result.scalar_one_or_none():
+            return movie_id  # Already a valid DB ID
+
+    # movie_id is missing or not a valid DB ID — sync from source
+    synced_id = await ensure_movie_synced(
+        db=db,
+        movie_source=movie_source,
+        movie_source_id=movie_source_id,
+        movie_poster_url=movie_poster_url,
+    )
+    if synced_id:
+        logger.info(f"Synced movie from {movie_source}/{movie_source_id} -> DB ID {synced_id}")
+    return synced_id
+
+
+async def _apply_enrichment(
+    db: AsyncSession,
+    session: Session,
+    movie_id: str,
+) -> None:
+    """Apply enrichment options (TMDB, Fanart, palette) to a resolved movie.
+
+    Reads enrichment_options from the session and applies requested enrichments.
+
+    Args:
+        db: Database session.
+        session: Cinema session with enrichment_options.
+        movie_id: ID of the movie to enrich.
+    """
+    options = session.enrichment_options or {}
+    if not options:
+        return
+
+    from theatarr.services.movie_enrichment import (
+        enrich_from_tmdb,
+        enrich_from_fanart,
+        EnrichmentError,
+    )
+
+    # TMDB enrichment
+    if options.get("tmdb"):
+        try:
+            await enrich_from_tmdb(db, movie_id)
+            logger.info(f"TMDB enrichment applied for session {session.id}")
+        except EnrichmentError as e:
+            logger.warning(f"TMDB enrichment failed for session {session.id}: {e}")
+
+    # Fanart.tv enrichment
+    if options.get("fanart"):
+        try:
+            await enrich_from_fanart(db, movie_id)
+            logger.info(f"Fanart.tv enrichment applied for session {session.id}")
+        except EnrichmentError as e:
+            logger.warning(f"Fanart.tv enrichment failed for session {session.id}: {e}")
+
+    # Palette extraction
+    if options.get("palette") and session.movie_poster_url:
+        try:
+            palette = await extract_palette_from_url(session.movie_poster_url)
+            session.color_palette = palette
+            logger.info(f"Palette extracted for session {session.id}")
+        except PaletteExtractionError as e:
+            logger.warning(f"Palette extraction failed for session {session.id}: {e}")
+
+
 class MovieResolutionError(Exception):
     """Error during movie resolution."""
 
@@ -94,11 +183,24 @@ async def resolve_vote_winner(
     session.movie_source_id = winning_movie.get("source_id") or winning_movie.get("movie_id")
     session.movie_source = winning_movie.get("source", "vote")
     session.movie_id = winning_movie.get("movie_id")
+
+    # Ensure movie is synced to local DB (needed for enrichment)
+    if session.movie_source and session.movie_source_id:
+        synced_id = await _ensure_movie_in_db(
+            db, session.movie_id, session.movie_source,
+            session.movie_source_id, session.movie_poster_url,
+        )
+        if synced_id:
+            session.movie_id = synced_id
+
     session.movie_resolved = True
     session.movie_resolved_at = datetime.now(timezone.utc)
 
-    # Extract color palette from poster if available
-    if session.movie_poster_url:
+    # Apply enrichment options if configured on the session
+    if session.enrichment_options and session.movie_id:
+        await _apply_enrichment(db, session, session.movie_id)
+    elif session.movie_poster_url:
+        # Fallback: extract palette even without enrichment options
         try:
             palette = await extract_palette_from_url(session.movie_poster_url)
             session.color_palette = palette
@@ -178,11 +280,24 @@ async def resolve_mystery_movie(
     session.movie_source_id = selected_movie.get("source_id") or selected_movie.get("movie_id")
     session.movie_source = selected_movie.get("source", "mystery")
     session.movie_id = selected_movie.get("movie_id")
+
+    # Ensure movie is synced to local DB (needed for enrichment)
+    if session.movie_source and session.movie_source_id:
+        synced_id = await _ensure_movie_in_db(
+            db, session.movie_id, session.movie_source,
+            session.movie_source_id, session.movie_poster_url,
+        )
+        if synced_id:
+            session.movie_id = synced_id
+
     session.movie_resolved = True
     session.movie_resolved_at = datetime.now(timezone.utc)
 
-    # Extract color palette from poster if available
-    if session.movie_poster_url:
+    # Apply enrichment options if configured on the session
+    if session.enrichment_options and session.movie_id:
+        await _apply_enrichment(db, session, session.movie_id)
+    elif session.movie_poster_url:
+        # Fallback: extract palette even without enrichment options
         try:
             palette = await extract_palette_from_url(session.movie_poster_url)
             session.color_palette = palette

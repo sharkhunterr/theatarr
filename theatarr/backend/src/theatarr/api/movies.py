@@ -159,31 +159,8 @@ async def search_movies(
     """Search movies across all connected services."""
     results: list[MovieSearchResult] = []
 
-    # Search local database first
-    local_query = select(Movie).where(Movie.title.ilike(f"%{query}%")).limit(limit)
-    local_result = await db.execute(local_query)
-    local_movies = local_result.scalars().all()
-
-    for m in local_movies:
-        results.append(MovieSearchResult(
-            id=m.id,
-            title=m.title,
-            year=m.year,
-            poster_url=m.poster_url,
-            backdrop_url=m.backdrop_url,
-            overview=m.overview,
-            rating=m.rating,
-            runtime_minutes=m.runtime_minutes,
-            genres=m.genres,
-            directors=m.directors,
-            cast=m.cast[:5] if m.cast else None,
-            tagline=m.tagline,
-            source="local",
-            source_id=m.tmdb_id,
-        ))
-
-    # Search connected media services if no specific source requested
-    # source can be: service_id (UUID), adapter_type ("plex", "jellyfin"), or None
+    # Search connected media services (Plex, Jellyfin, etc.)
+    # Local DB movies are not shown — they are only used as enrichment cache
     services_result = await db.execute(
         select(Service)
         .where(Service.category == ServiceCategory.MEDIA_SOURCE)

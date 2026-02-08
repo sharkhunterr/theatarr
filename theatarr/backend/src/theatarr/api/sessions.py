@@ -109,6 +109,8 @@ def _session_to_response(
         # Template override
         template_id=session.template_id,
         template=template_summary,
+        # Enrichment options
+        enrichment_options=session.enrichment_options,
         # Enriched fields
         linked_vote_session=vote_summary,
         participants_accepted=participants_accepted,
@@ -285,6 +287,8 @@ async def create_session(
         movie_resolved=data.movie_selection_mode == MovieSelectionModeSchema.FIXED and data.movie_title is not None,
         # Template override
         template_id=data.template_id,
+        # Enrichment options (for deferred enrichment in vote/mystery modes)
+        enrichment_options=data.enrichment_options,
     )
     db.add(session)
     await db.flush()  # Get session.id without committing
@@ -450,6 +454,8 @@ async def get_session(
         # Template override
         template_id=session.template_id,
         template=template_summary,
+        # Enrichment options
+        enrichment_options=session.enrichment_options,
     )
 
 
@@ -499,6 +505,8 @@ async def update_session(
         flag_modified(session, "workflow")
     if "color_palette" in update_data:
         flag_modified(session, "color_palette")
+    if "enrichment_options" in update_data:
+        flag_modified(session, "enrichment_options")
 
     # Handle sequences update
     if data.sequences is not None:

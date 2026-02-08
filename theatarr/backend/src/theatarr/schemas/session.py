@@ -177,6 +177,9 @@ class SessionCreate(SessionBase):
     # Template override (if None, uses globally active template)
     template_id: str | None = None
 
+    # Enrichment options (stored for deferred enrichment in vote/mystery modes)
+    enrichment_options: dict | None = None
+
 
 class SessionUpdate(BaseSchema):
     """Schema for updating a session."""
@@ -207,6 +210,9 @@ class SessionUpdate(BaseSchema):
 
     # Template override (if None, uses globally active template)
     template_id: str | None = None
+
+    # Enrichment options
+    enrichment_options: dict | None = None
 
 
 # ============================================================================
@@ -243,6 +249,9 @@ class SessionResponse(SessionBase, IDTimestampSchema):
     # Template override
     template_id: str | None = None
     template: TemplateSummary | None = None
+
+    # Enrichment options
+    enrichment_options: dict | None = None
 
     # List view enriched fields
     linked_vote_session: VoteSessionSummary | None = None

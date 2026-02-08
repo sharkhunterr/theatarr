@@ -99,6 +99,8 @@ interface Session {
   mystery_config?: MysteryConfig | null;
   // Template override
   template_id?: string | null;
+  // Enrichment options
+  enrichment_options?: Record<string, boolean> | null;
 }
 
 interface Service {
@@ -346,17 +348,20 @@ export function SessionEditor() {
     queryFn: () => apiClient.get('/movies/enrichment-status'),
   });
 
-  // Fetch movie enrichment state when movie_id changes
+  // Fetch movie enrichment state when movie_id changes (for green badge display)
   useEffect(() => {
     if (session?.movie_id) {
       apiClient.get<{ enrichment_sources?: string[] }>(`/movies/${session.movie_id}`)
         .then((movie) => {
           const sources = movie.enrichment_sources || [];
           setEnrichedSources(sources);
-          setEnrichmentOptions({
-            tmdb: sources.includes('tmdb'),
-            fanart: sources.includes('fanart'),
-          });
+          // Only init enrichment options from movie if no session-level options are set
+          if (!session.enrichment_options) {
+            setEnrichmentOptions({
+              tmdb: sources.includes('tmdb'),
+              fanart: sources.includes('fanart'),
+            });
+          }
         })
         .catch(() => {});
     } else {
@@ -423,16 +428,27 @@ export function SessionEditor() {
       }
       setSession(data);
 
-      // Load enrichment state
+      // Load enrichment options from session (for vote/mystery deferred enrichment)
+      if (data.enrichment_options) {
+        setEnrichmentOptions({
+          tmdb: !!data.enrichment_options.tmdb,
+          fanart: !!data.enrichment_options.fanart,
+        });
+      }
+
+      // Load enrichment state from movie (to show already-enriched badges)
       if (data.movie_id) {
         try {
           const movie = await apiClient.get<{ enrichment_sources?: string[] }>(`/movies/${data.movie_id}`);
           const sources = movie.enrichment_sources || [];
           setEnrichedSources(sources);
-          setEnrichmentOptions({
-            tmdb: sources.includes('tmdb'),
-            fanart: sources.includes('fanart'),
-          });
+          // If no session-level options, init from movie's enriched sources
+          if (!data.enrichment_options) {
+            setEnrichmentOptions({
+              tmdb: sources.includes('tmdb'),
+              fanart: sources.includes('fanart'),
+            });
+          }
         } catch {
           // Movie fetch failed, keep defaults
         }
@@ -514,6 +530,15 @@ export function SessionEditor() {
 
       const mode = session.movie_selection_mode || 'fixed';
 
+      // Build enrichment_options from toggle states
+      const enrichOpts: Record<string, boolean> = {};
+      if (enrichmentOptions.tmdb) enrichOpts.tmdb = true;
+      if (enrichmentOptions.fanart) enrichOpts.fanart = true;
+      // Include palette for deferred enrichment (vote/mystery modes)
+      if (mode !== 'fixed' && (enrichOpts.tmdb || enrichOpts.fanart)) {
+        enrichOpts.palette = true;
+      }
+
       const payload: Record<string, unknown> = {
         name: session.name,
         description: session.description || null,
@@ -521,6 +546,7 @@ export function SessionEditor() {
         workflow: serializeWorkflow(workflowToSave),
         movie_selection_mode: mode,
         template_id: session.template_id || null,
+        enrichment_options: Object.keys(enrichOpts).length > 0 ? enrichOpts : null,
       };
 
       // Mode-specific fields
@@ -948,53 +974,6 @@ export function SessionEditor() {
                             ))}
                           </div>
                         )}
-                        {/* Enrichment toggles */}
-                        {session.movie_title && (
-                          <div className="flex items-center gap-3 mt-2">
-                            {(['tmdb', 'fanart'] as const).map((source) => {
-                              const available = enrichmentStatus?.[source]?.available ?? false;
-                              const isEnabled = enrichmentOptions[source] ?? false;
-                              const isEnriched = enrichedSources.includes(source);
-                              const error = enrichmentErrors[source];
-                              const label = source === 'tmdb' ? 'TMDB' : 'Fanart.tv';
-                              const tooltip = !available
-                                ? (language === 'fr' ? `${label} non configuré` : `${label} not configured`)
-                                : isEnriched && isEnabled
-                                  ? (language === 'fr' ? `Déjà enrichi via ${label}` : `Already enriched from ${label}`)
-                                  : isEnabled
-                                    ? (language === 'fr' ? `${label} sera appliqué à la sauvegarde` : `${label} will be applied on save`)
-                                    : (language === 'fr' ? `Activer l'enrichissement ${label}` : `Enable ${label} enrichment`);
-
-                              return (
-                                <button
-                                  key={source}
-                                  type="button"
-                                  disabled={!available}
-                                  title={tooltip}
-                                  onClick={() => toggleEnrichment(source)}
-                                  className={clsx(
-                                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all',
-                                    !available && 'opacity-40 cursor-not-allowed bg-dark-border/50 text-dark-muted',
-                                    isEnabled && isEnriched && 'bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25',
-                                    isEnabled && !isEnriched && 'bg-theatarr-500/20 text-theatarr-400 border border-theatarr-500/30 hover:bg-theatarr-500/30',
-                                    available && !isEnabled && 'bg-dark-bg hover:bg-dark-border text-dark-muted border border-dark-border hover:border-dark-muted',
-                                    error && 'bg-red-500/20 text-red-400 border border-red-500/30',
-                                  )}
-                                >
-                                  {isEnabled ? (
-                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
-                                  ) : source === 'tmdb' ? (
-                                    <svg viewBox="0 0 20 20" className="w-3.5 h-3.5"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2"/><text x="10" y="14" textAnchor="middle" fontSize="8" fill="currentColor">T</text></svg>
-                                  ) : (
-                                    <svg viewBox="0 0 20 20" className="w-3.5 h-3.5"><rect x="2" y="2" width="16" height="16" rx="3" fill="none" stroke="currentColor" strokeWidth="2"/><text x="10" y="14" textAnchor="middle" fontSize="7" fill="currentColor">F</text></svg>
-                                  )}
-                                  {label}
-                                  {error && <span className="text-red-400 ml-0.5">!</span>}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1093,6 +1072,75 @@ export function SessionEditor() {
                   revealAt={session.mystery_reveal_at || undefined}
                   onRevealAtChange={(revealAt) => setSession({ ...session, mystery_reveal_at: revealAt })}
                 />
+              </div>
+            )}
+
+            {/* Common Enrichment Options - visible for all modes */}
+            {(enrichmentStatus?.tmdb?.available || enrichmentStatus?.fanart?.available) && (
+              <div className="border-t border-dark-border pt-4 mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Palette size={16} className="text-theatarr-500" />
+                  <span className="text-sm font-medium text-dark-text">
+                    {language === 'fr' ? "Options d'enrichissement" : 'Enrichment Options'}
+                  </span>
+                </div>
+                <p className="text-xs text-dark-muted mb-3">
+                  {session.movie_selection_mode === 'vote'
+                    ? (language === 'fr'
+                      ? "L'enrichissement sera appliqué automatiquement quand le film sera voté."
+                      : 'Enrichment will be applied automatically when the movie is voted.')
+                    : session.movie_selection_mode === 'mystery'
+                      ? (language === 'fr'
+                        ? "L'enrichissement sera appliqué automatiquement quand le film sera révélé."
+                        : 'Enrichment will be applied automatically when the movie is revealed.')
+                      : (language === 'fr'
+                        ? "L'enrichissement sera appliqué à la sauvegarde."
+                        : 'Enrichment will be applied on save.')}
+                </p>
+                <div className="flex items-center gap-3">
+                  {(['tmdb', 'fanart'] as const).map((source) => {
+                    const available = enrichmentStatus?.[source]?.available ?? false;
+                    const isEnabled = enrichmentOptions[source] ?? false;
+                    const isEnriched = enrichedSources.includes(source);
+                    const error = enrichmentErrors[source];
+                    const label = source === 'tmdb' ? 'TMDB' : 'Fanart.tv';
+                    const tooltip = !available
+                      ? (language === 'fr' ? `${label} non configuré` : `${label} not configured`)
+                      : isEnriched && isEnabled
+                        ? (language === 'fr' ? `Déjà enrichi via ${label}` : `Already enriched from ${label}`)
+                        : isEnabled
+                          ? (language === 'fr' ? `${label} activé` : `${label} enabled`)
+                          : (language === 'fr' ? `Activer l'enrichissement ${label}` : `Enable ${label} enrichment`);
+
+                    return (
+                      <button
+                        key={source}
+                        type="button"
+                        disabled={!available}
+                        title={tooltip}
+                        onClick={() => toggleEnrichment(source)}
+                        className={clsx(
+                          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all',
+                          !available && 'opacity-40 cursor-not-allowed bg-dark-border/50 text-dark-muted',
+                          isEnabled && isEnriched && 'bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25',
+                          isEnabled && !isEnriched && 'bg-theatarr-500/20 text-theatarr-400 border border-theatarr-500/30 hover:bg-theatarr-500/30',
+                          available && !isEnabled && 'bg-dark-bg hover:bg-dark-border text-dark-muted border border-dark-border hover:border-dark-muted',
+                          error && 'bg-red-500/20 text-red-400 border border-red-500/30',
+                        )}
+                      >
+                        {isEnabled ? (
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+                        ) : source === 'tmdb' ? (
+                          <svg viewBox="0 0 20 20" className="w-3.5 h-3.5"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2"/><text x="10" y="14" textAnchor="middle" fontSize="8" fill="currentColor">T</text></svg>
+                        ) : (
+                          <svg viewBox="0 0 20 20" className="w-3.5 h-3.5"><rect x="2" y="2" width="16" height="16" rx="3" fill="none" stroke="currentColor" strokeWidth="2"/><text x="10" y="14" textAnchor="middle" fontSize="7" fill="currentColor">F</text></svg>
+                        )}
+                        {label}
+                        {error && <span className="text-red-400 ml-0.5">!</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

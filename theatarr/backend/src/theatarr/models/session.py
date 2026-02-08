@@ -147,6 +147,12 @@ class Session(UUIDMixin, TimestampMixin, Base):
         nullable=True,
     )
 
+    # Enrichment options (stored so enrichment runs when movie is resolved)
+    enrichment_options: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
     # Template override (if None, uses the globally active template)
     template_id: Mapped[str | None] = mapped_column(
         String(36),
