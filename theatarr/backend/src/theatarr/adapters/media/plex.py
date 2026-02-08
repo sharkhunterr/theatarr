@@ -146,6 +146,11 @@ class PlexAdapter(ServiceAdapter):
                 description="List movies in a library",
             ),
             Capability(
+                name="list_genres",
+                parameters=["library_id"],
+                description="List all genres in a movie library",
+            ),
+            Capability(
                 name="get_movie",
                 parameters=["movie_id"],
                 description="Get movie details",
@@ -187,6 +192,8 @@ class PlexAdapter(ServiceAdapter):
                 return await self._list_libraries()
             elif command.action == "list_movies":
                 return await self._list_movies(command.parameters)
+            elif command.action == "list_genres":
+                return await self._list_genres(command.parameters)
             elif command.action == "get_movie":
                 return await self._get_movie(command.parameters)
             elif command.action == "get_movie_images":
@@ -245,6 +252,8 @@ class PlexAdapter(ServiceAdapter):
 
         movies = []
         for movie in data.get("MediaContainer", {}).get("Metadata", []):
+            # Extract genres from Plex Genre array
+            genres = [g.get("tag") for g in movie.get("Genre", []) if g.get("tag")]
             movies.append({
                 "id": movie.get("ratingKey"),
                 "title": movie.get("title"),
@@ -254,11 +263,37 @@ class PlexAdapter(ServiceAdapter):
                 "thumb": movie.get("thumb"),
                 "art": movie.get("art"),
                 "rating": movie.get("audienceRating"),
+                "genres": genres,
             })
 
         return CommandResult(
             success=True,
             data={"movies": movies, "total": len(movies)},
+        )
+
+    async def _list_genres(self, parameters: dict[str, Any]) -> CommandResult:
+        """List all genres available in a movie library."""
+        if not self._client:
+            return CommandResult(success=False, message="Not connected")
+
+        library_id = parameters.get("library_id")
+        if not library_id:
+            return CommandResult(success=False, message="library_id is required")
+
+        response = await self._client.get(
+            f"{self.server_url}/library/sections/{library_id}/genre"
+        )
+        data = response.json()
+
+        genres = []
+        for genre in data.get("MediaContainer", {}).get("Directory", []):
+            tag = genre.get("title") or genre.get("tag")
+            if tag:
+                genres.append(tag)
+
+        return CommandResult(
+            success=True,
+            data={"genres": sorted(genres)},
         )
 
     async def _get_movie(self, parameters: dict[str, Any]) -> CommandResult:

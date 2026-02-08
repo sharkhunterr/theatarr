@@ -41,8 +41,15 @@ _log_buffer: deque[dict] = deque(maxlen=MAX_LOG_ENTRIES)
 class BufferedLogHandler(logging.Handler):
     """Logging handler that stores entries in a memory buffer."""
 
+    # Loggers to always skip (too noisy, no value in the UI)
+    _SKIP_LOGGERS = {"aiosqlite", "sqlalchemy", "python_multipart.multipart", "uvicorn.access"}
+
     def emit(self, record: logging.LogRecord) -> None:
         try:
+            # Skip noisy loggers entirely
+            for prefix in self._SKIP_LOGGERS:
+                if record.name.startswith(prefix):
+                    return
             _log_buffer.append({
                 "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
                 "level": record.levelname,

@@ -572,11 +572,47 @@ async def list_genres(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[str]:
-    """Get list of all genres in the database."""
+    """Get all genres from the connected media service (Plex/Jellyfin).
+
+    Falls back to local database genres if no media service is available.
+    """
+    # Try to get genres from the media service first
+    services_result = await db.execute(
+        select(Service)
+        .where(Service.category == ServiceCategory.MEDIA_SOURCE)
+        .where(Service.is_enabled == True)
+    )
+    service = services_result.scalars().first()
+
+    if service:
+        try:
+            adapter = get_adapter(service.adapter_type, service.config)
+
+            # Find the movie library
+            libs_result = await adapter.execute(
+                Command(action="list_libraries", parameters={})
+            )
+            if libs_result.success and libs_result.data:
+                libraries = libs_result.data.get("libraries", [])
+                movie_library = next(
+                    (lib for lib in libraries if lib.get("type") == "movie"), None
+                )
+                if movie_library:
+                    genres_result = await adapter.execute(
+                        Command(
+                            action="list_genres",
+                            parameters={"library_id": movie_library.get("id")},
+                        )
+                    )
+                    if genres_result.success and genres_result.data:
+                        return genres_result.data.get("genres", [])
+        except Exception:
+            logger.warning("Failed to fetch genres from media service, falling back to local DB")
+
+    # Fallback: local database genres
     result = await db.execute(select(Movie.genres).distinct())
     all_genres = result.scalars().all()
 
-    # Flatten and deduplicate
     genres = set()
     for genre_list in all_genres:
         if genre_list:

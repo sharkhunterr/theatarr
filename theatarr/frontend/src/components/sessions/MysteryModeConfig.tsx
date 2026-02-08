@@ -13,10 +13,10 @@ interface MysteryModeConfigProps {
   onRevealAtChange?: (revealAt: string | null) => void;
 }
 
-const GENRES = [
-  'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary',
-  'Drama', 'Family', 'Fantasy', 'History', 'Horror', 'Music',
-  'Mystery', 'Romance', 'Science Fiction', 'Thriller', 'War', 'Western'
+const FALLBACK_GENRES = [
+  'Action', 'Aventure', 'Animation', 'Comédie', 'Crime', 'Documentaire',
+  'Drame', 'Familial', 'Fantastique', 'Histoire', 'Horreur', 'Musique',
+  'Mystère', 'Romance', 'Science-Fiction', 'Thriller', 'Guerre', 'Western'
 ];
 
 export function MysteryModeConfig({
@@ -28,6 +28,14 @@ export function MysteryModeConfig({
   const { language } = useLayoutStore();
   const [movieSearchQuery, setMovieSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Fetch genres dynamically from media service (language-independent)
+  const { data: serviceGenres } = useQuery<string[]>({
+    queryKey: ['genres-list'],
+    queryFn: () => apiClient.get<string[]>('/movies/genres/list'),
+    staleTime: 5 * 60 * 1000,
+  });
+  const GENRES = serviceGenres && serviceGenres.length > 0 ? serviceGenres : FALLBACK_GENRES;
 
   const t = {
     title: language === 'fr' ? 'Configuration Mystère' : 'Mystery Configuration',

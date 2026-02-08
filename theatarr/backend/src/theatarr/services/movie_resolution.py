@@ -442,6 +442,11 @@ async def _get_filtered_random_movie(
     rating_min = filters.get("rating_min")
     genres = filters.get("genres", [])
 
+    logger.info(
+        f"Filtering {len(movies)} movies from service "
+        f"(genres={genres}, year_min={year_min}, year_max={year_max}, rating_min={rating_min})"
+    )
+
     filtered = movies
     if year_min:
         filtered = [m for m in filtered if m.get("year") and m["year"] >= year_min]
@@ -450,6 +455,13 @@ async def _get_filtered_random_movie(
     if rating_min:
         filtered = [m for m in filtered if m.get("rating") and m["rating"] >= rating_min]
     if genres:
+        # Log a sample of genres from Plex to help diagnose language mismatches
+        sample_genres = set()
+        for m in filtered[:20]:
+            for g in (m.get("genres") or []):
+                sample_genres.add(g)
+        logger.info(f"Sample genres from service: {sorted(sample_genres)}")
+
         filtered = [
             m for m in filtered
             if m.get("genres") and any(
@@ -458,7 +470,10 @@ async def _get_filtered_random_movie(
             )
         ]
 
+    logger.info(f"After filtering: {len(filtered)} movies match")
+
     if not filtered:
+        logger.warning(f"No movies match filters: {filters}")
         return None
 
     movie = random.choice(filtered)
