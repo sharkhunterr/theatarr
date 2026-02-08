@@ -1,6 +1,8 @@
 """Session history and logs API router for Theatarr."""
 
-from datetime import datetime
+import logging
+from collections import deque
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -9,12 +11,56 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from theatarr.database import get_db
-from theatarr.api.deps import get_current_user
+from theatarr.api.deps import get_current_user, AdminUser
 from theatarr.models import User, Session
 from theatarr.schemas.base import PaginatedResponse
 
 
 router = APIRouter(prefix="/logs", tags=["logs"])
+
+
+# ============================================================================
+# In-memory log buffer (captures Python logging output)
+# ============================================================================
+
+MAX_LOG_ENTRIES = 2000
+
+
+class LogEntry(BaseModel):
+    """A single log entry."""
+
+    timestamp: str
+    level: str
+    logger_name: str
+    message: str
+
+
+_log_buffer: deque[dict] = deque(maxlen=MAX_LOG_ENTRIES)
+
+
+class BufferedLogHandler(logging.Handler):
+    """Logging handler that stores entries in a memory buffer."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            _log_buffer.append({
+                "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+                "level": record.levelname,
+                "logger_name": record.name,
+                "message": self.format(record),
+            })
+        except Exception:
+            pass
+
+
+def setup_log_capture() -> None:
+    """Install the buffered log handler on the root logger."""
+    handler = BufferedLogHandler()
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logging.getLogger().addHandler(handler)
+    # Also ensure root logger captures everything
+    logging.getLogger().setLevel(logging.DEBUG)
 
 
 # ============================================================================
@@ -325,3 +371,75 @@ async def get_recent_activity(
         ))
 
     return sorted(events, key=lambda e: e.timestamp, reverse=True)
+
+
+# ============================================================================
+# System Logs (Python logging captured in-memory)
+# ============================================================================
+
+
+@router.get("/system", response_model=list[LogEntry])
+async def get_system_logs(
+    current_user: AdminUser,
+    level: Optional[str] = Query(None, description="Filter by level: DEBUG, INFO, WARNING, ERROR"),
+    category: Optional[str] = Query(None, description="Filter by category: scheduler, sessions, vote, services, enrichment, movies, auth, system"),
+    search: Optional[str] = Query(None, description="Search in message text"),
+    limit: int = Query(200, ge=1, le=2000),
+) -> list[LogEntry]:
+    """Get system logs from in-memory buffer.
+
+    Categories map to logger name prefixes:
+    - scheduler: theatarr.services.scheduler
+    - sessions: theatarr.api.sessions, theatarr.services.engine
+    - vote: theatarr.api.vote, theatarr.services.vote, theatarr.api.portal
+    - services: theatarr.api.services, theatarr.adapters
+    - enrichment: theatarr.services.movie_enrichment, theatarr.services.movie_sync, theatarr.services.movie_resolution
+    - movies: theatarr.api.movies
+    - auth: theatarr.api.auth, theatarr.api.deps
+    - system: uvicorn, sqlalchemy (excluded by default)
+    """
+    CATEGORY_PREFIXES = {
+        "scheduler": ["theatarr.services.scheduler"],
+        "sessions": ["theatarr.api.sessions", "theatarr.services.engine"],
+        "vote": ["theatarr.api.vote", "theatarr.services.vote", "theatarr.api.portal"],
+        "services": ["theatarr.api.services", "theatarr.adapters"],
+        "enrichment": [
+            "theatarr.services.movie_enrichment",
+            "theatarr.services.movie_sync",
+            "theatarr.services.movie_resolution",
+            "theatarr.services.palette",
+        ],
+        "movies": ["theatarr.api.movies"],
+        "auth": ["theatarr.api.auth", "theatarr.api.deps"],
+        "system": ["uvicorn", "fastapi"],
+    }
+
+    results = []
+    for entry in reversed(_log_buffer):
+        # Filter by level
+        if level and entry["level"] != level.upper():
+            continue
+
+        # Filter by category
+        if category:
+            prefixes = CATEGORY_PREFIXES.get(category, [])
+            if prefixes and not any(entry["logger_name"].startswith(p) for p in prefixes):
+                continue
+            # Exclude sqlalchemy noise unless explicitly requested
+            if category != "system" and entry["logger_name"].startswith("sqlalchemy"):
+                continue
+
+        # Exclude sqlalchemy by default (too noisy)
+        if not category and entry["logger_name"].startswith("sqlalchemy"):
+            continue
+
+        # Search filter
+        if search and search.lower() not in entry["message"].lower():
+            continue
+
+        results.append(LogEntry(**entry))
+
+        if len(results) >= limit:
+            break
+
+    return results

@@ -338,7 +338,7 @@ async def _get_random_movie(db: AsyncSession) -> dict | None:
         "poster_url": movie.poster_url,
         "movie_id": movie.id,
         "source": movie.source,
-        "source_id": movie.source_id,
+        "source_id": movie.plex_key or movie.jellyfin_id,
         "year": movie.year,
     }
 
@@ -392,7 +392,7 @@ async def _get_filtered_random_movie(
         "poster_url": movie.poster_url,
         "movie_id": movie.id,
         "source": movie.source,
-        "source_id": movie.source_id,
+        "source_id": movie.plex_key or movie.jellyfin_id,
         "year": movie.year,
     }
 

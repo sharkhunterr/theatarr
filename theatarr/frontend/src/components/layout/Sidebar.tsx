@@ -13,6 +13,7 @@ import {
   Palette,
   Plug,
   History,
+  ScrollText,
   Settings,
   Users,
   ChevronLeft,
@@ -40,6 +41,7 @@ const navItems: NavItem[] = [
   { label: 'Templates', labelFr: 'Modèles', icon: Palette, path: '/templates' },
   { label: 'Services', labelFr: 'Services', icon: Plug, path: '/services' },
   { label: 'History', labelFr: 'Historique', icon: History, path: '/history' },
+  { label: 'Logs', labelFr: 'Logs', icon: ScrollText, path: '/logs' },
   { label: 'Settings', labelFr: 'Paramètres', icon: Settings, path: '/settings' },
 ];
 

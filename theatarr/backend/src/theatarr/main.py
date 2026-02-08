@@ -26,11 +26,22 @@ from theatarr.database import close_db, init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
+    from theatarr.services.scheduler import get_scheduler
+
     # Startup
+    from theatarr.api.logs import setup_log_capture
+    setup_log_capture()
+
     discover_adapters()
     await init_db()
+
+    scheduler = get_scheduler()
+    await scheduler.start()
+
     yield
+
     # Shutdown
+    await scheduler.stop()
     await close_db()
 
 

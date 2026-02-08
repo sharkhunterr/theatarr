@@ -15,6 +15,7 @@ import { VoteSessionManager } from './pages/VoteSessionManager';
 import { TrailersManager } from './pages/TrailersManager';
 import { ConfigPage } from './pages/ConfigPage';
 import { SessionHistory } from './pages/SessionHistory';
+import { SystemLogs } from './pages/SystemLogs';
 import { UsersPage } from './pages/UsersPage';
 
 // Portal Pages
@@ -214,6 +215,14 @@ function AppRoutes() {
           <RequireAuth>
             <SessionHistory />
           </RequireAuth>
+        }
+      />
+      <Route
+        path="/logs"
+        element={
+          <RequireAdmin>
+            <SystemLogs />
+          </RequireAdmin>
         }
       />
       <Route

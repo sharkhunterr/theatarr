@@ -44,7 +44,6 @@ from theatarr.services.movie_resolution import (
     resolve_vote_winner,
 )
 from theatarr.services.movie_sync import ensure_movie_synced
-from theatarr.services.scheduler import get_scheduler
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
