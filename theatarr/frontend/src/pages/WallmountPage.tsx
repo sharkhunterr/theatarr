@@ -26,6 +26,14 @@ interface WallmountState {
     genres?: string[];
     directors?: string[];
     cast?: string[];
+    studios?: string[];
+    original_title?: string;
+    enrichment_sources?: string[];
+    keywords?: string[];
+    vote_count?: number;
+    extra_backdrops?: string[];
+    extra_posters?: string[];
+    logos?: string[];
   } | null;
   palette: {
     primary: string;

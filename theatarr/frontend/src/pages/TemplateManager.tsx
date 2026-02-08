@@ -72,12 +72,17 @@ export function TemplateManager() {
     },
   });
 
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   const initBuiltinsMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.post('/templates/init-builtins', {});
+      const result = await apiClient.post<TemplateListResponse>('/templates/init-builtins', {});
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
+      setSuccessMessage(`${data?.total || 0} templates integres mis a jour`);
+      setTimeout(() => setSuccessMessage(null), 3000);
     },
   });
 
@@ -134,11 +139,13 @@ export function TemplateManager() {
             variant="secondary"
             onClick={() => initBuiltinsMutation.mutate()}
             disabled={initBuiltinsMutation.isPending}
+            title="Mettre a jour les templates integres"
           >
             <RefreshCw
               size={16}
-              className={initBuiltinsMutation.isPending ? 'animate-spin' : ''}
+              className={initBuiltinsMutation.isPending ? 'animate-spin mr-2' : 'mr-2'}
             />
+            <span className="hidden sm:inline">MAJ Integres</span>
           </Button>
           <Button onClick={handleCreate}>
             <Plus size={16} className="mr-1" />
@@ -146,6 +153,14 @@ export function TemplateManager() {
           </Button>
         </div>
       </div>
+
+      {/* Success Message */}
+      {successMessage && (
+        <div className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm flex items-center gap-2">
+          <Check size={16} />
+          {successMessage}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-2 mb-6">

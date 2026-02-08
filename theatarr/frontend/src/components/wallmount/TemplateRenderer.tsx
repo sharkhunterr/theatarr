@@ -229,7 +229,7 @@ interface BadgeConfig {
   text?: string;
   show_when?: 'always' | 'scheduled' | 'running' | 'countdown_under_24h' | 'never';
   fallback_text?: string;
-  style?: 'pulse' | 'glow' | 'shimmer' | 'neon' | 'solid' | 'outline' | 'gradient' | 'glass-pill' | 'gold-ribbon' | 'stamp' | 'status-badge' | 'pill-animated';
+  style?: 'pulse' | 'glow' | 'shimmer' | 'neon' | 'solid' | 'outline' | 'gradient' | 'glass-pill' | 'gold-ribbon' | 'stamp' | 'status-badge' | 'pill-animated' | 'gradient-border';
   color?: string;
   colors?: Record<string, string>;
   dynamic_texts?: Record<string, string>;
@@ -282,7 +282,15 @@ interface TemplateConfig {
   poster_index?: number;
   rotate_backdrops?: boolean;
   rotate_interval?: number;
+  rotate_posters?: boolean;
+  poster_rotate_interval?: number;
   use_logo_image?: boolean;
+  // Enrichment display
+  show_enrichment_sources?: boolean;
+  show_studios?: boolean;
+  show_original_title?: boolean;
+  show_overview?: boolean;
+  cast_scroll?: boolean;
 }
 
 interface TemplateRendererProps {
@@ -310,6 +318,11 @@ interface TemplateRendererProps {
       genres?: string[];
       directors?: string[];
       cast?: string[];
+      studios?: string[];
+      original_title?: string;
+      enrichment_sources?: string[];
+      keywords?: string[];
+      vote_count?: number;
     };
     session?: {
       name?: string;
@@ -396,6 +409,24 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
     if (!movie?.logos?.length) return undefined;
     return movie.logos[0];
   }, [movie?.logos]);
+
+  // All posters for rotation
+  const allPosters = useMemo(() => {
+    const list: string[] = [];
+    if (movie?.poster_url) list.push(movie.poster_url);
+    if (movie?.extra_posters) list.push(...movie.extra_posters);
+    return list;
+  }, [movie?.poster_url, movie?.extra_posters]);
+
+  const [posterRotatingIndex, setPosterRotatingIndex] = useState(0);
+  useEffect(() => {
+    if (!config?.rotate_posters || allPosters.length <= 1) return;
+    const interval = (config.poster_rotate_interval ?? 15) * 1000;
+    const timer = setInterval(() => {
+      setPosterRotatingIndex((prev) => (prev + 1) % allPosters.length);
+    }, interval);
+    return () => clearInterval(timer);
+  }, [config?.rotate_posters, config?.poster_rotate_interval, allPosters.length]);
 
   const renderComponent = (component: TemplateLayout['components'][0], index: number) => {
     switch (component.type) {
@@ -2556,6 +2587,1169 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
               </span>
             </div>
           )}
+        </div>
+      );
+    }
+
+    // SHOWCASE ENRICHED - Premium template leveraging TMDB + Fanart.tv data
+    if (layoutStyle === 'showcase-enriched') {
+      const currentPoster = allPosters.length > 0
+        ? allPosters[posterRotatingIndex % allPosters.length]
+        : movie?.poster_url;
+
+      return (
+        <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+          <style>{animationStyles}{`
+            @keyframes ken-burns-slow {
+              0% { transform: scale(1) translate(0, 0); }
+              50% { transform: scale(1.06) translate(-0.5%, -0.3%); }
+              100% { transform: scale(1) translate(0, 0); }
+            }
+            @keyframes fade-in-up {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes gradient-shift {
+              0%, 100% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+            }
+            @keyframes cast-marquee {
+              0% { transform: translateX(0); }
+              100% { transform: translateX(-50%); }
+            }
+            @keyframes poster-fade {
+              0%, 90% { opacity: 1; }
+              95%, 100% { opacity: 0; }
+            }
+            .showcase-backdrop {
+              animation: ken-burns-slow ${config?.rotate_interval ?? 20}s ease-in-out infinite;
+              transition: opacity 2s ease-in-out;
+            }
+            .showcase-fade-in {
+              animation: fade-in-up 0.8s ease-out both;
+            }
+            .showcase-glass {
+              backdrop-filter: blur(20px) saturate(1.5);
+              -webkit-backdrop-filter: blur(20px) saturate(1.5);
+              background: rgba(0, 0, 0, 0.35);
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              border-radius: 16px;
+            }
+            .showcase-gradient-bar {
+              background: linear-gradient(90deg,
+                ${palette?.vibrant || '#6366f1'}60,
+                ${palette?.accent || '#8b5cf6'}60,
+                ${palette?.vibrant || '#6366f1'}60
+              );
+              background-size: 200% 100%;
+              animation: gradient-shift 6s ease-in-out infinite;
+            }
+            .showcase-cast-track {
+              display: flex;
+              gap: 1.5rem;
+              animation: cast-marquee 30s linear infinite;
+              width: max-content;
+            }
+            .showcase-poster {
+              transition: opacity 1s ease-in-out;
+            }
+          `}</style>
+
+          {/* Full bleed backdrops with Ken Burns + crossfade */}
+          {config?.rotate_backdrops && allBackdrops.length > 1 ? (
+            allBackdrops.map((url, i) => (
+              <div
+                key={`showcase-bd-${i}`}
+                className="absolute inset-0 bg-cover bg-center showcase-backdrop"
+                style={{
+                  backgroundImage: `url(${url})`,
+                  opacity: i === rotatingIndex % allBackdrops.length ? 1 : 0,
+                }}
+              />
+            ))
+          ) : effectiveBackdrop ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center showcase-backdrop"
+              style={{ backgroundImage: `url(${effectiveBackdrop})` }}
+            />
+          ) : null}
+
+          {/* Gradient overlays for readability */}
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to right, ${palette?.background || '#0a0a0f'}ee 0%, ${palette?.background || '#0a0a0f'}cc 40%, ${palette?.background || '#0a0a0f'}60 60%, transparent 100%)`,
+          }} />
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to top, ${palette?.background || '#0a0a0f'}cc 0%, transparent 30%, transparent 80%, ${palette?.background || '#0a0a0f'}80 100%)`,
+          }} />
+
+          {/* Top accent bar */}
+          <div className="absolute top-0 left-0 right-0 h-0.5 showcase-gradient-bar z-20" />
+
+          {/* Main content: 2 columns */}
+          <div className="relative z-10 w-full h-full flex">
+
+            {/* LEFT COLUMN (55%) - Movie info */}
+            <div className="w-[55%] h-full flex flex-col justify-between p-10">
+
+              {/* Top: Logo or Title */}
+              <div>
+                <div className="showcase-fade-in" style={{ animationDelay: '0.2s' }}>
+                  {config?.use_logo_image && effectiveLogo ? (
+                    <img
+                      src={effectiveLogo}
+                      alt={movie?.title || ''}
+                      className="max-w-[450px] max-h-[140px] object-contain mb-4 drop-shadow-2xl"
+                    />
+                  ) : (
+                    <h1
+                      className="text-5xl font-bold mb-1 tracking-tight leading-tight"
+                      style={{
+                        color: palette?.text || '#ffffff',
+                        textShadow: '0 4px 30px rgba(0,0,0,0.8)',
+                      }}
+                    >
+                      {movie?.title}
+                    </h1>
+                  )}
+                </div>
+
+                {/* Original title */}
+                {config?.show_original_title && movie?.original_title && movie.original_title !== movie.title && (
+                  <div className="showcase-fade-in text-lg opacity-50 italic mb-3" style={{ animationDelay: '0.3s' }}>
+                    {movie.original_title}
+                  </div>
+                )}
+
+                {/* Tagline */}
+                {movie?.tagline && (
+                  <div className="showcase-fade-in text-xl italic opacity-70 mb-5" style={{
+                    animationDelay: '0.4s',
+                    color: palette?.accent || '#a5b4fc',
+                  }}>
+                    "{movie.tagline}"
+                  </div>
+                )}
+
+                {/* Rating + Year + Runtime row */}
+                <div className="showcase-fade-in flex items-center gap-5 mb-5" style={{ animationDelay: '0.5s' }}>
+                  {movie?.rating && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl" style={{ color: palette?.accent || '#fbbf24' }}>★</span>
+                      <span className="text-2xl font-bold">{movie.rating.toFixed(1)}</span>
+                      <span className="text-sm opacity-50">/10</span>
+                      {movie.vote_count && (
+                        <span className="text-xs opacity-40 ml-1">({movie.vote_count.toLocaleString()} votes)</span>
+                      )}
+                    </div>
+                  )}
+                  {movie?.year && (
+                    <span className="text-lg opacity-70 font-medium">{movie.year}</span>
+                  )}
+                  {movie?.runtime_minutes && (
+                    <span className="text-lg opacity-70">
+                      {Math.floor(movie.runtime_minutes / 60)}h{String(movie.runtime_minutes % 60).padStart(2, '0')}
+                    </span>
+                  )}
+                </div>
+
+                {/* Genres pills */}
+                {movie?.genres && movie.genres.length > 0 && (
+                  <div className="showcase-fade-in flex flex-wrap gap-2 mb-5" style={{ animationDelay: '0.6s' }}>
+                    {movie.genres.slice(0, 5).map((genre, i) => (
+                      <span
+                        key={i}
+                        className="px-3 py-1 rounded-full text-sm font-medium"
+                        style={{
+                          backgroundColor: `${palette?.vibrant || '#6366f1'}25`,
+                          color: palette?.vibrant || '#a5b4fc',
+                          border: `1px solid ${palette?.vibrant || '#6366f1'}40`,
+                        }}
+                      >
+                        {genre}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Keywords */}
+                {movie?.keywords && movie.keywords.length > 0 && (
+                  <div className="showcase-fade-in flex flex-wrap gap-1.5 mb-5" style={{ animationDelay: '0.65s' }}>
+                    {movie.keywords.slice(0, 6).map((kw, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded text-xs opacity-50"
+                        style={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                        }}
+                      >
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Directors */}
+                {movie?.directors && movie.directors.length > 0 && (
+                  <div className="showcase-fade-in mb-3 text-base" style={{ animationDelay: '0.7s' }}>
+                    <span className="opacity-50 uppercase tracking-wider text-xs mr-2">Réalisé par</span>
+                    <span className="font-semibold opacity-90">{movie.directors.join(', ')}</span>
+                  </div>
+                )}
+
+                {/* Studios */}
+                {config?.show_studios && movie?.studios && movie.studios.length > 0 && (
+                  <div className="showcase-fade-in text-sm opacity-40" style={{ animationDelay: '0.8s' }}>
+                    {movie.studios.join(' · ')}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom: Countdown + Session */}
+              <div>
+                {countdown_to && (
+                  <div className="showcase-fade-in mb-4" style={{ animationDelay: '1s' }}>
+                    <CountdownTimer targetDate={countdown_to} palette={palette} size="xl" showSeconds animate />
+                  </div>
+                )}
+                {session?.name && (
+                  <div className="showcase-fade-in text-sm uppercase tracking-[0.3em] opacity-40" style={{ animationDelay: '1.2s' }}>
+                    {session.name}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN (45%) - Glass panel */}
+            <div className="w-[45%] h-full flex flex-col p-10 pl-0">
+              <div className="showcase-glass flex-1 flex flex-col p-8 overflow-hidden showcase-fade-in" style={{ animationDelay: '0.6s' }}>
+
+                {/* Synopsis */}
+                {config?.show_overview && movie?.overview && (
+                  <div className="mb-6 flex-shrink-0">
+                    <div className="text-xs uppercase tracking-wider opacity-40 mb-3" style={{ color: palette?.accent || '#a5b4fc' }}>
+                      Synopsis
+                    </div>
+                    <p className="text-base leading-relaxed opacity-80 line-clamp-6">
+                      {movie.overview}
+                    </p>
+                  </div>
+                )}
+
+                {/* Separator */}
+                <div className="h-px my-4 flex-shrink-0" style={{
+                  background: `linear-gradient(to right, transparent, ${palette?.vibrant || '#ffffff'}30, transparent)`,
+                }} />
+
+                {/* Cast - scrolling marquee */}
+                {movie?.cast && movie.cast.length > 0 && (
+                  <div className="mb-6 flex-shrink-0">
+                    <div className="text-xs uppercase tracking-wider opacity-40 mb-3" style={{ color: palette?.accent || '#a5b4fc' }}>
+                      Casting
+                    </div>
+                    <div className="overflow-hidden">
+                      {config?.cast_scroll && movie.cast.length > 4 ? (
+                        <div className="showcase-cast-track">
+                          {[...movie.cast, ...movie.cast].map((name, i) => (
+                            <span key={i} className="text-sm opacity-70 whitespace-nowrap">{name}</span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {movie.cast.map((name, i) => (
+                            <span key={i} className="text-sm opacity-70">{name}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Spacer */}
+                <div className="flex-1" />
+
+                {/* Poster thumbnail with rotation */}
+                {currentPoster && (
+                  <div className="flex items-end justify-between mt-4">
+                    <div className="flex-shrink-0">
+                      <img
+                        src={currentPoster}
+                        alt={movie?.title || ''}
+                        className="w-24 h-36 object-cover rounded-lg shadow-xl showcase-poster"
+                        style={{
+                          boxShadow: `0 15px 40px -10px ${palette?.primary || '#000'}80`,
+                        }}
+                      />
+                    </div>
+
+                    {/* Enrichment badges */}
+                    {config?.show_enrichment_sources && movie?.enrichment_sources && movie.enrichment_sources.length > 0 && (
+                      <div className="flex items-center gap-2 opacity-30">
+                        {movie.enrichment_sources.includes('tmdb') && (
+                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border border-current">TMDB</span>
+                        )}
+                        {movie.enrichment_sources.includes('fanart') && (
+                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border border-current">Fanart</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // FANART GALLERY - Full screen backdrop slideshow with minimal overlay
+    if (layoutStyle === 'fanart-gallery') {
+      const bdCount = allBackdrops.length;
+      const progressPct = bdCount > 1 ? ((rotatingIndex % bdCount) + 1) / bdCount * 100 : 100;
+
+      return (
+        <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+          <style>{animationStyles}{`
+            @keyframes gallery-ken-burns {
+              0% { transform: scale(1); }
+              100% { transform: scale(1.08); }
+            }
+            @keyframes gallery-fade-in {
+              from { opacity: 0; transform: translateY(10px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .gallery-slide {
+              animation: gallery-ken-burns ${config?.rotate_interval ?? 12}s ease-out forwards;
+              transition: opacity 1.5s ease-in-out;
+            }
+            .gallery-info {
+              animation: gallery-fade-in 0.6s ease-out both;
+            }
+          `}</style>
+
+          {/* Full bleed backdrops with crossfade */}
+          {config?.rotate_backdrops && bdCount > 1 ? (
+            allBackdrops.map((url, i) => (
+              <div
+                key={`gallery-bd-${i}`}
+                className="absolute inset-0 bg-cover bg-center gallery-slide"
+                style={{
+                  backgroundImage: `url(${url})`,
+                  opacity: i === rotatingIndex % bdCount ? 1 : 0,
+                }}
+              />
+            ))
+          ) : effectiveBackdrop ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center gallery-slide"
+              style={{ backgroundImage: `url(${effectiveBackdrop})` }}
+            />
+          ) : null}
+
+          {/* Subtle vignette */}
+          <div className="absolute inset-0" style={{
+            background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%)',
+          }} />
+
+          {/* Bottom gradient for text readability */}
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to top, ${palette?.background || '#000'}cc 0%, ${palette?.background || '#000'}60 15%, transparent 40%)`,
+          }} />
+
+          {/* Top-left: Logo or Title */}
+          <div className="absolute top-8 left-10 z-10 gallery-info" style={{ animationDelay: '0.2s' }}>
+            {config?.use_logo_image && effectiveLogo ? (
+              <img
+                src={effectiveLogo}
+                alt={movie?.title || ''}
+                className="max-w-[300px] max-h-[80px] object-contain drop-shadow-2xl"
+              />
+            ) : (
+              <h1 className="text-3xl font-bold drop-shadow-2xl" style={{
+                color: palette?.text || '#fff',
+              }}>
+                {movie?.title}
+              </h1>
+            )}
+          </div>
+
+          {/* Bottom info bar */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 p-8 flex items-end justify-between">
+            {/* Left: movie info */}
+            <div className="gallery-info" style={{ animationDelay: '0.4s' }}>
+              {/* Title (if logo shown above) */}
+              {config?.use_logo_image && effectiveLogo && (
+                <h2 className="text-2xl font-bold mb-1 drop-shadow-lg" style={{
+                  color: palette?.text || '#fff',
+                }}>
+                  {movie?.title}
+                </h2>
+              )}
+
+              {/* Meta row */}
+              <div className="flex items-center gap-4 text-sm opacity-80 mb-2">
+                {movie?.year && <span>{movie.year}</span>}
+                {movie?.runtime_minutes && (
+                  <span>{Math.floor(movie.runtime_minutes / 60)}h{String(movie.runtime_minutes % 60).padStart(2, '0')}</span>
+                )}
+                {movie?.rating && (
+                  <span className="flex items-center gap-1">
+                    <span style={{ color: palette?.accent || '#fbbf24' }}>★</span>
+                    {movie.rating.toFixed(1)}
+                  </span>
+                )}
+                {movie?.directors && movie.directors.length > 0 && (
+                  <span className="opacity-70">{movie.directors[0]}</span>
+                )}
+              </div>
+
+              {/* Genres */}
+              {movie?.genres && movie.genres.length > 0 && (
+                <div className="flex gap-2">
+                  {movie.genres.slice(0, 4).map((g, i) => (
+                    <span
+                      key={i}
+                      className="px-2 py-0.5 rounded-full text-xs"
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.12)',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                      }}
+                    >
+                      {g}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right: countdown + progress */}
+            <div className="gallery-info text-right" style={{ animationDelay: '0.6s' }}>
+              {countdown_to && (
+                <div className="mb-3">
+                  <CountdownTimer targetDate={countdown_to} palette={palette} size="lg" showSeconds animate />
+                </div>
+              )}
+
+              {/* Slide progress indicator */}
+              {bdCount > 1 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs opacity-40">{(rotatingIndex % bdCount) + 1}/{bdCount}</span>
+                  <div className="w-24 h-0.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${progressPct}%`,
+                        backgroundColor: palette?.vibrant || palette?.accent || '#fff',
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {session?.name && (
+                <div className="text-xs uppercase tracking-widest opacity-30 mt-2">{session.name}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // PANORAMA SLIDE - Backdrops slide horizontally left-to-right
+    if (layoutStyle === 'panorama-slide') {
+      const bdCount = allBackdrops.length;
+      const slideInterval = config?.rotate_interval ?? 10;
+
+      return (
+        <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+          <style>{animationStyles}{`
+            @keyframes panorama-slide-in {
+              from { transform: translateX(100%); }
+              to { transform: translateX(0); }
+            }
+            @keyframes panorama-slide-out {
+              from { transform: translateX(0); }
+              to { transform: translateX(-100%); }
+            }
+            @keyframes panorama-zoom {
+              0% { transform: scale(1); }
+              100% { transform: scale(1.05); }
+            }
+            @keyframes panorama-info-in {
+              from { opacity: 0; transform: translateX(-30px); }
+              to { opacity: 1; transform: translateX(0); }
+            }
+            .panorama-active {
+              animation: panorama-zoom ${slideInterval}s ease-out forwards;
+              z-index: 1;
+            }
+            .panorama-info {
+              animation: panorama-info-in 0.8s ease-out both;
+            }
+          `}</style>
+
+          {/* Backdrops with horizontal slide transition */}
+          {bdCount > 0 ? (
+            allBackdrops.map((url, i) => {
+              const isActive = i === rotatingIndex % bdCount;
+              return (
+                <div
+                  key={`pano-bd-${i}`}
+                  className={`absolute inset-0 bg-cover bg-center ${isActive ? 'panorama-active' : ''}`}
+                  style={{
+                    backgroundImage: `url(${url})`,
+                    opacity: isActive ? 1 : 0,
+                    transition: 'opacity 1.2s ease-in-out',
+                  }}
+                />
+              );
+            })
+          ) : effectiveBackdrop ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center panorama-active"
+              style={{ backgroundImage: `url(${effectiveBackdrop})` }}
+            />
+          ) : null}
+
+          {/* Vignette overlay */}
+          <div className="absolute inset-0" style={{
+            background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%)',
+          }} />
+
+          {/* Left gradient for text readability */}
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to right, ${palette?.background || '#000'}cc 0%, ${palette?.background || '#000'}80 25%, transparent 50%)`,
+          }} />
+
+          {/* Bottom gradient */}
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to top, ${palette?.background || '#000'}bb 0%, transparent 25%)`,
+          }} />
+
+          {/* Left content column */}
+          <div className="absolute left-0 top-0 bottom-0 w-[45%] z-10 flex flex-col justify-between p-10">
+
+            {/* Top: Logo or Title */}
+            <div className="panorama-info" style={{ animationDelay: '0.2s' }}>
+              {config?.use_logo_image && effectiveLogo ? (
+                <img
+                  src={effectiveLogo}
+                  alt={movie?.title || ''}
+                  className="max-w-[400px] max-h-[120px] object-contain drop-shadow-2xl"
+                />
+              ) : movie ? (
+                <h1
+                  className="text-5xl font-bold tracking-tight drop-shadow-2xl"
+                  style={{ color: palette?.text || '#fff' }}
+                >
+                  {movie.title}
+                </h1>
+              ) : null}
+
+              {/* Tagline */}
+              {movie?.tagline && (
+                <p className="text-lg italic opacity-60 mt-3" style={{ color: palette?.accent || '#a5b4fc' }}>
+                  "{movie.tagline}"
+                </p>
+              )}
+            </div>
+
+            {/* Middle: Movie info */}
+            <div className="panorama-info" style={{ animationDelay: '0.5s' }}>
+              {/* Rating */}
+              {movie?.rating && (
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-3xl" style={{ color: palette?.accent || '#fbbf24' }}>★</span>
+                  <span className="text-3xl font-bold">{movie.rating.toFixed(1)}</span>
+                  <span className="text-base opacity-40">/10</span>
+                  {movie.vote_count && (
+                    <span className="text-sm opacity-30">({movie.vote_count.toLocaleString()})</span>
+                  )}
+                </div>
+              )}
+
+              {/* Meta: year, runtime */}
+              <div className="flex items-center gap-4 text-lg opacity-70 mb-4">
+                {movie?.year && <span className="font-medium">{movie.year}</span>}
+                {movie?.runtime_minutes && (
+                  <>
+                    <span className="opacity-30">·</span>
+                    <span>{Math.floor(movie.runtime_minutes / 60)}h{String(movie.runtime_minutes % 60).padStart(2, '0')}</span>
+                  </>
+                )}
+                {movie?.directors && movie.directors.length > 0 && (
+                  <>
+                    <span className="opacity-30">·</span>
+                    <span>{movie.directors[0]}</span>
+                  </>
+                )}
+              </div>
+
+              {/* Genres */}
+              {movie?.genres && movie.genres.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {movie.genres.slice(0, 4).map((genre, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1 rounded-full text-sm"
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                      }}
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Overview */}
+              {movie?.overview && (
+                <p className="text-base leading-relaxed opacity-60 line-clamp-3 mb-3">
+                  {movie.overview}
+                </p>
+              )}
+            </div>
+
+            {/* Bottom: Countdown + session */}
+            <div className="panorama-info" style={{ animationDelay: '0.8s' }}>
+              {countdown_to && (
+                <div className="mb-3">
+                  <CountdownTimer targetDate={countdown_to} palette={palette} size="xl" showSeconds animate />
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                {session?.name && (
+                  <span className="text-xs uppercase tracking-[0.3em] opacity-30">{session.name}</span>
+                )}
+                {/* Slide indicator */}
+                {bdCount > 1 && (
+                  <div className="flex items-center gap-2">
+                    {allBackdrops.map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-8 h-0.5 rounded-full transition-all duration-500"
+                        style={{
+                          backgroundColor: i === rotatingIndex % bdCount
+                            ? (palette?.vibrant || palette?.accent || '#fff')
+                            : 'rgba(255,255,255,0.15)',
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // MODERN ENRICHED - Modern design with all enriched data, logos, badges
+    if (layoutStyle === 'modern-enriched') {
+      const bdCount = allBackdrops.length;
+      const currentPoster = allPosters.length > 0
+        ? allPosters[posterRotatingIndex % allPosters.length]
+        : movie?.poster_url;
+      const badgeColor = getBadgeColor(config, vote_info, session?.status, palette);
+      const badgeText = resolveDynamicText(
+        config?.badge?.text || 'Prochainement',
+        movie, session, countdown_to, vote_info
+      );
+
+      return (
+        <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+          <style>{animationStyles}{`
+            @keyframes modern-ken-burns {
+              0% { transform: scale(1.02) translate(0, 0); }
+              50% { transform: scale(1.08) translate(-0.5%, -0.3%); }
+              100% { transform: scale(1.02) translate(0, 0); }
+            }
+            @keyframes modern-fade-in {
+              from { opacity: 0; transform: translateY(15px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes gradient-border-spin {
+              0% { --angle: 0deg; }
+              100% { --angle: 360deg; }
+            }
+            @keyframes modern-cast-scroll {
+              0% { transform: translateX(0); }
+              100% { transform: translateX(-50%); }
+            }
+            @keyframes glow-pulse {
+              0%, 100% { box-shadow: 0 0 15px ${badgeColor}60, 0 0 30px ${badgeColor}20; }
+              50% { box-shadow: 0 0 25px ${badgeColor}80, 0 0 50px ${badgeColor}40; }
+            }
+            @keyframes border-flow {
+              0% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+              100% { background-position: 0% 50%; }
+            }
+            .modern-backdrop {
+              animation: modern-ken-burns ${config?.rotate_interval ?? 15}s ease-in-out infinite;
+              transition: opacity 2s ease-in-out;
+            }
+            .modern-fade {
+              animation: modern-fade-in 0.7s ease-out both;
+            }
+            .modern-glass {
+              backdrop-filter: blur(24px) saturate(1.4);
+              -webkit-backdrop-filter: blur(24px) saturate(1.4);
+              background: rgba(0, 0, 0, 0.3);
+              border: 1px solid rgba(255, 255, 255, 0.06);
+            }
+            .modern-badge-gradient-border {
+              position: relative;
+              background: ${palette?.background || '#0a0a0f'};
+              border-radius: 9999px;
+              padding: 2px;
+              animation: glow-pulse 3s ease-in-out infinite;
+            }
+            .modern-badge-gradient-border::before {
+              content: '';
+              position: absolute;
+              inset: 0;
+              border-radius: 9999px;
+              padding: 2px;
+              background: linear-gradient(135deg, ${badgeColor}, ${palette?.accent || '#8b5cf6'}, ${badgeColor});
+              background-size: 200% 200%;
+              animation: border-flow 4s ease-in-out infinite;
+              -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+              -webkit-mask-composite: xor;
+              mask-composite: exclude;
+            }
+            .modern-cast-track {
+              display: flex;
+              gap: 2rem;
+              animation: modern-cast-scroll 35s linear infinite;
+              width: max-content;
+            }
+          `}</style>
+
+          {/* Full bleed backdrops with Ken Burns + crossfade */}
+          {config?.rotate_backdrops && bdCount > 1 ? (
+            allBackdrops.map((url, i) => (
+              <div
+                key={`modern-bd-${i}`}
+                className="absolute inset-0 bg-cover bg-center modern-backdrop"
+                style={{
+                  backgroundImage: `url(${url})`,
+                  opacity: i === rotatingIndex % bdCount ? 1 : 0,
+                }}
+              />
+            ))
+          ) : effectiveBackdrop ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center modern-backdrop"
+              style={{ backgroundImage: `url(${effectiveBackdrop})` }}
+            />
+          ) : null}
+
+          {/* Multi-layer gradient overlay */}
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(135deg, ${palette?.background || '#0a0a0f'}ee 0%, ${palette?.background || '#0a0a0f'}bb 35%, ${palette?.background || '#0a0a0f'}60 60%, ${palette?.background || '#0a0a0f'}90 100%)`,
+          }} />
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to top, ${palette?.background || '#0a0a0f'}dd 0%, transparent 40%, transparent 70%, ${palette?.background || '#0a0a0f'}99 100%)`,
+          }} />
+
+          {/* Badge - top right with gradient border effect */}
+          {badgeText && config?.badge?.show_when !== 'never' && (
+            <div className="absolute top-8 right-10 z-20">
+              <div className="modern-badge-gradient-border">
+                <div
+                  className="px-5 py-2 rounded-full font-semibold text-sm uppercase tracking-wider flex items-center gap-2"
+                  style={{
+                    background: `${palette?.background || '#0a0a0f'}`,
+                    color: badgeColor,
+                  }}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor: badgeColor,
+                      animation: 'blink 1.5s ease-in-out infinite',
+                    }}
+                  />
+                  {badgeText}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main content grid */}
+          <div className="relative z-10 w-full h-full flex">
+
+            {/* LEFT (60%) - Info */}
+            <div className="w-[60%] h-full flex flex-col justify-between p-10">
+
+              {/* Top section */}
+              <div>
+                {/* Logo or Title */}
+                <div className="modern-fade" style={{ animationDelay: '0.2s' }}>
+                  {config?.use_logo_image && effectiveLogo ? (
+                    <img
+                      src={effectiveLogo}
+                      alt={movie?.title || ''}
+                      className="max-w-[420px] max-h-[130px] object-contain mb-4 drop-shadow-2xl"
+                    />
+                  ) : movie ? (
+                    <h1
+                      className="text-5xl font-bold mb-2 tracking-tight"
+                      style={{
+                        color: palette?.text || '#ffffff',
+                        textShadow: '0 4px 30px rgba(0,0,0,0.6)',
+                      }}
+                    >
+                      {movie.title}
+                    </h1>
+                  ) : null}
+                </div>
+
+                {/* Original title */}
+                {movie?.original_title && movie.original_title !== movie?.title && (
+                  <div className="modern-fade text-base opacity-40 italic mb-3" style={{ animationDelay: '0.3s' }}>
+                    {movie.original_title}
+                  </div>
+                )}
+
+                {/* Tagline */}
+                {movie?.tagline && (
+                  <div className="modern-fade text-lg italic opacity-60 mb-5" style={{
+                    animationDelay: '0.35s',
+                    color: palette?.accent || '#a5b4fc',
+                  }}>
+                    "{movie.tagline}"
+                  </div>
+                )}
+
+                {/* Rating row */}
+                <div className="modern-fade flex items-center gap-5 mb-5" style={{ animationDelay: '0.4s' }}>
+                  {movie?.rating && (
+                    <div className="flex items-center gap-2">
+                      {/* Star rating visual */}
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span
+                            key={star}
+                            className="text-lg"
+                            style={{
+                              color: movie.rating! >= star * 2
+                                ? (palette?.accent || '#fbbf24')
+                                : movie.rating! >= star * 2 - 1
+                                  ? (palette?.accent || '#fbbf24')
+                                  : 'rgba(255,255,255,0.15)',
+                              opacity: movie.rating! >= star * 2 ? 1 : movie.rating! >= star * 2 - 1 ? 0.5 : 1,
+                            }}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      <span className="text-xl font-bold ml-1">{movie.rating.toFixed(1)}</span>
+                      {movie.vote_count && (
+                        <span className="text-xs opacity-30">({movie.vote_count.toLocaleString()})</span>
+                      )}
+                    </div>
+                  )}
+                  {movie?.year && (
+                    <div className="px-3 py-1 rounded-md text-sm font-medium" style={{
+                      backgroundColor: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                    }}>
+                      {movie.year}
+                    </div>
+                  )}
+                  {movie?.runtime_minutes && (
+                    <div className="px-3 py-1 rounded-md text-sm" style={{
+                      backgroundColor: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                    }}>
+                      {Math.floor(movie.runtime_minutes / 60)}h{String(movie.runtime_minutes % 60).padStart(2, '0')}
+                    </div>
+                  )}
+                </div>
+
+                {/* Genres pills */}
+                {movie?.genres && movie.genres.length > 0 && (
+                  <div className="modern-fade flex flex-wrap gap-2 mb-5" style={{ animationDelay: '0.5s' }}>
+                    {movie.genres.slice(0, 5).map((genre, i) => (
+                      <span
+                        key={i}
+                        className="px-4 py-1.5 rounded-full text-sm font-medium"
+                        style={{
+                          background: `linear-gradient(135deg, ${palette?.vibrant || '#6366f1'}20, ${palette?.accent || '#8b5cf6'}15)`,
+                          color: palette?.vibrant || '#a5b4fc',
+                          border: `1px solid ${palette?.vibrant || '#6366f1'}30`,
+                        }}
+                      >
+                        {genre}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Director */}
+                {movie?.directors && movie.directors.length > 0 && (
+                  <div className="modern-fade mb-3" style={{ animationDelay: '0.55s' }}>
+                    <span className="text-xs uppercase tracking-wider opacity-40 mr-2">Réalisé par</span>
+                    <span className="text-base font-semibold opacity-85">{movie.directors.join(', ')}</span>
+                  </div>
+                )}
+
+                {/* Studios */}
+                {config?.show_studios && movie?.studios && movie.studios.length > 0 && (
+                  <div className="modern-fade text-sm opacity-35 mb-4" style={{ animationDelay: '0.6s' }}>
+                    {movie.studios.join(' · ')}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom: Countdown */}
+              <div>
+                {countdown_to && (
+                  <div className="modern-fade mb-4" style={{ animationDelay: '0.9s' }}>
+                    <CountdownTimer targetDate={countdown_to} palette={palette} size="xl" showSeconds animate />
+                  </div>
+                )}
+                {session?.name && (
+                  <div className="modern-fade text-xs uppercase tracking-[0.3em] opacity-30" style={{ animationDelay: '1s' }}>
+                    {session.name}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT (40%) - Glass panel with synopsis, cast, poster */}
+            <div className="w-[40%] h-full flex flex-col p-10 pl-0">
+              <div className="modern-glass rounded-2xl flex-1 flex flex-col p-8 overflow-hidden modern-fade" style={{ animationDelay: '0.5s' }}>
+
+                {/* Synopsis */}
+                {config?.show_overview && movie?.overview && (
+                  <div className="mb-5 flex-shrink-0">
+                    <div className="text-xs uppercase tracking-wider opacity-35 mb-3" style={{ color: palette?.accent || '#a5b4fc' }}>
+                      Synopsis
+                    </div>
+                    <p className="text-sm leading-relaxed opacity-75 line-clamp-5">
+                      {movie.overview}
+                    </p>
+                  </div>
+                )}
+
+                {/* Separator */}
+                <div className="h-px my-3 flex-shrink-0" style={{
+                  background: `linear-gradient(to right, transparent, ${palette?.vibrant || '#ffffff'}20, transparent)`,
+                }} />
+
+                {/* Cast */}
+                {movie?.cast && movie.cast.length > 0 && (
+                  <div className="mb-5 flex-shrink-0">
+                    <div className="text-xs uppercase tracking-wider opacity-35 mb-3" style={{ color: palette?.accent || '#a5b4fc' }}>
+                      Casting
+                    </div>
+                    <div className="overflow-hidden">
+                      {config?.cast_scroll && movie.cast.length > 4 ? (
+                        <div className="modern-cast-track">
+                          {[...movie.cast, ...movie.cast].map((name, i) => (
+                            <span key={i} className="text-sm opacity-65 whitespace-nowrap">{name}</span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                          {movie.cast.slice(0, 8).map((name, i) => (
+                            <span key={i} className="text-sm opacity-65">{name}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Keywords */}
+                {movie?.keywords && movie.keywords.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-4 flex-shrink-0">
+                    {movie.keywords.slice(0, 5).map((kw, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded text-xs opacity-35"
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                        }}
+                      >
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Spacer */}
+                <div className="flex-1" />
+
+                {/* Bottom: poster + enrichment sources */}
+                <div className="flex items-end justify-between mt-4">
+                  {currentPoster && (
+                    <img
+                      src={currentPoster}
+                      alt={movie?.title || ''}
+                      className="w-20 h-28 object-cover rounded-lg shadow-xl"
+                      style={{
+                        boxShadow: `0 12px 35px -8px ${palette?.primary || '#000'}80`,
+                        transition: 'opacity 1s ease',
+                      }}
+                    />
+                  )}
+
+                  {/* Enrichment source badges */}
+                  {config?.show_enrichment_sources && movie?.enrichment_sources && movie.enrichment_sources.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      {movie.enrichment_sources.includes('tmdb') && (
+                        <span
+                          className="text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-medium"
+                          style={{
+                            background: `linear-gradient(135deg, #01d277 0%, #01b4e4 100%)`,
+                            color: '#fff',
+                            opacity: 0.6,
+                          }}
+                        >
+                          TMDB
+                        </span>
+                      )}
+                      {movie.enrichment_sources.includes('fanart') && (
+                        <span
+                          className="text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-medium"
+                          style={{
+                            background: `linear-gradient(135deg, #1da1f2 0%, #0d95e8 100%)`,
+                            color: '#fff',
+                            opacity: 0.6,
+                          }}
+                        >
+                          Fanart
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // DEBUG TMDB - Simple template showing all TMDB data explicitly
+    if (layoutStyle === 'debug-tmdb') {
+      const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
+        <div className="flex gap-3 py-1.5 border-b border-white/10">
+          <span className="text-yellow-400 font-mono text-sm w-44 flex-shrink-0 text-right">{label}</span>
+          <span className="text-white/90 text-sm">{value || <span className="text-red-400/60 italic">vide</span>}</span>
+        </div>
+      );
+
+      return (
+        <div className="w-full h-full overflow-auto p-8" style={{ backgroundColor: '#0c0c14', color: '#e0e0e0', fontFamily: 'monospace' }}>
+          <div className="max-w-5xl mx-auto">
+            <h1 className="text-2xl font-bold text-yellow-400 mb-1">Debug TMDB Data</h1>
+            <p className="text-xs text-white/30 mb-6">Template de verification des donnees enrichies</p>
+
+            <div className="grid grid-cols-2 gap-8">
+              {/* Left: text fields */}
+              <div>
+                <h2 className="text-lg font-bold text-cyan-400 mb-3 border-b border-cyan-400/30 pb-1">Infos de base</h2>
+                <Field label="Titre" value={movie?.title} />
+                <Field label="Titre original" value={movie?.original_title} />
+                <Field label="Annee" value={movie?.year} />
+                <Field label="Duree" value={movie?.runtime_minutes ? `${movie.runtime_minutes} min (${Math.floor(movie.runtime_minutes / 60)}h${String(movie.runtime_minutes % 60).padStart(2, '0')})` : undefined} />
+                <Field label="Tagline" value={movie?.tagline} />
+                <Field label="Note TMDB" value={movie?.rating ? `${movie.rating.toFixed(1)}/10` : undefined} />
+                <Field label="Nombre de votes" value={movie?.vote_count?.toLocaleString()} />
+                <Field label="Synopsis" value={movie?.overview ? <span className="line-clamp-3">{movie.overview}</span> : undefined} />
+
+                <h2 className="text-lg font-bold text-cyan-400 mt-6 mb-3 border-b border-cyan-400/30 pb-1">Listes</h2>
+                <Field label="Genres" value={movie?.genres?.length ? movie.genres.join(', ') : undefined} />
+                <Field label="Realisateurs" value={movie?.directors?.length ? movie.directors.join(', ') : undefined} />
+                <Field label="Casting" value={movie?.cast?.length ? `${movie.cast.length} acteurs: ${movie.cast.join(', ')}` : undefined} />
+                <Field label="Studios" value={movie?.studios?.length ? movie.studios.join(', ') : undefined} />
+                <Field label="Mots-cles" value={movie?.keywords?.length ? movie.keywords.join(', ') : undefined} />
+
+                <h2 className="text-lg font-bold text-cyan-400 mt-6 mb-3 border-b border-cyan-400/30 pb-1">Enrichissement</h2>
+                <Field label="Sources" value={movie?.enrichment_sources?.length ? movie.enrichment_sources.join(', ') : undefined} />
+              </div>
+
+              {/* Right: images */}
+              <div>
+                <h2 className="text-lg font-bold text-green-400 mb-3 border-b border-green-400/30 pb-1">Images</h2>
+
+                <div className="mb-4">
+                  <div className="text-xs text-yellow-400 mb-1">Poster principal</div>
+                  {movie?.poster_url ? (
+                    <img src={movie.poster_url} alt="poster" className="w-32 h-48 object-cover rounded border border-white/20" />
+                  ) : <span className="text-red-400/60 text-sm italic">aucun</span>}
+                </div>
+
+                <div className="mb-4">
+                  <div className="text-xs text-yellow-400 mb-1">Backdrop principal</div>
+                  {movie?.backdrop_url ? (
+                    <img src={movie.backdrop_url} alt="backdrop" className="w-64 h-36 object-cover rounded border border-white/20" />
+                  ) : <span className="text-red-400/60 text-sm italic">aucun</span>}
+                </div>
+
+                <div className="mb-4">
+                  <div className="text-xs text-yellow-400 mb-1">Logos ({movie?.logos?.length || 0})</div>
+                  {movie?.logos && movie.logos.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {movie.logos.slice(0, 3).map((url, i) => (
+                        <img key={i} src={url} alt={`logo-${i}`} className="h-12 object-contain bg-white/10 rounded p-1" />
+                      ))}
+                    </div>
+                  ) : <span className="text-red-400/60 text-sm italic">aucun</span>}
+                </div>
+
+                <div className="mb-4">
+                  <div className="text-xs text-yellow-400 mb-1">Extra backdrops ({movie?.extra_backdrops?.length || 0})</div>
+                  {movie?.extra_backdrops && movie.extra_backdrops.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {movie.extra_backdrops.slice(0, 4).map((url, i) => (
+                        <img key={i} src={url} alt={`bd-${i}`} className="w-28 h-16 object-cover rounded border border-white/10" />
+                      ))}
+                      {movie.extra_backdrops.length > 4 && <span className="text-xs text-white/40 self-end">+{movie.extra_backdrops.length - 4}</span>}
+                    </div>
+                  ) : <span className="text-red-400/60 text-sm italic">aucun</span>}
+                </div>
+
+                <div className="mb-4">
+                  <div className="text-xs text-yellow-400 mb-1">Extra posters ({movie?.extra_posters?.length || 0})</div>
+                  {movie?.extra_posters && movie.extra_posters.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {movie.extra_posters.slice(0, 4).map((url, i) => (
+                        <img key={i} src={url} alt={`poster-${i}`} className="w-16 h-24 object-cover rounded border border-white/10" />
+                      ))}
+                      {movie.extra_posters.length > 4 && <span className="text-xs text-white/40 self-end">+{movie.extra_posters.length - 4}</span>}
+                    </div>
+                  ) : <span className="text-red-400/60 text-sm italic">aucun</span>}
+                </div>
+
+                <h2 className="text-lg font-bold text-green-400 mt-4 mb-3 border-b border-green-400/30 pb-1">Session</h2>
+                <Field label="Nom" value={session?.name} />
+                <Field label="Countdown" value={countdown_to} />
+
+                {palette && (
+                  <>
+                    <h2 className="text-lg font-bold text-purple-400 mt-4 mb-3 border-b border-purple-400/30 pb-1">Palette</h2>
+                    <div className="flex gap-2 flex-wrap">
+                      {Object.entries(palette).filter(([k]) => k !== 'css_vars').map(([key, val]) => (
+                        <div key={key} className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded border border-white/20" style={{ backgroundColor: val as string }} />
+                          <span className="text-xs text-white/60">{key}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       );
     }

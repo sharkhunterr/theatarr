@@ -109,7 +109,12 @@ async def get_wallmount_state(
                     "rating": movie.rating,
                     "genres": movie.genres,
                     "directors": movie.directors,
-                    "cast": movie.cast[:5] if movie.cast else [],
+                    "cast": movie.cast[:10] if movie.cast else [],
+                    "studios": movie.studios or [],
+                    "original_title": movie.original_title,
+                    "enrichment_sources": movie.enrichment_sources or [],
+                    "keywords": movie.keywords or [],
+                    "vote_count": movie.vote_count,
                 }
 
                 # Get palette
@@ -282,10 +287,18 @@ async def get_wallmount_state(
                             "tagline": movie.tagline,
                             "poster_url": movie.poster_url,
                             "backdrop_url": movie.backdrop_url,
+                            "extra_backdrops": movie.extra_backdrops or [],
+                            "extra_posters": movie.extra_posters or [],
+                            "logos": movie.logos or [],
                             "rating": movie.rating,
                             "genres": movie.genres,
                             "directors": movie.directors,
-                            "cast": movie.cast[:5] if movie.cast else [],
+                            "cast": movie.cast[:10] if movie.cast else [],
+                            "studios": movie.studios or [],
+                            "original_title": movie.original_title,
+                            "enrichment_sources": movie.enrichment_sources or [],
+                            "keywords": movie.keywords or [],
+                            "vote_count": movie.vote_count,
                         }
 
                         # Get palette
@@ -431,7 +444,12 @@ async def get_wallmount_state(
                 "rating": movie.rating,
                 "genres": movie.genres,
                 "directors": movie.directors,
-                "cast": movie.cast[:5] if movie.cast else [],
+                "cast": movie.cast[:10] if movie.cast else [],
+                "studios": movie.studios or [],
+                "original_title": movie.original_title,
+                "enrichment_sources": movie.enrichment_sources or [],
+                "keywords": movie.keywords or [],
+                "vote_count": movie.vote_count,
             }
 
             # Get or create palette

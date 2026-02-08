@@ -168,3 +168,14 @@ def discover_adapters() -> None:
         from theatarr.adapters.players import chromecast  # noqa: F401
     except ImportError:
         pass
+
+    # Metadata adapters
+    try:
+        from theatarr.adapters.metadata import tmdb  # noqa: F401
+    except ImportError:
+        pass
+
+    try:
+        from theatarr.adapters.metadata import fanart  # noqa: F401
+    except ImportError:
+        pass

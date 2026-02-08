@@ -1,5 +1,6 @@
 """Movies API router for Theatarr."""
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,6 +15,14 @@ from theatarr.models.service import ServiceCategory
 from theatarr.schemas.base import PaginatedResponse
 from theatarr.adapters.registry import get_adapter
 from theatarr.adapters.base import Command
+from theatarr.services.movie_enrichment import (
+    enrich_from_tmdb,
+    enrich_from_fanart,
+    get_enrichment_status as _get_enrichment_status,
+    EnrichmentError,
+)
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/movies", tags=["movies"])
@@ -39,6 +48,7 @@ class MovieSchema(BaseModel):
     source: str  # plex, jellyfin, tmdb, local
     source_id: str | None
     has_trailer: bool
+    enrichment_sources: list[str] | None = None
 
 
 class MovieSearchResult(BaseModel):
@@ -125,7 +135,7 @@ async def list_movies(
             genres=m.genres,
             source="local",
             source_id=m.tmdb_id,
-            has_trailer=bool(m.trailer_url),
+            has_trailer=False,
         )
         for m in movies
     ]
@@ -379,6 +389,77 @@ async def get_movie_details_from_source(
         raise HTTPException(status_code=500, detail=f"Failed to fetch movie details: {str(e)}")
 
 
+class EnrichmentStatusResponse(BaseModel):
+    """Response for enrichment service status."""
+    tmdb: dict
+    fanart: dict
+
+
+class EnrichmentResultResponse(BaseModel):
+    """Response for enrichment result."""
+    success: bool
+    movie_id: str
+    sources_enriched: list[str]
+    enrichment_sources: list[str]
+    message: str | None = None
+
+
+@router.get("/enrichment-status")
+async def enrichment_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> EnrichmentStatusResponse:
+    """Check which metadata enrichment services are available."""
+    status = await _get_enrichment_status(db)
+    return EnrichmentStatusResponse(**status)
+
+
+@router.post("/{movie_id}/enrich")
+async def enrich_movie(
+    movie_id: str,
+    sources: str = Query("tmdb,fanart", description="Comma-separated list of sources: tmdb,fanart"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> EnrichmentResultResponse:
+    """Enrich a movie with metadata from TMDB and/or Fanart.tv."""
+    result = await db.execute(select(Movie).where(Movie.id == movie_id))
+    movie = result.scalar_one_or_none()
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+
+    source_list = [s.strip() for s in sources.split(",") if s.strip()]
+    enriched: list[str] = []
+    errors: list[str] = []
+
+    for source in source_list:
+        try:
+            if source == "tmdb":
+                await enrich_from_tmdb(db, movie_id)
+                enriched.append("tmdb")
+            elif source == "fanart":
+                await enrich_from_fanart(db, movie_id)
+                enriched.append("fanart")
+            else:
+                errors.append(f"Unknown source: {source}")
+        except EnrichmentError as e:
+            logger.warning(f"Enrichment error ({source}): {e}")
+            errors.append(f"{source}: {str(e)}")
+
+    await db.refresh(movie)
+
+    message = None
+    if errors:
+        message = "; ".join(errors)
+
+    return EnrichmentResultResponse(
+        success=len(enriched) > 0,
+        movie_id=movie_id,
+        sources_enriched=enriched,
+        enrichment_sources=movie.enrichment_sources or [],
+        message=message,
+    )
+
+
 @router.get("/{movie_id}")
 async def get_movie(
     movie_id: str,
@@ -404,7 +485,8 @@ async def get_movie(
         genres=movie.genres,
         source="local",
         source_id=movie.tmdb_id,
-        has_trailer=bool(movie.trailer_url),
+        has_trailer=False,
+        enrichment_sources=movie.enrichment_sources or [],
     )
 
 

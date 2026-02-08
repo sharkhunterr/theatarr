@@ -53,10 +53,14 @@ class Movie(UUIDMixin, TimestampMixin, Base):
     directors: Mapped[list | None] = mapped_column(JSON, default=list)
     cast: Mapped[list | None] = mapped_column(JSON, default=list)
     studios: Mapped[list | None] = mapped_column(JSON, default=list)
+    keywords: Mapped[list | None] = mapped_column(JSON, default=list)
 
     # Source tracking
     source: Mapped[str | None] = mapped_column(String(50))  # plex, jellyfin, tmdb
     source_updated_at: Mapped[str | None] = mapped_column(String(50))
+
+    # Enrichment tracking
+    enrichment_sources: Mapped[list | None] = mapped_column(JSON, default=list)
 
     def __repr__(self) -> str:
         return f"<Movie(id={self.id}, title='{self.title}', year={self.year})>"
