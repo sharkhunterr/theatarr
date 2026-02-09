@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Zap, Eye, EyeOff, UserCheck, Lock, Users, Vote } from 'lucide-react';
+import { Zap, Eye, EyeOff, UserCheck, Lock, Users, Vote, Clock, Calendar } from 'lucide-react';
 import clsx from 'clsx';
 import { Button, Input } from '../common';
 import { MovieSelector, MovieOption } from './MovieSelector';
@@ -16,7 +16,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
   const [description, setDescription] = useState('');
   const [movieOptions, setMovieOptions] = useState<MovieOption[]>([]);
   const [maxVotesPerUser, setMaxVotesPerUser] = useState(1);
-  const [allowMultipleVotes, setAllowMultipleVotes] = useState(false);
+  const [allowMultipleVotes] = useState(false);
   const [showResultsDuringVoting, setShowResultsDuringVoting] = useState(false);
   const [anonymousVoting, setAnonymousVoting] = useState(true);
   const [requireToken, setRequireToken] = useState(true);
@@ -126,10 +126,10 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
 
       {/* Voting Options */}
       <div className="border-t border-dark-border pt-6">
-        <h3 className="text-lg font-semibold text-dark-text mb-4">Options de vote</h3>
+        <h3 className="text-lg font-semibold text-dark-text mb-4">Parametres</h3>
 
         {/* Options grid */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="grid grid-cols-2 gap-2">
           {/* Open Immediately */}
           <button
             type="button"
@@ -155,33 +155,6 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
             </div>
             <div className="text-xs font-medium text-dark-text">Ouvrir immediatement</div>
             <div className="text-[10px] text-dark-muted">Le vote demarre des la creation</div>
-          </button>
-
-          {/* Close when all voted */}
-          <button
-            type="button"
-            onClick={() => setCloseWhenAllVoted(!closeWhenAllVoted)}
-            className={clsx(
-              'p-3 rounded-lg border text-left transition-all',
-              closeWhenAllVoted
-                ? 'bg-blue-500/10 border-blue-500/50'
-                : 'bg-dark-bg border-dark-border hover:border-dark-muted'
-            )}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <Users size={16} className={closeWhenAllVoted ? 'text-blue-400' : 'text-dark-muted'} />
-              <div className={clsx(
-                'w-8 h-4 rounded-full transition-colors relative',
-                closeWhenAllVoted ? 'bg-blue-500' : 'bg-dark-border'
-              )}>
-                <div className={clsx(
-                  'absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform',
-                  closeWhenAllVoted ? 'left-4' : 'left-0.5'
-                )} />
-              </div>
-            </div>
-            <div className="text-xs font-medium text-dark-text">Cloture automatique</div>
-            <div className="text-[10px] text-dark-muted">Fermer quand tous ont vote</div>
           </button>
 
           {/* Show Results */}
@@ -286,17 +259,54 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
             <div className="text-[10px] text-dark-muted">Par participant</div>
           </div>
         </div>
+      </div>
 
-        {/* Closing date */}
-        <div className="p-3 bg-dark-surface rounded-lg">
-          <label className="block text-sm font-medium text-dark-text mb-2">
-            Date de fermeture (optionnel)
+      {/* Cloture */}
+      <div className="border-t border-dark-border pt-6">
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-dark-text mb-4">
+          <Clock size={16} />
+          Cloture
+        </h3>
+
+        {/* Close when all voted */}
+        <button
+          type="button"
+          onClick={() => setCloseWhenAllVoted(!closeWhenAllVoted)}
+          className={clsx(
+            'w-full p-3 rounded-lg border text-left transition-all flex items-center gap-3 mb-3',
+            closeWhenAllVoted
+              ? 'bg-blue-500/10 border-blue-500/50'
+              : 'bg-dark-bg border-dark-border hover:border-dark-muted'
+          )}
+        >
+          <Users size={16} className={closeWhenAllVoted ? 'text-blue-400 flex-shrink-0' : 'text-dark-muted flex-shrink-0'} />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium text-dark-text">Cloture automatique</div>
+            <div className="text-[10px] text-dark-muted">Fermer quand tous ont vote</div>
+          </div>
+          <div className={clsx(
+            'w-8 h-4 rounded-full transition-colors relative flex-shrink-0',
+            closeWhenAllVoted ? 'bg-blue-500' : 'bg-dark-border'
+          )}>
+            <div className={clsx(
+              'absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform',
+              closeWhenAllVoted ? 'left-4' : 'left-0.5'
+            )} />
+          </div>
+        </button>
+
+        {/* Scheduled close */}
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-xs text-dark-muted">
+            <Calendar size={12} />
+            Cloture programmee
           </label>
           <Input
             type="datetime-local"
             value={closesAt}
             onChange={(e) => setClosesAt(e.target.value)}
           />
+          <p className="text-[10px] text-dark-muted">Cloturer le vote a cette date/heure</p>
         </div>
       </div>
 

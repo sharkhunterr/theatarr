@@ -79,6 +79,39 @@ interface VoteSessionConfig {
   close_when_all_voted?: boolean;
 }
 
+interface LinkedVoteSession {
+  id: string;
+  name: string;
+  description?: string | null;
+  status: string;
+  total_votes: number;
+  is_open: boolean;
+  movie_options?: Array<{
+    title: string;
+    year?: number;
+    poster_url?: string;
+    backdrop_url?: string;
+    overview?: string;
+    rating?: number;
+    runtime_minutes?: number;
+    genres?: string[];
+    directors?: string[];
+    cast?: string[];
+    movie_id?: string;
+    source?: string;
+    source_id?: string;
+    vote_count?: number;
+  }>;
+  max_votes_per_user: number;
+  allow_multiple_votes: boolean;
+  require_token: boolean;
+  show_results_during_voting: boolean;
+  anonymous_voting: boolean;
+  close_when_all_voted: boolean;
+  opens_at?: string | null;
+  closes_at?: string | null;
+}
+
 interface Session {
   id: string;
   name: string;
@@ -95,6 +128,8 @@ interface Session {
   // Movie selection mode fields
   movie_selection_mode?: MovieSelectionMode;
   linked_vote_session_id?: string | null;
+  linked_vote_session?: LinkedVoteSession | null;
+  vote_reveal_at?: string | null;
   mystery_reveal_at?: string | null;
   mystery_config?: MysteryConfig | null;
   // Template override
@@ -428,6 +463,25 @@ export function SessionEditor() {
       }
       setSession(data);
 
+      // Load vote config from linked vote session (for vote mode editing)
+      if (data.linked_vote_session) {
+        const vs = data.linked_vote_session;
+        setVoteConfig({
+          name: vs.name,
+          description: vs.description || undefined,
+          movie_options: vs.movie_options || [],
+          max_votes_per_user: vs.max_votes_per_user,
+          allow_multiple_votes: vs.allow_multiple_votes,
+          require_token: vs.require_token,
+          show_results_during_voting: vs.show_results_during_voting,
+          anonymous_voting: vs.anonymous_voting,
+          open_immediately: vs.is_open || vs.status === 'open',
+          close_when_all_voted: vs.close_when_all_voted,
+          opens_at: vs.opens_at || undefined,
+          closes_at: vs.closes_at || undefined,
+        });
+      }
+
       // Load mystery config from session (for mystery mode editing)
       if (data.mystery_config) {
         setMysteryConfig(data.mystery_config);
@@ -562,9 +616,12 @@ export function SessionEditor() {
         payload.movie_source = session.movie_source || null;
         payload.color_palette = session.color_palette || null;
       } else if (mode === 'vote') {
+        payload.vote_reveal_at = session.vote_reveal_at || null;
         if (session.linked_vote_session_id) {
           payload.linked_vote_session_id = session.linked_vote_session_id;
-        } else if (voteConfig.movie_options.length >= 2) {
+        }
+        // Always send vote_session_config to create or update the vote session
+        if (voteConfig.movie_options.length >= 2) {
           payload.vote_session_config = {
             name: voteConfig.name || session.name,
             movie_options: voteConfig.movie_options,
@@ -575,6 +632,7 @@ export function SessionEditor() {
             anonymous_voting: voteConfig.anonymous_voting,
             open_immediately: voteConfig.open_immediately,
             close_when_all_voted: voteConfig.close_when_all_voted,
+            closes_at: voteConfig.closes_at || undefined,
           };
         }
       } else if (mode === 'mystery') {
@@ -1064,6 +1122,8 @@ export function SessionEditor() {
                   onChange={setVoteConfig}
                   linkedVoteSessionId={session.linked_vote_session_id || undefined}
                   onLinkVoteSession={(id) => setSession({ ...session, linked_vote_session_id: id })}
+                  revealAt={session.vote_reveal_at || undefined}
+                  onRevealAtChange={(revealAt) => setSession({ ...session, vote_reveal_at: revealAt })}
                 />
               </div>
             )}

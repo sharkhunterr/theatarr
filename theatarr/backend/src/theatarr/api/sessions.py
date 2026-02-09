@@ -1,6 +1,6 @@
 """Sessions API router for Theatarr."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select, Integer, case
@@ -46,6 +46,15 @@ from theatarr.services.movie_resolution import (
 from theatarr.services.movie_sync import ensure_movie_synced
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
+
+
+def _parse_dt(value: str | datetime | None) -> datetime | None:
+    """Parse an ISO date string to datetime, or return as-is if already datetime."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def _session_to_response(
@@ -103,6 +112,7 @@ def _session_to_response(
         movie_resolved=session.movie_resolved,
         movie_resolved_at=session.movie_resolved_at,
         linked_vote_session_id=session.linked_vote_session_id,
+        vote_reveal_at=session.vote_reveal_at,
         mystery_reveal_at=session.mystery_reveal_at,
         mystery_config=mystery_config,
         # Template override
@@ -133,11 +143,20 @@ def _vote_session_to_summary(vs: VoteSession, include_vote_counts: bool = True) 
     return VoteSessionSummary(
         id=vs.id,
         name=vs.name,
+        description=vs.description,
         status=vs.status.value if isinstance(vs.status, VoteSessionStatus) else vs.status,
         total_votes=vs.total_votes,
         is_open=vs.is_open,
         winning_movie_index=vs.winning_movie_index,
         movie_options=movie_options,
+        max_votes_per_user=vs.max_votes_per_user,
+        allow_multiple_votes=vs.allow_multiple_votes,
+        require_token=vs.require_token,
+        show_results_during_voting=vs.show_results_during_voting,
+        anonymous_voting=vs.anonymous_voting,
+        close_when_all_voted=vs.close_when_all_voted,
+        opens_at=vs.opens_at,
+        closes_at=vs.closes_at,
     )
 
 
@@ -280,6 +299,7 @@ async def create_session(
         status=SessionStatus.SCHEDULED if data.scheduled_at else SessionStatus.DRAFT,
         # Movie selection mode fields
         movie_selection_mode=data.movie_selection_mode.value,
+        vote_reveal_at=data.vote_reveal_at,
         mystery_reveal_at=data.mystery_reveal_at,
         mystery_config=mystery_config_dict,
         # FIXED mode starts as resolved
@@ -323,8 +343,8 @@ async def create_session(
                 show_results_during_voting=vote_config.get("show_results_during_voting", False),
                 anonymous_voting=vote_config.get("anonymous_voting", True),
                 close_when_all_voted=vote_config.get("close_when_all_voted", False),
-                opens_at=vote_config.get("opens_at"),
-                closes_at=vote_config.get("closes_at"),
+                opens_at=_parse_dt(vote_config.get("opens_at")),
+                closes_at=_parse_dt(vote_config.get("closes_at")),
                 linked_session_id=session.id,
                 created_by=user.id,
             )
@@ -448,6 +468,7 @@ async def get_session(
         movie_resolved_at=session.movie_resolved_at,
         linked_vote_session_id=session.linked_vote_session_id,
         linked_vote_session=linked_vote_session,
+        vote_reveal_at=session.vote_reveal_at,
         mystery_reveal_at=session.mystery_reveal_at,
         mystery_config=mystery_config,
         # Template override
@@ -494,8 +515,23 @@ async def update_session(
         if synced_movie_id:
             session.movie_id = synced_movie_id
 
-    # Update basic fields (exclude sequences)
-    update_data = data.model_dump(exclude_unset=True, exclude={"sequences"})
+    # Extract non-model fields before the generic setattr loop
+    update_data = data.model_dump(
+        exclude_unset=True,
+        exclude={"sequences", "vote_session_config"},
+    )
+
+    # Convert enum to string value for DB storage
+    if "movie_selection_mode" in update_data and update_data["movie_selection_mode"] is not None:
+        mode = update_data["movie_selection_mode"]
+        update_data["movie_selection_mode"] = mode.value if hasattr(mode, "value") else mode
+
+    # Convert MysteryConfig Pydantic model to dict for JSON column
+    if "mystery_config" in update_data and update_data["mystery_config"] is not None:
+        mc = update_data["mystery_config"]
+        if hasattr(mc, "model_dump"):
+            update_data["mystery_config"] = mc.model_dump()
+
     for field, value in update_data.items():
         setattr(session, field, value)
 
@@ -508,6 +544,67 @@ async def update_session(
         flag_modified(session, "enrichment_options")
     if "mystery_config" in update_data:
         flag_modified(session, "mystery_config")
+
+    # Handle VOTE mode: create/update inline vote session
+    if data.vote_session_config is not None:
+        vote_config = data.vote_session_config
+        if session.linked_vote_session_id:
+            # Update existing vote session
+            vs_result = await db.execute(
+                select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
+            )
+            vote_session = vs_result.scalar_one_or_none()
+            if vote_session:
+                if "name" in vote_config:
+                    vote_session.name = vote_config["name"]
+                if "description" in vote_config:
+                    vote_session.description = vote_config["description"]
+                if "movie_options" in vote_config:
+                    vote_session.movie_options = vote_config["movie_options"]
+                    flag_modified(vote_session, "movie_options")
+                if "max_votes_per_user" in vote_config:
+                    vote_session.max_votes_per_user = vote_config["max_votes_per_user"]
+                if "allow_multiple_votes" in vote_config:
+                    vote_session.allow_multiple_votes = vote_config["allow_multiple_votes"]
+                if "require_token" in vote_config:
+                    vote_session.require_token = vote_config["require_token"]
+                if "show_results_during_voting" in vote_config:
+                    vote_session.show_results_during_voting = vote_config["show_results_during_voting"]
+                if "anonymous_voting" in vote_config:
+                    vote_session.anonymous_voting = vote_config["anonymous_voting"]
+                if "close_when_all_voted" in vote_config:
+                    vote_session.close_when_all_voted = vote_config["close_when_all_voted"]
+                if "opens_at" in vote_config:
+                    vote_session.opens_at = _parse_dt(vote_config["opens_at"])
+                if "closes_at" in vote_config:
+                    vote_session.closes_at = _parse_dt(vote_config["closes_at"])
+                if vote_config.get("open_immediately") and vote_session.status == VoteSessionStatus.DRAFT.value:
+                    vote_session.status = VoteSessionStatus.OPEN
+        else:
+            # Create new inline vote session
+            vote_name = vote_config.get("name") or session.name
+            open_immediately = vote_config.get("open_immediately", False)
+            initial_status = VoteSessionStatus.OPEN if open_immediately else VoteSessionStatus.DRAFT
+
+            vote_session = VoteSession(
+                name=vote_name,
+                description=vote_config.get("description"),
+                status=initial_status,
+                movie_options=vote_config.get("movie_options", []),
+                max_votes_per_user=vote_config.get("max_votes_per_user", 1),
+                allow_multiple_votes=vote_config.get("allow_multiple_votes", False),
+                require_token=vote_config.get("require_token", True),
+                show_results_during_voting=vote_config.get("show_results_during_voting", False),
+                anonymous_voting=vote_config.get("anonymous_voting", True),
+                close_when_all_voted=vote_config.get("close_when_all_voted", False),
+                opens_at=_parse_dt(vote_config.get("opens_at")),
+                closes_at=_parse_dt(vote_config.get("closes_at")),
+                linked_session_id=session.id,
+                created_by=user.id,
+            )
+            db.add(vote_session)
+            await db.flush()
+            session.linked_vote_session_id = vote_session.id
 
     # Handle sequences update
     if data.sequences is not None:

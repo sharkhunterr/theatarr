@@ -3,13 +3,16 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote, Shuffle, Sparkles, Eye } from 'lucide-react';
+import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote, Shuffle, Sparkles, Eye, Trophy } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../../api/client';
-import { getMysteryRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
+import { getMysteryRevealCountdown, getVoteRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
 import { useCountdown } from '../../hooks/useCountdown';
+import { useSetting } from '../../hooks/useSettings';
 import { MysteryPoster } from '../../components/common/MysteryPoster';
+import { VotePoster } from '../../components/common/VotePoster';
+import { VotePosterCollage } from '../../components/common/VotePosterCollage';
 
 interface SessionDetail {
   id: string;
@@ -28,12 +31,15 @@ interface SessionDetail {
   movie_selection_mode: string | null;
   movie_resolved: boolean;
   mystery_reveal_at: string | null;
+  vote_reveal_at: string | null;
   linked_vote_session_id: string | null;
   linked_vote_is_open: boolean | null;
+  vote_movie_posters: string[] | null;
 }
 
 export function SessionDetail() {
   useCountdown();
+  const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -116,6 +122,8 @@ export function SessionDetail() {
   const bgColor = session.color_palette?.dominant || '#1a1a1a';
   const isMysteryHidden = session.movie_selection_mode === 'mystery' && !session.movie_resolved;
   const isMysteryRevealed = session.movie_selection_mode === 'mystery' && session.movie_resolved;
+  const isVoteHidden = session.movie_selection_mode === 'vote' && !session.movie_resolved;
+  const isVoteRevealed = session.movie_selection_mode === 'vote' && session.movie_resolved;
 
   return (
     <div className="space-y-4">
@@ -131,10 +139,12 @@ export function SessionDetail() {
       {/* Hero */}
       <div
         className="relative rounded-xl overflow-hidden"
-        style={{ backgroundColor: isMysteryHidden ? '#1a0a2e' : bgColor }}
+        style={{ backgroundColor: isMysteryHidden ? '#1a0a2e' : isVoteHidden ? '#0a1628' : bgColor }}
       >
         {isMysteryHidden ? (
           <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-transparent to-purple-900/20" />
+        ) : isVoteHidden ? (
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-900/30 via-transparent to-blue-900/20" />
         ) : session.movie_poster_url && (
           <div className="absolute inset-0">
             <img
@@ -147,9 +157,15 @@ export function SessionDetail() {
         )}
 
         <div className="relative p-4 flex gap-4">
-          {/* Poster / Mystery poster */}
+          {/* Poster / Mystery poster / Vote poster */}
           {isMysteryHidden ? (
             <MysteryPoster className="w-24 h-36 flex-shrink-0 rounded-lg shadow-lg" />
+          ) : isVoteHidden ? (
+            posterDisplay === 'posters' && session.vote_movie_posters?.length ? (
+              <VotePosterCollage posters={session.vote_movie_posters} className="w-24 h-36 flex-shrink-0 rounded-lg shadow-lg" />
+            ) : (
+              <VotePoster className="w-24 h-36 flex-shrink-0 rounded-lg shadow-lg" />
+            )
           ) : (
             <div className="w-24 h-36 flex-shrink-0 rounded-lg overflow-hidden bg-dark-border shadow-lg">
               {session.movie_poster_url ? (
@@ -211,9 +227,35 @@ export function SessionDetail() {
                   );
                 })()}
               </div>
+            ) : isVoteHidden ? (
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <Vote size={14} className="text-blue-400" />
+                  <span className="text-blue-300 font-medium">
+                    {session.linked_vote_is_open === false ? 'Vote clos' : 'En attente du vote'}
+                  </span>
+                </div>
+                {session.vote_reveal_at && (() => {
+                  const reveal = getVoteRevealCountdown(session.vote_reveal_at);
+                  return (
+                    <span
+                      className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', reveal.pulse && 'animate-pulse')}
+                      style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
+                    >
+                      <Eye size={10} />
+                      {reveal.text}
+                    </span>
+                  );
+                })()}
+              </div>
             ) : isMysteryRevealed ? (
               <div className="flex items-center gap-1.5 mt-1">
                 <Sparkles size={14} className="text-purple-400" />
+                <p className="text-white/80">{session.movie_title}</p>
+              </div>
+            ) : isVoteRevealed ? (
+              <div className="flex items-center gap-1.5 mt-1">
+                <Trophy size={14} className="text-yellow-500" />
                 <p className="text-white/80">{session.movie_title}</p>
               </div>
             ) : session.movie_title ? (

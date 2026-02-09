@@ -137,6 +137,10 @@ class Session(UUIDMixin, TimestampMixin, Base):
         JSON,
         nullable=True,
     )
+    vote_reveal_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     movie_resolved: Mapped[bool] = mapped_column(
         Boolean,
         default=False,

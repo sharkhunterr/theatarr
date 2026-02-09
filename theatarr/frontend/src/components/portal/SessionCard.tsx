@@ -5,8 +5,11 @@
 import { Calendar, Check, X, Clock, Vote, Shuffle, Trophy, Sparkles, Film } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
-import { getMysteryRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
+import { getMysteryRevealCountdown, getVoteRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
+import { useSetting } from '../../hooks/useSettings';
 import { MysteryPoster } from '../common/MysteryPoster';
+import { VotePoster } from '../common/VotePoster';
+import { VotePosterCollage } from '../common/VotePosterCollage';
 
 interface SessionCardProps {
   id: string;
@@ -19,8 +22,10 @@ interface SessionCardProps {
   movieSelectionMode?: string | null;
   movieResolved?: boolean;
   mysteryRevealAt?: string | null;
+  voteRevealAt?: string | null;
   linkedVoteSessionId?: string | null;
   linkedVoteIsOpen?: boolean | null;
+  voteMoviePosters?: string[] | null;
 }
 
 export function SessionCard({
@@ -34,9 +39,12 @@ export function SessionCard({
   movieSelectionMode,
   movieResolved,
   mysteryRevealAt,
+  voteRevealAt,
   linkedVoteSessionId,
   linkedVoteIsOpen,
+  voteMoviePosters,
 }: SessionCardProps) {
+  const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('fr-FR', {
@@ -106,8 +114,12 @@ export function SessionCard({
           showVoteLink: false,
         };
       }
+      const revealText = voteRevealAt ? getVoteRevealCountdown(voteRevealAt).text : null;
+      const voteText = linkedVoteIsOpen === false
+        ? (revealText ? `Vote clos \u00b7 ${revealText}` : 'Vote clos')
+        : (revealText ? `En attente du vote \u00b7 ${revealText}` : 'En attente du vote');
       return {
-        text: 'En attente du vote',
+        text: voteText,
         icon: <Vote size={14} className="text-blue-400" />,
         showVoteLink: canVote && linkedVoteSessionId && linkedVoteIsOpen,
       };
@@ -153,6 +165,12 @@ export function SessionCard({
         <div className="w-20 h-28 flex-shrink-0">
           {movieSelectionMode === 'mystery' && !movieResolved ? (
             <MysteryPoster className="w-full h-full rounded-none" particles={6} questionMarkSize="text-2xl" />
+          ) : movieSelectionMode === 'vote' && !movieResolved ? (
+            posterDisplay === 'posters' && voteMoviePosters?.length ? (
+              <VotePosterCollage posters={voteMoviePosters} className="w-full h-full rounded-none" />
+            ) : (
+              <VotePoster className="w-full h-full rounded-none" particles={6} iconSize="text-2xl" />
+            )
           ) : moviePosterUrl ? (
             <img
               src={moviePosterUrl}

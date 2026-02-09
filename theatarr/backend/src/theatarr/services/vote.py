@@ -271,14 +271,27 @@ async def close_voting(
         linked_session = result.scalar_one_or_none()
 
         if linked_session and not linked_session.movie_resolved:
-            try:
-                await resolve_vote_winner(db, linked_session, vote_session)
-            except MovieResolutionError as e:
-                # Log but don't fail the close operation
-                import logging
-                logging.getLogger(__name__).warning(
-                    f"Failed to auto-resolve movie for session {linked_session.id}: {e}"
-                )
+            # Check if the session has a future vote_reveal_at (delayed reveal)
+            should_resolve = True
+            if linked_session.vote_reveal_at:
+                now = datetime.now()
+                if linked_session.vote_reveal_at > now:
+                    should_resolve = False
+                    import logging
+                    logging.getLogger(__name__).info(
+                        f"Delayed reveal for session {linked_session.id}: "
+                        f"vote_reveal_at={linked_session.vote_reveal_at}"
+                    )
+
+            if should_resolve:
+                try:
+                    await resolve_vote_winner(db, linked_session, vote_session)
+                except MovieResolutionError as e:
+                    # Log but don't fail the close operation
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        f"Failed to auto-resolve movie for session {linked_session.id}: {e}"
+                    )
 
     return vote_session
 

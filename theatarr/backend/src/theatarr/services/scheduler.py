@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from theatarr.config import settings
 from theatarr.database import async_session_maker
@@ -59,6 +60,8 @@ class SessionScheduler:
             try:
                 await self._check_scheduled_sessions()
                 await self._check_mystery_reveals()
+                await self._check_vote_closes()
+                await self._check_vote_reveals()
                 await asyncio.sleep(self._check_interval)
             except asyncio.CancelledError:
                 break
@@ -164,6 +167,129 @@ class SessionScheduler:
 
                 except MovieResolutionError as e:
                     logger.exception(f"Failed to reveal mystery movie for session {session.id}: {e}")
+
+    async def _check_vote_closes(self) -> None:
+        """Check and auto-close any vote sessions past their closes_at time."""
+        from theatarr.api.ws import ws_manager, Channel
+        from theatarr.models.vote import VoteSession, VoteSessionStatus
+        from theatarr.services.vote import close_voting
+
+        now = datetime.now()
+
+        async with async_session_maker() as db:
+            result = await db.execute(
+                select(VoteSession)
+                .options(selectinload(VoteSession.votes))
+                .where(
+                    VoteSession.status == VoteSessionStatus.OPEN,
+                    VoteSession.closes_at <= now,
+                )
+            )
+            vote_sessions = result.scalars().all()
+
+            if not vote_sessions:
+                return
+
+            logger.info("Found %d vote sessions to auto-close", len(vote_sessions))
+
+            for vs in vote_sessions:
+                try:
+                    # Check if linked session has a future vote_reveal_at
+                    auto_resolve = True
+                    if vs.linked_session_id:
+                        linked = await db.execute(
+                            select(Session).where(Session.id == vs.linked_session_id)
+                        )
+                        linked_session = linked.scalar_one_or_none()
+                        if linked_session and linked_session.vote_reveal_at:
+                            if linked_session.vote_reveal_at > now:
+                                auto_resolve = False
+                                logger.info(
+                                    "Vote session %s: delayed reveal until %s",
+                                    vs.id, linked_session.vote_reveal_at,
+                                )
+
+                    logger.info("Auto-closing vote session: %s (%s)", vs.id, vs.name)
+                    await close_voting(db, vs, assign_winner=True, auto_resolve_linked=auto_resolve)
+
+                    await ws_manager.broadcast(Channel.VOTE.value, {
+                        "type": "vote_closed",
+                        "payload": {"vote_session_id": vs.id, "name": vs.name},
+                    })
+                except Exception as e:
+                    logger.exception("Failed to auto-close vote session %s: %s", vs.id, e)
+
+    async def _check_vote_reveals(self) -> None:
+        """Check and reveal any vote movies that are due."""
+        from theatarr.api.ws import ws_manager, Channel
+        from theatarr.models.vote import VoteSession, VoteSessionStatus
+        from theatarr.services.movie_resolution import (
+            resolve_vote_winner,
+            MovieResolutionError,
+        )
+
+        now = datetime.now()
+
+        async with async_session_maker() as db:
+            result = await db.execute(
+                select(Session).where(
+                    Session.movie_selection_mode == MovieSelectionMode.VOTE.value,
+                    Session.movie_resolved == False,
+                    Session.vote_reveal_at <= now,
+                    Session.linked_vote_session_id.isnot(None),
+                )
+            )
+            sessions = result.scalars().all()
+
+            if not sessions:
+                return
+
+            logger.info("Found %d vote sessions ready to reveal", len(sessions))
+
+            for session in sessions:
+                try:
+                    # Verify the vote is actually closed
+                    vs_result = await db.execute(
+                        select(VoteSession).where(
+                            VoteSession.id == session.linked_vote_session_id
+                        )
+                    )
+                    vote_session = vs_result.scalar_one_or_none()
+
+                    if not vote_session or vote_session.status != VoteSessionStatus.CLOSED:
+                        logger.debug(
+                            "Vote session for %s not closed yet, skipping reveal",
+                            session.id,
+                        )
+                        continue
+
+                    logger.info(
+                        "Revealing vote winner for session: %s (%s)",
+                        session.id, session.name,
+                    )
+                    await resolve_vote_winner(db, session, vote_session)
+
+                    resolved_payload = {
+                        "type": "movie_resolved",
+                        "payload": {
+                            "session_id": session.id,
+                            "movie_title": session.movie_title,
+                            "movie_poster_url": session.movie_poster_url,
+                            "selection_mode": "vote",
+                        },
+                    }
+                    await ws_manager.broadcast(Channel.SESSION.value, resolved_payload)
+                    await ws_manager.broadcast(Channel.WALLMOUNT.value, resolved_payload)
+                    logger.info(
+                        "Vote movie revealed for session %s: %s",
+                        session.id, session.movie_title,
+                    )
+
+                except MovieResolutionError as e:
+                    logger.exception(
+                        "Failed to reveal vote movie for session %s: %s",
+                        session.id, e,
+                    )
 
     async def _auto_resume_interrupted_sessions(self) -> None:
         """Auto-resume sessions that were interrupted (e.g., by system restart)."""

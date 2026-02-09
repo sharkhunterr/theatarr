@@ -17,3 +17,5 @@ export { Spinner } from './Spinner';
 export type { SpinnerProps } from './Spinner';
 
 export { MysteryPoster } from './MysteryPoster';
+export { VotePoster } from './VotePoster';
+export { VotePosterCollage } from './VotePosterCollage';

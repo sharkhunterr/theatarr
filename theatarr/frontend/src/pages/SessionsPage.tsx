@@ -18,9 +18,12 @@ import {
   Monitor,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { getMysteryRevealCountdown } from '../utils/countdown';
+import { getMysteryRevealCountdown, getVoteRevealCountdown } from '../utils/countdown';
 import { useCountdown } from '../hooks/useCountdown';
+import { useSetting } from '../hooks/useSettings';
 import { MysteryPoster } from '../components/common/MysteryPoster';
+import { VotePoster } from '../components/common/VotePoster';
+import { VotePosterCollage } from '../components/common/VotePosterCollage';
 import { Button, Card, Spinner, Modal } from '../components/common';
 import { useSessionStore, Session, VoteSessionSummary } from '../stores/sessionStore';
 import { useSession } from '../hooks/useSession';
@@ -29,6 +32,7 @@ import { apiClient } from '../api/client';
 
 export function SessionsPage() {
   useCountdown();
+  const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
   const navigate = useNavigate();
   const { language } = useLayoutStore();
   const { sessions, isLoading } = useSessionStore();
@@ -256,6 +260,17 @@ export function SessionsPage() {
                   <div className="w-20 sm:w-24 flex-shrink-0">
                     {movieDisplay.type === 'mystery' ? (
                       <MysteryPoster className="w-full h-full" particles={6} questionMarkSize="text-2xl" />
+                    ) : movieDisplay.type === 'vote' ? (
+                      posterDisplay === 'posters' && voteSession?.movie_options?.length ? (
+                        <VotePosterCollage
+                          posters={voteSession.movie_options
+                            .map((opt) => opt.poster_url)
+                            .filter((url): url is string => !!url)}
+                          className="w-full h-full"
+                        />
+                      ) : (
+                        <VotePoster className="w-full h-full" particles={6} iconSize="text-2xl" />
+                      )
                     ) : movieDisplay.poster ? (
                       <img
                         src={movieDisplay.poster}
@@ -263,11 +278,7 @@ export function SessionsPage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className={clsx(
-                        'w-full h-full flex items-center justify-center',
-                        movieDisplay.type === 'vote' ? 'bg-blue-500/20' :
-                        'bg-dark-border'
-                      )}>
+                      <div className="w-full h-full flex items-center justify-center bg-dark-border">
                         <MovieIcon size={32} className={movieDisplay.iconColor} />
                       </div>
                     )}
@@ -296,6 +307,19 @@ export function SessionsPage() {
                         {/* Mystery reveal countdown */}
                         {session.movie_selection_mode === 'mystery' && !session.movie_resolved && session.mystery_reveal_at && (() => {
                           const reveal = getMysteryRevealCountdown(session.mystery_reveal_at);
+                          return (
+                            <span
+                              className={clsx('flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium', reveal.pulse && 'animate-pulse')}
+                              style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
+                            >
+                              <Eye size={10} />
+                              {reveal.text}
+                            </span>
+                          );
+                        })()}
+                        {/* Vote reveal countdown */}
+                        {session.movie_selection_mode === 'vote' && !session.movie_resolved && session.vote_reveal_at && (() => {
+                          const reveal = getVoteRevealCountdown(session.vote_reveal_at);
                           return (
                             <span
                               className={clsx('flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium', reveal.pulse && 'animate-pulse')}

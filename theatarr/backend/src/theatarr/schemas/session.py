@@ -89,11 +89,21 @@ class VoteSessionSummary(BaseSchema):
 
     id: str
     name: str
+    description: str | None = None
     status: str
     total_votes: int
     is_open: bool
     winning_movie_index: int | None = None
     movie_options: list[dict[str, Any]] | None = None
+    # Config fields (for editing)
+    max_votes_per_user: int = 1
+    allow_multiple_votes: bool = False
+    require_token: bool = True
+    show_results_during_voting: bool = False
+    anonymous_voting: bool = True
+    close_when_all_voted: bool = False
+    opens_at: datetime | None = None
+    closes_at: datetime | None = None
 
 
 # ============================================================================
@@ -170,6 +180,9 @@ class SessionCreate(SessionBase):
     vote_session_config: dict | None = None  # VoteSessionCreate fields
     linked_vote_session_id: str | None = None
 
+    # For VOTE mode: delayed reveal
+    vote_reveal_at: datetime | None = None
+
     # For MYSTERY mode
     mystery_reveal_at: datetime | None = None
     mystery_config: MysteryConfig | None = None
@@ -203,6 +216,7 @@ class SessionUpdate(BaseSchema):
     # For VOTE mode
     vote_session_config: dict | None = None
     linked_vote_session_id: str | None = None
+    vote_reveal_at: datetime | None = None
 
     # For MYSTERY mode
     mystery_reveal_at: datetime | None = None
@@ -243,6 +257,7 @@ class SessionResponse(SessionBase, IDTimestampSchema):
     movie_resolved: bool = False
     movie_resolved_at: datetime | None = None
     linked_vote_session_id: str | None = None
+    vote_reveal_at: datetime | None = None
     mystery_reveal_at: datetime | None = None
     mystery_config: MysteryConfig | None = None
 

@@ -30,8 +30,10 @@ interface PortalSession {
   movie_selection_mode?: string | null;
   movie_resolved?: boolean;
   mystery_reveal_at?: string | null;
+  vote_reveal_at?: string | null;
   linked_vote_session_id?: string | null;
   linked_vote_is_open?: boolean | null;
+  vote_movie_posters?: string[] | null;
 }
 
 interface PortalVote {
@@ -132,8 +134,10 @@ export function PortalHome() {
                 movieSelectionMode={session.movie_selection_mode}
                 movieResolved={session.movie_resolved}
                 mysteryRevealAt={session.mystery_reveal_at}
+                voteRevealAt={session.vote_reveal_at}
                 linkedVoteSessionId={session.linked_vote_session_id}
                 linkedVoteIsOpen={session.linked_vote_is_open}
+                voteMoviePosters={session.vote_movie_posters}
               />
             ))}
           </div>
@@ -195,8 +199,10 @@ export function PortalHome() {
                 movieSelectionMode={session.movie_selection_mode}
                 movieResolved={session.movie_resolved}
                 mysteryRevealAt={session.mystery_reveal_at}
+                voteRevealAt={session.vote_reveal_at}
                 linkedVoteSessionId={session.linked_vote_session_id}
                 linkedVoteIsOpen={session.linked_vote_is_open}
+                voteMoviePosters={session.vote_movie_posters}
               />
             ))}
           </div>

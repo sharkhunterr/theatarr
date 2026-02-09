@@ -100,6 +100,7 @@ export interface Session {
   movie_resolved_at?: string;
   linked_vote_session_id?: string;
   linked_vote_session?: VoteSessionSummary;
+  vote_reveal_at?: string;
   mystery_reveal_at?: string;
   mystery_config?: MysteryConfig;
   // Enriched fields from list

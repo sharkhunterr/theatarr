@@ -14,9 +14,10 @@ interface SettingDefinition {
   key: string;
   label: string;
   description: string;
-  type: 'string' | 'number' | 'boolean' | 'json';
+  type: 'string' | 'number' | 'boolean' | 'json' | 'select';
   defaultValue?: unknown;
   category: string;
+  options?: { value: string; label: string }[];
 }
 
 // Predefined settings schema
@@ -133,6 +134,18 @@ const SETTINGS_SCHEMA: SettingDefinition[] = [
     type: 'boolean',
     defaultValue: false,
     category: 'Voting',
+  },
+  {
+    key: 'voting.poster_display',
+    label: 'Affichage film en vote',
+    description: 'Style d\'affichage quand le vote est en attente',
+    type: 'select',
+    defaultValue: 'animation',
+    category: 'Voting',
+    options: [
+      { value: 'animation', label: 'Animation VotePoster' },
+      { value: 'posters', label: 'Collage des affiches' },
+    ],
   },
 
   // API
@@ -274,6 +287,20 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
             value={String(value ?? '')}
             onChange={(e) => updateSetting(def.key, parseFloat(e.target.value) || 0)}
           />
+        );
+      case 'select':
+        return (
+          <select
+            value={String(value ?? def.defaultValue ?? '')}
+            onChange={(e) => updateSetting(def.key, e.target.value)}
+            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text focus:outline-none focus:ring-2 focus:ring-theatarr-500 text-sm"
+          >
+            {def.options?.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         );
       case 'json':
         return (

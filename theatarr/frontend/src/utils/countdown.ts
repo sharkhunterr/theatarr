@@ -89,3 +89,22 @@ export function getMysteryRevealCountdown(revealAt: string): { text: string; col
     pulse: diff < 5 * 60 * 1000,
   };
 }
+
+/**
+ * Get vote reveal countdown info.
+ */
+export function getVoteRevealCountdown(revealAt: string): { text: string; color: string; pulse: boolean } {
+  const target = new Date(revealAt).getTime();
+  const now = Date.now();
+  const diff = target - now;
+
+  if (diff <= 0) {
+    return { text: 'Revelation imminente', color: '#3b82f6', pulse: true };
+  }
+
+  return {
+    text: `Revelation dans ${formatCountdownShort(revealAt)}`,
+    color: '#3b82f6',
+    pulse: diff < 5 * 60 * 1000,
+  };
+}

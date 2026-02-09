@@ -22,8 +22,10 @@ class PortalSessionSummary(BaseSchema):
     movie_selection_mode: str | None = None
     movie_resolved: bool = False
     mystery_reveal_at: datetime | None = None
+    vote_reveal_at: datetime | None = None
     linked_vote_session_id: str | None = None
     linked_vote_is_open: bool | None = None
+    vote_movie_posters: list[str] | None = None
 
 
 class PortalSessionDetail(BaseSchema):
@@ -46,8 +48,10 @@ class PortalSessionDetail(BaseSchema):
     movie_selection_mode: str | None = None
     movie_resolved: bool = False
     mystery_reveal_at: datetime | None = None
+    vote_reveal_at: datetime | None = None
     linked_vote_session_id: str | None = None
     linked_vote_is_open: bool | None = None
+    vote_movie_posters: list[str] | None = None
 
 
 class PortalSessionListResponse(BaseSchema):

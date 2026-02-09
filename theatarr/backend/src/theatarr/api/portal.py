@@ -1,5 +1,6 @@
 """Portal API router for Theatarr - User portal endpoints."""
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
@@ -31,7 +32,21 @@ from theatarr.schemas.portal import (
 from theatarr.schemas.user import PasswordChangeRequest, UserSelfUpdate
 from theatarr.services.auth import CurrentUser, hash_password, verify_password
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/portal", tags=["Portal"])
+
+
+def _extract_vote_movie_posters(linked_vote: VoteSession | None) -> list[str] | None:
+    """Extract poster URLs from a vote session's movie options."""
+    if not linked_vote or not linked_vote.movie_options:
+        return None
+    posters = [
+        opt.get("poster_url")
+        for opt in linked_vote.movie_options
+        if isinstance(opt, dict) and opt.get("poster_url")
+    ]
+    return posters if posters else None
 
 
 # ============================================================================
@@ -267,6 +282,7 @@ async def get_my_sessions(
         session = p.session
         # Check if linked vote session is open
         linked_vote_is_open = None
+        linked_vote = None
         if session.linked_vote_session_id:
             vote_result = await db.execute(
                 select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
@@ -287,8 +303,10 @@ async def get_my_sessions(
                 movie_selection_mode=session.movie_selection_mode,
                 movie_resolved=session.movie_resolved,
                 mystery_reveal_at=session.mystery_reveal_at,
+                vote_reveal_at=session.vote_reveal_at,
                 linked_vote_session_id=session.linked_vote_session_id,
                 linked_vote_is_open=linked_vote_is_open,
+                vote_movie_posters=_extract_vote_movie_posters(linked_vote),
             )
         )
 
@@ -334,6 +352,7 @@ async def get_pending_invitations(
         session = p.session
         # Check if linked vote session is open
         linked_vote_is_open = None
+        linked_vote = None
         if session.linked_vote_session_id:
             vote_result = await db.execute(
                 select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
@@ -354,8 +373,10 @@ async def get_pending_invitations(
                 movie_selection_mode=session.movie_selection_mode,
                 movie_resolved=session.movie_resolved,
                 mystery_reveal_at=session.mystery_reveal_at,
+                vote_reveal_at=session.vote_reveal_at,
                 linked_vote_session_id=session.linked_vote_session_id,
                 linked_vote_is_open=linked_vote_is_open,
+                vote_movie_posters=_extract_vote_movie_posters(linked_vote),
             )
         )
 
@@ -391,6 +412,7 @@ async def get_session_detail(
 
     # Check if linked vote session is open
     linked_vote_is_open = None
+    linked_vote = None
     if session.linked_vote_session_id:
         vote_result = await db.execute(
             select(VoteSession).where(VoteSession.id == session.linked_vote_session_id)
@@ -416,8 +438,10 @@ async def get_session_detail(
         movie_selection_mode=session.movie_selection_mode,
         movie_resolved=session.movie_resolved,
         mystery_reveal_at=session.mystery_reveal_at,
+        vote_reveal_at=session.vote_reveal_at,
         linked_vote_session_id=session.linked_vote_session_id,
         linked_vote_is_open=linked_vote_is_open,
+        vote_movie_posters=_extract_vote_movie_posters(linked_vote),
     )
 
 
@@ -907,10 +931,22 @@ async def cast_vote(
             )
             linked_session = session_result.scalar_one_or_none()
             if linked_session and not linked_session.movie_resolved:
-                try:
-                    await resolve_vote_winner(db, linked_session, vs)
-                except MovieResolutionError:
-                    pass  # Ignore resolution errors
+                # Check if delayed reveal is configured
+                should_resolve = True
+                if linked_session.vote_reveal_at:
+                    now = datetime.now()
+                    if linked_session.vote_reveal_at > now:
+                        should_resolve = False
+                        logger.info(
+                            f"Delayed reveal for session {linked_session.id}: "
+                            f"vote_reveal_at={linked_session.vote_reveal_at}"
+                        )
+
+                if should_resolve:
+                    try:
+                        await resolve_vote_winner(db, linked_session, vs)
+                    except MovieResolutionError:
+                        pass  # Ignore resolution errors
 
     return PortalVoteResponse(
         success=True,

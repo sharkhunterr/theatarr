@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Film, X, Plus, Vote, Link as LinkIcon, Zap, Eye, EyeOff, UserCheck, Lock, Users } from 'lucide-react';
+import { Search, Film, X, Plus, Vote, Link as LinkIcon, Zap, Eye, EyeOff, UserCheck, Lock, Users, Calendar, Clock } from 'lucide-react';
 import clsx from 'clsx';
 import { Spinner } from '../common';
 import { apiClient } from '../../api/client';
@@ -52,6 +52,8 @@ interface VoteModeConfigProps {
   onChange: (config: VoteSessionConfig) => void;
   linkedVoteSessionId?: string;
   onLinkVoteSession?: (id: string | null) => void;
+  revealAt?: string | null;
+  onRevealAtChange?: (revealAt: string | null) => void;
 }
 
 export function VoteModeConfig({
@@ -60,13 +62,18 @@ export function VoteModeConfig({
   onChange,
   linkedVoteSessionId,
   onLinkVoteSession,
+  revealAt,
+  onRevealAtChange,
 }: VoteModeConfigProps) {
   // sessionName is available for future use (e.g., auto-naming vote session)
   void _sessionName;
   const { language } = useLayoutStore();
   const [movieSearchQuery, setMovieSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [showLinkExisting, setShowLinkExisting] = useState(!!linkedVoteSessionId);
+  // When editing, config is pre-loaded from linked vote → show full edit view
+  const [showLinkExisting, setShowLinkExisting] = useState(
+    !!linkedVoteSessionId && config.movie_options.length === 0
+  );
 
   const t = {
     title: language === 'fr' ? 'Configuration du vote' : 'Vote Configuration',
@@ -94,6 +101,13 @@ export function VoteModeConfig({
     openImmediatelyDesc: language === 'fr' ? 'Le vote demarre des la creation' : 'Voting starts on creation',
     closeWhenAllVoted: language === 'fr' ? 'Cloture automatique' : 'Auto-close',
     closeWhenAllVotedDesc: language === 'fr' ? 'Fermer quand tous ont vote' : 'Close when everyone voted',
+    closesAt: language === 'fr' ? 'Cloture programmee' : 'Scheduled close',
+    closesAtHelp: language === 'fr' ? 'Cloturer le vote a cette date/heure' : 'Close voting at this date/time',
+    revealTiming: language === 'fr' ? 'Revelation du resultat' : 'Result reveal timing',
+    revealImmediate: language === 'fr' ? 'Immediate' : 'Immediate',
+    revealImmediateDesc: language === 'fr' ? 'Reveler le film des la cloture' : 'Reveal movie as soon as vote closes',
+    revealScheduled: language === 'fr' ? 'Programmee' : 'Scheduled',
+    revealScheduledDesc: language === 'fr' ? 'Reveler le film a une date precise' : 'Reveal movie at a specific date',
   };
 
   // Movie search query
@@ -192,38 +206,62 @@ export function VoteModeConfig({
     }
   };
 
+  // Hide the create/link toggle when editing an existing linked vote
+  const isEditingLinkedVote = !!linkedVoteSessionId && config.movie_options.length > 0;
+
   return (
     <div className="space-y-4">
-      {/* Mode Toggle */}
-      <div className="flex gap-2 mb-4">
-        <button
-          type="button"
-          onClick={() => {
-            setShowLinkExisting(false);
-            if (onLinkVoteSession) onLinkVoteSession(null);
-          }}
-          className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors flex items-center justify-center gap-2 ${
-            !showLinkExisting
-              ? 'bg-theatarr-500 border-theatarr-500 text-white'
-              : 'border-dark-border text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <Plus size={14} />
-          {t.createNew}
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowLinkExisting(true)}
-          className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors flex items-center justify-center gap-2 ${
-            showLinkExisting
-              ? 'bg-theatarr-500 border-theatarr-500 text-white'
-              : 'border-dark-border text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <LinkIcon size={14} />
-          {t.linkExisting}
-        </button>
-      </div>
+      {/* Mode Toggle - hidden when editing an existing linked vote */}
+      {!isEditingLinkedVote && (
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => {
+              setShowLinkExisting(false);
+              if (onLinkVoteSession) onLinkVoteSession(null);
+            }}
+            className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+              !showLinkExisting
+                ? 'bg-theatarr-500 border-theatarr-500 text-white'
+                : 'border-dark-border text-dark-muted hover:text-dark-text'
+            }`}
+          >
+            <Plus size={14} />
+            {t.createNew}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowLinkExisting(true)}
+            className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+              showLinkExisting
+                ? 'bg-theatarr-500 border-theatarr-500 text-white'
+                : 'border-dark-border text-dark-muted hover:text-dark-text'
+            }`}
+          >
+            <LinkIcon size={14} />
+            {t.linkExisting}
+          </button>
+        </div>
+      )}
+
+      {/* Linked vote info banner (when editing an existing linked vote) */}
+      {linkedVoteSessionId && !showLinkExisting && (
+        <div className="p-2.5 bg-theatarr-500/10 border border-theatarr-500/30 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <LinkIcon size={14} className="text-theatarr-500" />
+            <span className="text-xs text-dark-text">
+              {t.linkedTo}: <span className="font-mono text-dark-muted">{linkedVoteSessionId.slice(0, 8)}...</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onLinkVoteSession?.(null)}
+            className="text-xs text-red-400 hover:text-red-300"
+          >
+            {t.unlink}
+          </button>
+        </div>
+      )}
 
       {showLinkExisting ? (
         /* Link Existing Vote Session */
@@ -409,33 +447,6 @@ export function VoteModeConfig({
                 <div className="text-[10px] text-dark-muted">{t.openImmediatelyDesc}</div>
               </button>
 
-              {/* Close when all voted */}
-              <button
-                type="button"
-                onClick={() => onChange({ ...config, close_when_all_voted: !config.close_when_all_voted })}
-                className={clsx(
-                  'p-3 rounded-lg border text-left transition-all',
-                  config.close_when_all_voted
-                    ? 'bg-blue-500/10 border-blue-500/50'
-                    : 'bg-dark-bg border-dark-border hover:border-dark-muted'
-                )}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <Users size={16} className={config.close_when_all_voted ? 'text-blue-400' : 'text-dark-muted'} />
-                  <div className={clsx(
-                    'w-8 h-4 rounded-full transition-colors relative',
-                    config.close_when_all_voted ? 'bg-blue-500' : 'bg-dark-border'
-                  )}>
-                    <div className={clsx(
-                      'absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform',
-                      config.close_when_all_voted ? 'left-4' : 'left-0.5'
-                    )} />
-                  </div>
-                </div>
-                <div className="text-xs font-medium text-dark-text">{t.closeWhenAllVoted}</div>
-                <div className="text-[10px] text-dark-muted">{t.closeWhenAllVotedDesc}</div>
-              </button>
-
               {/* Show Results */}
               <button
                 type="button"
@@ -540,6 +551,107 @@ export function VoteModeConfig({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Cloture & Revelation */}
+          <div className="space-y-3 pt-3 border-t border-dark-border">
+            <h4 className="flex items-center gap-2 text-sm font-medium text-dark-text">
+              <Clock size={14} />
+              {language === 'fr' ? 'Cloture & Revelation' : 'Closing & Reveal'}
+            </h4>
+
+            {/* Close when all voted */}
+            <button
+              type="button"
+              onClick={() => onChange({ ...config, close_when_all_voted: !config.close_when_all_voted })}
+              className={clsx(
+                'w-full p-3 rounded-lg border text-left transition-all flex items-center gap-3',
+                config.close_when_all_voted
+                  ? 'bg-blue-500/10 border-blue-500/50'
+                  : 'bg-dark-bg border-dark-border hover:border-dark-muted'
+              )}
+            >
+              <Users size={16} className={config.close_when_all_voted ? 'text-blue-400 flex-shrink-0' : 'text-dark-muted flex-shrink-0'} />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-dark-text">{t.closeWhenAllVoted}</div>
+                <div className="text-[10px] text-dark-muted">{t.closeWhenAllVotedDesc}</div>
+              </div>
+              <div className={clsx(
+                'w-8 h-4 rounded-full transition-colors relative flex-shrink-0',
+                config.close_when_all_voted ? 'bg-blue-500' : 'bg-dark-border'
+              )}>
+                <div className={clsx(
+                  'absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform',
+                  config.close_when_all_voted ? 'left-4' : 'left-0.5'
+                )} />
+              </div>
+            </button>
+
+            {/* Scheduled close */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-xs text-dark-muted">
+                <Calendar size={12} />
+                {t.closesAt}
+              </label>
+              <input
+                type="datetime-local"
+                value={config.closes_at ? config.closes_at.slice(0, 16) : ''}
+                onChange={(e) => onChange({
+                  ...config,
+                  closes_at: e.target.value ? new Date(e.target.value).toISOString() : undefined,
+                })}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text text-sm"
+              />
+              <p className="text-[10px] text-dark-muted">{t.closesAtHelp}</p>
+            </div>
+
+            {/* Reveal Timing */}
+            {onRevealAtChange && (
+              <div className="space-y-2 pt-2 border-t border-dark-border/50">
+                <label className="flex items-center gap-2 text-xs text-dark-muted">
+                  <Eye size={12} />
+                  {t.revealTiming}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onRevealAtChange(null)}
+                    className={clsx(
+                      'p-3 rounded-lg border text-left transition-all',
+                      !revealAt
+                        ? 'bg-green-500/10 border-green-500/50'
+                        : 'bg-dark-bg border-dark-border hover:border-dark-muted'
+                    )}
+                  >
+                    <Zap size={16} className={!revealAt ? 'text-green-400 mb-1' : 'text-dark-muted mb-1'} />
+                    <div className="text-xs font-medium text-dark-text">{t.revealImmediate}</div>
+                    <div className="text-[10px] text-dark-muted">{t.revealImmediateDesc}</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRevealAtChange(revealAt || new Date().toISOString())}
+                    className={clsx(
+                      'p-3 rounded-lg border text-left transition-all',
+                      revealAt
+                        ? 'bg-blue-500/10 border-blue-500/50'
+                        : 'bg-dark-bg border-dark-border hover:border-dark-muted'
+                    )}
+                  >
+                    <Calendar size={16} className={revealAt ? 'text-blue-400 mb-1' : 'text-dark-muted mb-1'} />
+                    <div className="text-xs font-medium text-dark-text">{t.revealScheduled}</div>
+                    <div className="text-[10px] text-dark-muted">{t.revealScheduledDesc}</div>
+                  </button>
+                </div>
+                {revealAt && (
+                  <input
+                    type="datetime-local"
+                    value={revealAt.slice(0, 16)}
+                    onChange={(e) => onRevealAtChange(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text text-sm"
+                  />
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
