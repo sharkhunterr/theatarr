@@ -357,6 +357,13 @@ interface TemplateRendererProps {
       is_open?: boolean;
       status?: string;
       winning_movie_index?: number;
+      closes_at?: string;
+      close_when_all_voted?: boolean;
+      total_tokens?: number;
+      vote_counts?: Record<number, number>;
+      movie_options?: Array<{ title: string; poster_url?: string; year?: number }>;
+      vote_reveal_at?: string;
+      show_results_during_voting?: boolean;
     };
     mystery_info?: {
       reveal_at: string | null;
@@ -3076,6 +3083,707 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
                 ? resolveDynamicText(config?.badge?.text || '{{status_text}}', movie, session, countdown_to, vote_info, mystery_info)
                 : 'Film mystere'}
             </span>
+          </div>
+        </div>
+      );
+    }
+
+    // CINEMATIC VOTE - Vote mode template with blue theme
+    if (layoutStyle === 'cinematic-vote') {
+      const voteAccent = '#3b82f6';
+      const voteAccentLight = '#60a5fa';
+      const isResolved = vote_info?.status === 'closed' && vote_info?.winning_movie_index != null && !!movie;
+
+      return (
+        <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+          <style>{animationStyles}{`
+            @keyframes ken-burns-vote {
+              0% { transform: scale(1) translate(0, 0); }
+              50% { transform: scale(1.08) translate(-1%, -0.5%); }
+              100% { transform: scale(1) translate(0, 0); }
+            }
+            @keyframes fade-in-up-vote {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes gradient-shift-vote {
+              0%, 100% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+            }
+            @keyframes vote-pulse {
+              0%, 100% { opacity: 0.6; transform: scale(1); }
+              50% { opacity: 1; transform: scale(1.02); }
+            }
+            @keyframes vote-glow {
+              0%, 100% { text-shadow: 0 0 20px ${voteAccent}40, 0 0 60px ${voteAccent}20; }
+              50% { text-shadow: 0 0 40px ${voteAccent}80, 0 0 80px ${voteAccent}40, 0 0 120px ${voteAccent}20; }
+            }
+            @keyframes vote-particle-float {
+              0% { transform: translateY(100vh) scale(0); opacity: 0; }
+              10% { opacity: 0.6; }
+              90% { opacity: 0.6; }
+              100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+            }
+            @keyframes vote-reveal-burst {
+              0% { transform: scale(0.8); opacity: 0; filter: blur(10px); }
+              60% { transform: scale(1.05); opacity: 1; filter: blur(0); }
+              100% { transform: scale(1); opacity: 1; filter: blur(0); }
+            }
+            @keyframes vote-progress-fill {
+              from { width: 0%; }
+              to { width: var(--progress-width); }
+            }
+            .vote-backdrop {
+              animation: ken-burns-vote ${config?.rotate_backdrops ? (config.rotate_interval ?? 30) : 60}s ease-in-out infinite;
+              transition: opacity 1.5s ease-in-out;
+            }
+            .vote-info-anim {
+              animation: fade-in-up-vote 1s ease-out both;
+            }
+            .vote-gradient-bar {
+              background: linear-gradient(90deg, ${voteAccent}60, ${voteAccentLight}60, ${voteAccent}60);
+              background-size: 200% 100%;
+              animation: gradient-shift-vote 6s ease-in-out infinite;
+            }
+            .vote-icon-glow {
+              animation: vote-glow 3s ease-in-out infinite;
+            }
+            .vote-particle {
+              position: absolute;
+              width: 4px;
+              height: 4px;
+              border-radius: 50%;
+              background: ${voteAccent};
+              animation: vote-particle-float linear infinite;
+            }
+            .vote-reveal-anim {
+              animation: vote-reveal-burst 1.2s ease-out both;
+            }
+          `}</style>
+
+          {/* Backdrop: blur heavy when voting, clear when resolved */}
+          {isResolved && effectiveBackdrop ? (
+            config?.rotate_backdrops && allBackdrops.length > 1 ? (
+              allBackdrops.map((url, i) => (
+                <div
+                  key={`backdrop-${i}`}
+                  className="absolute inset-0 bg-cover bg-center vote-backdrop"
+                  style={{
+                    backgroundImage: `url(${url})`,
+                    opacity: i === rotatingIndex % allBackdrops.length ? 1 : 0,
+                  }}
+                />
+              ))
+            ) : (
+              <div
+                className="absolute inset-0 bg-cover bg-center vote-backdrop"
+                style={{ backgroundImage: `url(${effectiveBackdrop})` }}
+              />
+            )
+          ) : effectiveBackdrop ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center vote-backdrop"
+              style={{
+                backgroundImage: `url(${effectiveBackdrop})`,
+                filter: 'blur(30px) brightness(0.3)',
+                transform: 'scale(1.1)',
+              }}
+            />
+          ) : null}
+
+          {/* Dark blue gradient overlays */}
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to top, #0a1628 0%, transparent 40%, transparent 70%, #0a162890 100%)`,
+          }} />
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(to right, #0a1628cc 0%, transparent 30%, transparent 70%, #0a1628cc 100%)`,
+          }} />
+
+          {/* Floating particles (vote in progress only) */}
+          {!isResolved && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <div
+                  key={`vote-particle-${i}`}
+                  className="vote-particle"
+                  style={{
+                    left: `${5 + Math.random() * 90}%`,
+                    animationDuration: `${6 + Math.random() * 10}s`,
+                    animationDelay: `${Math.random() * 8}s`,
+                    opacity: 0.3 + Math.random() * 0.4,
+                    width: `${2 + Math.random() * 4}px`,
+                    height: `${2 + Math.random() * 4}px`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Accent gradient bar at top */}
+          <div className="absolute top-0 left-0 right-0 h-1 vote-gradient-bar" />
+
+          {/* Content */}
+          <div className="relative z-10 w-full h-full flex flex-col justify-end p-12">
+
+            {isResolved ? (
+              <>
+                {/* RESOLVED STATE — show winning movie info */}
+                <div className="vote-reveal-anim" style={{ animationDelay: '0.2s' }}>
+                  {config?.use_logo_image && effectiveLogo ? (
+                    <img
+                      src={effectiveLogo}
+                      alt={movie?.title || ''}
+                      className="max-w-[350px] max-h-[120px] object-contain mb-6 drop-shadow-2xl"
+                    />
+                  ) : (
+                    <h1
+                      className="text-6xl font-bold mb-2 tracking-tight"
+                      style={{
+                        color: palette?.text || '#ffffff',
+                        textShadow: '0 4px 30px rgba(0,0,0,0.8)',
+                      }}
+                    >
+                      {movie?.title}
+                      {movie?.year && (
+                        <span className="ml-4 text-3xl font-light opacity-60">({movie.year})</span>
+                      )}
+                    </h1>
+                  )}
+                </div>
+
+                {movie?.tagline && (
+                  <div className="vote-reveal-anim text-xl italic opacity-70 mb-6" style={{ animationDelay: '0.4s' }}>
+                    {movie.tagline}
+                  </div>
+                )}
+
+                <div className="vote-reveal-anim flex items-center gap-6 mb-8" style={{ animationDelay: '0.6s' }}>
+                  {movie?.runtime_minutes && (
+                    <span className="text-lg opacity-80">
+                      {Math.floor(movie.runtime_minutes / 60)}h{String(movie.runtime_minutes % 60).padStart(2, '0')}
+                    </span>
+                  )}
+                  {movie?.rating && (
+                    <span className="flex items-center gap-1.5 text-lg">
+                      <span style={{ color: '#fbbf24' }}>★</span>
+                      <span className="opacity-90">{movie.rating.toFixed(1)}</span>
+                    </span>
+                  )}
+                  {movie?.genres?.slice(0, 3).map((genre, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1 rounded-full text-sm border"
+                      style={{
+                        borderColor: `${voteAccent}40`,
+                        color: '#ffffff',
+                        backgroundColor: `${voteAccent}15`,
+                      }}
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+
+                {countdown_to && (
+                  <div className="vote-reveal-anim" style={{ animationDelay: '0.8s' }}>
+                    <CountdownTimer targetDate={countdown_to} palette={palette} size="xl" showSeconds animate />
+                  </div>
+                )}
+
+                {session?.name && (
+                  <div className="vote-reveal-anim mt-6 text-sm uppercase tracking-[0.3em] opacity-50" style={{ animationDelay: '1s' }}>
+                    {session.name}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* VOTE IN PROGRESS STATE */}
+                <div className="flex-1 flex flex-col items-center justify-center -mb-12">
+                  {/* Vote icon placeholder */}
+                  <div
+                    className="w-56 h-80 rounded-2xl flex items-center justify-center mb-10"
+                    style={{
+                      background: `linear-gradient(135deg, #0a1628, ${voteAccent}20)`,
+                      border: `2px solid ${voteAccent}40`,
+                      boxShadow: `0 0 80px ${voteAccent}15, inset 0 0 40px ${voteAccent}05`,
+                      animation: 'vote-pulse 4s ease-in-out infinite',
+                    }}
+                  >
+                    {/* Vote ballot SVG icon */}
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="w-32 h-32 vote-icon-glow"
+                      style={{ color: voteAccent }}
+                    >
+                      <path
+                        d="M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5zm4.293 10.707a1 1 0 0 1 0-1.414L11.586 10 9.293 7.707a1 1 0 1 1 1.414-1.414l3 3a1 1 0 0 1 0 1.414l-3 3a1 1 0 0 1-1.414 0z"
+                        fill="currentColor"
+                        opacity="0.9"
+                      />
+                      <path
+                        d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        fill="none"
+                      />
+                    </svg>
+                  </div>
+
+                  {/* Vote label */}
+                  <h1
+                    className="text-5xl font-bold tracking-wider mb-4 vote-icon-glow"
+                    style={{ color: voteAccent }}
+                  >
+                    VOTE EN COURS
+                  </h1>
+
+                  {/* Vote progress: X/Y votes if close_when_all_voted */}
+                  {vote_info?.close_when_all_voted && (vote_info?.total_tokens ?? 0) > 0 && (
+                    <div className="flex flex-col items-center gap-3 mt-4">
+                      <div className="text-lg opacity-50 uppercase tracking-widest">Votes</div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-4xl font-bold" style={{ color: voteAccent }}>
+                          {vote_info?.total_votes ?? 0}
+                        </span>
+                        <span className="text-2xl opacity-40">/</span>
+                        <span className="text-4xl font-bold opacity-60">
+                          {vote_info?.total_tokens ?? 0}
+                        </span>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="w-64 h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${voteAccent}20` }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-1000 ease-out"
+                          style={{
+                            width: `${Math.min(100, ((vote_info?.total_votes ?? 0) / (vote_info?.total_tokens || 1)) * 100)}%`,
+                            background: `linear-gradient(90deg, ${voteAccent}, ${voteAccentLight})`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Close countdown */}
+                  {vote_info?.closes_at && (
+                    <div className="flex flex-col items-center gap-3 mt-4">
+                      <div className="text-lg opacity-50 uppercase tracking-widest">Cloture dans</div>
+                      <CountdownTimer
+                        targetDate={vote_info.closes_at}
+                        palette={{ primary: voteAccent, accent: voteAccent, text: palette?.text }}
+                        size="xl"
+                        showSeconds
+                        animate
+                      />
+                    </div>
+                  )}
+
+                  {/* Reveal countdown (vote closed but delayed reveal) */}
+                  {vote_info?.status === 'closed' && vote_info?.vote_reveal_at && (
+                    <div className="flex flex-col items-center gap-3 mt-4">
+                      <div className="text-lg opacity-50 uppercase tracking-widest">Revelation dans</div>
+                      <CountdownTimer
+                        targetDate={vote_info.vote_reveal_at}
+                        palette={{ primary: '#22c55e', accent: '#22c55e', text: palette?.text }}
+                        size="xl"
+                        showSeconds
+                        animate
+                      />
+                    </div>
+                  )}
+
+                  {/* Session start countdown (if different) */}
+                  {countdown_to && (
+                    <div className="flex flex-col items-center gap-2 mt-6">
+                      <div className="text-sm opacity-40 uppercase tracking-widest">Seance dans</div>
+                      <CountdownTimer
+                        targetDate={countdown_to}
+                        palette={palette}
+                        size="lg"
+                        showSeconds
+                        animate
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Session name at bottom */}
+                {session?.name && (
+                  <div className="vote-info-anim text-sm uppercase tracking-[0.3em] opacity-50" style={{ animationDelay: '0.5s' }}>
+                    {session.name}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Poster in corner (resolved only) */}
+          {isResolved && effectivePoster && (
+            <div className="absolute top-8 right-8 z-20 vote-reveal-anim" style={{ animationDelay: '1.2s' }}>
+              <img
+                src={effectivePoster}
+                alt={movie?.title || ''}
+                className="w-32 rounded-lg shadow-2xl"
+                style={{
+                  boxShadow: `0 25px 50px -12px ${palette?.primary || '#000'}80`,
+                }}
+              />
+            </div>
+          )}
+
+          {/* Badge */}
+          <div className="absolute top-8 left-8 z-20 vote-info-anim" style={{ animationDelay: '0.3s' }}>
+            <span
+              className="px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md"
+              style={{
+                backgroundColor: isResolved
+                  ? `#22c55e30`
+                  : `${voteAccent}30`,
+                color: '#ffffff',
+                border: `1px solid ${isResolved ? '#22c55e' : voteAccent}50`,
+              }}
+            >
+              {isResolved ? 'Film choisi par vote' : 'Vote en cours'}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    // CINEMATIC VOTE PODIUM - Vote with movie grid and podium reveal
+    if (layoutStyle === 'cinematic-vote-podium') {
+      const voteAccent = '#3b82f6';
+      const voteAccentLight = '#60a5fa';
+      const isResolved = vote_info?.status === 'closed' && vote_info?.winning_movie_index != null && !!movie;
+      const movieOptions = vote_info?.movie_options || [];
+      const voteCounts = vote_info?.vote_counts || {};
+      const maxVotes = Math.max(1, ...Object.values(voteCounts));
+
+      // Sort movies by vote count for podium (descending)
+      const sortedMovies = movieOptions
+        .map((m, i) => ({ ...m, index: i, votes: voteCounts[i] || 0 }))
+        .sort((a, b) => b.votes - a.votes);
+
+      // Podium colors
+      const podiumColors = ['#fbbf24', '#94a3b8', '#cd7f32']; // Gold, Silver, Bronze
+
+      return (
+        <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+          <style>{animationStyles}{`
+            @keyframes podium-fade-in {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes podium-slide-up {
+              from { opacity: 0; transform: translateY(60px) scale(0.9); }
+              to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            @keyframes card-pulse {
+              0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 ${voteAccent}30; }
+              50% { transform: scale(1.01); box-shadow: 0 0 20px 0 ${voteAccent}20; }
+            }
+            @keyframes confetti-fall {
+              0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+              100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+            }
+            @keyframes trophy-bounce {
+              0%, 100% { transform: scale(1); }
+              50% { transform: scale(1.1); }
+            }
+            @keyframes gradient-shift-podium {
+              0%, 100% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+            }
+            @keyframes bar-fill {
+              from { width: 0%; }
+            }
+            .podium-gradient-bar {
+              background: linear-gradient(90deg, ${voteAccent}60, ${voteAccentLight}60, ${voteAccent}60);
+              background-size: 200% 100%;
+              animation: gradient-shift-podium 6s ease-in-out infinite;
+            }
+            .podium-card {
+              animation: card-pulse 4s ease-in-out infinite;
+            }
+            .podium-entry {
+              animation: podium-slide-up 0.8s ease-out both;
+            }
+            .confetti-piece {
+              position: absolute;
+              width: 8px;
+              height: 8px;
+              animation: confetti-fall linear infinite;
+            }
+            .trophy-anim {
+              animation: trophy-bounce 2s ease-in-out infinite;
+            }
+          `}</style>
+
+          {/* Background */}
+          {effectiveBackdrop ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: `url(${effectiveBackdrop})`,
+                filter: isResolved ? 'blur(20px) brightness(0.25)' : 'blur(30px) brightness(0.2)',
+                transform: 'scale(1.1)',
+              }}
+            />
+          ) : null}
+
+          {/* Dark overlay */}
+          <div className="absolute inset-0" style={{
+            background: 'linear-gradient(to bottom, #0a1628e0 0%, #0a1628f0 100%)',
+          }} />
+
+          {/* Accent bar */}
+          <div className="absolute top-0 left-0 right-0 h-1 podium-gradient-bar" />
+
+          {/* Confetti (resolved only, first 5 seconds handled by CSS) */}
+          {isResolved && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {Array.from({ length: 30 }).map((_, i) => (
+                <div
+                  key={`confetti-${i}`}
+                  className="confetti-piece"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    backgroundColor: [
+                      '#fbbf24', '#3b82f6', '#22c55e', '#ef4444', '#a855f7', '#f97316',
+                    ][i % 6],
+                    borderRadius: i % 3 === 0 ? '50%' : '0',
+                    width: `${4 + Math.random() * 8}px`,
+                    height: `${4 + Math.random() * 8}px`,
+                    animationDuration: `${3 + Math.random() * 4}s`,
+                    animationDelay: `${Math.random() * 2}s`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="relative z-10 w-full h-full flex flex-col p-8">
+
+            {/* Badge */}
+            <div className="mb-6">
+              <span
+                className="px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md inline-block"
+                style={{
+                  backgroundColor: isResolved ? '#22c55e30' : `${voteAccent}30`,
+                  color: '#ffffff',
+                  border: `1px solid ${isResolved ? '#22c55e' : voteAccent}50`,
+                }}
+              >
+                {isResolved ? 'Resultats du vote' : 'Vote en cours'}
+              </span>
+              {session?.name && (
+                <span className="ml-4 text-sm uppercase tracking-widest opacity-40">
+                  {session.name}
+                </span>
+              )}
+            </div>
+
+            {isResolved ? (
+              <>
+                {/* PODIUM STATE */}
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  {/* Winner title */}
+                  <div className="podium-entry text-center mb-8" style={{ animationDelay: '0.2s' }}>
+                    <div className="trophy-anim text-5xl mb-2">🏆</div>
+                    <h2 className="text-2xl font-bold opacity-60 uppercase tracking-widest">Film choisi</h2>
+                  </div>
+
+                  {/* Podium */}
+                  <div className="flex items-end justify-center gap-6 w-full max-w-4xl">
+                    {sortedMovies.slice(0, Math.min(sortedMovies.length, 5)).map((m, podiumPos) => {
+                      const isWinner = podiumPos === 0;
+                      const podiumColor = podiumColors[podiumPos] || '#6b7280';
+                      const cardHeight = isWinner ? 'h-72' : podiumPos < 3 ? 'h-56' : 'h-44';
+                      const posterWidth = isWinner ? 'w-44' : podiumPos < 3 ? 'w-32' : 'w-24';
+
+                      return (
+                        <div
+                          key={m.index}
+                          className={`podium-entry flex flex-col items-center`}
+                          style={{ animationDelay: `${0.3 + podiumPos * 0.15}s` }}
+                        >
+                          {/* Rank badge */}
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-2"
+                            style={{
+                              backgroundColor: `${podiumColor}30`,
+                              color: podiumColor,
+                              border: `2px solid ${podiumColor}`,
+                            }}
+                          >
+                            {podiumPos + 1}
+                          </div>
+
+                          {/* Poster */}
+                          <div className={`${posterWidth} ${cardHeight} rounded-xl overflow-hidden mb-3 relative`}
+                            style={{
+                              boxShadow: isWinner
+                                ? `0 0 40px ${podiumColor}40, 0 20px 40px rgba(0,0,0,0.5)`
+                                : '0 10px 30px rgba(0,0,0,0.4)',
+                              border: isWinner ? `2px solid ${podiumColor}60` : '1px solid rgba(255,255,255,0.1)',
+                            }}
+                          >
+                            {m.poster_url ? (
+                              <img src={m.poster_url} alt={m.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center"
+                                style={{ background: `linear-gradient(135deg, #1a2744, ${voteAccent}20)` }}
+                              >
+                                <span className="text-2xl opacity-30">🎬</span>
+                              </div>
+                            )}
+                            {isWinner && (
+                              <div className="absolute inset-0 pointer-events-none"
+                                style={{ boxShadow: `inset 0 0 30px ${podiumColor}20` }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Title */}
+                          <div className="text-center max-w-[150px]">
+                            <div className={`font-semibold truncate ${isWinner ? 'text-base' : 'text-sm'}`}
+                              style={{ color: isWinner ? podiumColor : '#ffffff' }}
+                            >
+                              {m.title}
+                            </div>
+                            {m.votes > 0 && (
+                              <div className="text-xs opacity-50 mt-0.5">
+                                {m.votes} vote{m.votes > 1 ? 's' : ''}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Session countdown if scheduled */}
+                {countdown_to && (
+                  <div className="flex justify-center mt-4">
+                    <CountdownTimer targetDate={countdown_to} palette={palette} size="lg" showSeconds animate />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* VOTE IN PROGRESS — Movie grid */}
+                <div className="flex-1 flex flex-col">
+                  {/* Title */}
+                  <h1 className="text-3xl font-bold mb-6 text-center" style={{ color: voteAccent }}>
+                    Quel film pour ce soir ?
+                  </h1>
+
+                  {/* Movie options grid */}
+                  <div className={`flex-1 grid gap-4 ${
+                    movieOptions.length <= 2 ? 'grid-cols-2' :
+                    movieOptions.length <= 4 ? 'grid-cols-2 lg:grid-cols-4' :
+                    movieOptions.length <= 6 ? 'grid-cols-3' :
+                    'grid-cols-4'
+                  } items-center justify-items-center max-w-5xl mx-auto w-full`}>
+                    {movieOptions.map((m, i) => {
+                      const voteCount = voteCounts[i] || 0;
+                      const barWidth = maxVotes > 0 ? (voteCount / maxVotes) * 100 : 0;
+
+                      return (
+                        <div
+                          key={i}
+                          className="podium-card flex flex-col items-center p-3 rounded-xl w-full max-w-[200px]"
+                          style={{
+                            background: 'rgba(255,255,255,0.03)',
+                            border: `1px solid ${voteAccent}20`,
+                            animationDelay: `${i * 0.5}s`,
+                          }}
+                        >
+                          {/* Poster */}
+                          <div className="w-full aspect-[2/3] rounded-lg overflow-hidden mb-3">
+                            {m.poster_url ? (
+                              <img src={m.poster_url} alt={m.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center"
+                                style={{ background: `linear-gradient(135deg, #1a2744, ${voteAccent}15)` }}
+                              >
+                                <span className="text-3xl opacity-30">🎬</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Title */}
+                          <div className="text-sm font-medium text-center truncate w-full mb-1">
+                            {m.title}
+                          </div>
+                          {m.year && (
+                            <div className="text-xs opacity-40 mb-2">{m.year}</div>
+                          )}
+
+                          {/* Vote bar (only if show_results_during_voting is enabled) */}
+                          {vote_info?.show_results_during_voting && (vote_info?.total_votes ?? 0) > 0 && (
+                            <div className="w-full">
+                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${voteAccent}15` }}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${barWidth}%`,
+                                    background: `linear-gradient(90deg, ${voteAccent}, ${voteAccentLight})`,
+                                    animation: `bar-fill 1s ease-out`,
+                                    transition: 'width 0.5s ease-out',
+                                  }}
+                                />
+                              </div>
+                              <div className="text-xs text-center opacity-40 mt-1">
+                                {voteCount} vote{voteCount !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Bottom info */}
+                  <div className="flex items-center justify-center gap-8 mt-4">
+                    {/* Vote progress */}
+                    {vote_info?.close_when_all_voted && (vote_info?.total_tokens ?? 0) > 0 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm opacity-50">Votes:</span>
+                        <span className="text-xl font-bold" style={{ color: voteAccent }}>
+                          {vote_info?.total_votes ?? 0} / {vote_info?.total_tokens ?? 0}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Close countdown */}
+                    {vote_info?.closes_at && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm opacity-50">Cloture:</span>
+                        <CountdownTimer
+                          targetDate={vote_info.closes_at}
+                          palette={{ primary: voteAccent, accent: voteAccent, text: '#ffffff' }}
+                          size="lg"
+                          showSeconds
+                          animate
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Session countdown */}
+                  {countdown_to && (
+                    <div className="flex items-center justify-center gap-3 mt-2">
+                      <span className="text-sm opacity-40">Seance:</span>
+                      <CountdownTimer targetDate={countdown_to} palette={palette} size="md" showSeconds animate />
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       );

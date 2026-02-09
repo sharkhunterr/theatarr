@@ -51,6 +51,19 @@ interface WallmountState {
     config?: any;
   } | null;
   countdown_to: string | null;
+  vote_info?: {
+    total_votes?: number;
+    is_open?: boolean;
+    status?: string;
+    winning_movie_index?: number;
+    closes_at?: string;
+    close_when_all_voted?: boolean;
+    total_tokens?: number;
+    vote_counts?: Record<number, number>;
+    movie_options?: Array<{ title: string; poster_url?: string; year?: number }>;
+    vote_reveal_at?: string;
+    show_results_during_voting?: boolean;
+  } | null;
   mystery_info?: {
     reveal_at: string | null;
     is_revealed: boolean;
@@ -201,6 +214,7 @@ export function WallmountPage() {
             },
             countdown_to: state.countdown_to || undefined,
             palette: state.palette || undefined,
+            vote_info: state.vote_info || undefined,
             mystery_info: mysteryData,
           }}
         />
@@ -244,6 +258,7 @@ export function WallmountPage() {
             current_sequence_duration_ms: state.current_sequence_duration_ms || undefined,
           },
           palette: state.palette || undefined,
+          vote_info: state.vote_info || undefined,
           mystery_info: mysteryData,
         }}
       />

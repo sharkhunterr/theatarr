@@ -775,4 +775,73 @@ BUILTIN_TEMPLATES = {
             },
         },
     },
+    "cinematic_vote": {
+        "name": "Cinema Vote",
+        "description": "Template immersif pour sessions vote : affiche le vote en cours avec countdown de cloture, puis revele le film gagnant avec effet spectaculaire",
+        "template_type": TemplateType.MOVIE_INFO,
+        "is_builtin": True,
+        "layout": {
+            "style": "cinematic-vote",
+            "components": [
+                {"type": "backdrop", "opacity": 1, "blur": 0},
+                {"type": "vote_countdown"},
+                {"type": "logo", "position": "bottom-left", "size": "large"},
+                {"type": "title", "size": "xlarge"},
+                {"type": "metadata", "fields": ["year", "runtime", "rating"]},
+                {"type": "countdown", "size": "xl"},
+            ]
+        },
+        "config": {
+            "theme": "dark",
+            "use_palette_colors": True,
+            "use_logo_image": True,
+            "rotate_backdrops": True,
+            "rotate_interval": 25,
+            "badge": {
+                "text": "{{vote_status}}",
+                "show_when": "always",
+                "style": "glass-pill",
+                "color": "#3b82f6",
+                "colors": {
+                    "vote_open": "#3b82f6",
+                    "vote_closed": "#22c55e",
+                    "scheduled": "#6366f1",
+                    "running": "#ef4444",
+                    "default": "#6b7280",
+                },
+            },
+        },
+    },
+    "cinematic_vote_podium": {
+        "name": "Cinema Vote Podium",
+        "description": "Template vote avec affichage des films en lice et podium anime apres resolution du vote",
+        "template_type": TemplateType.MOVIE_INFO,
+        "is_builtin": True,
+        "layout": {
+            "style": "cinematic-vote-podium",
+            "components": [
+                {"type": "backdrop", "opacity": 0.3, "blur": 20},
+                {"type": "vote_options_grid"},
+                {"type": "vote_podium"},
+                {"type": "title", "size": "xlarge"},
+                {"type": "countdown", "size": "xl"},
+            ]
+        },
+        "config": {
+            "theme": "dark",
+            "badge": {
+                "text": "{{vote_status}}",
+                "show_when": "always",
+                "style": "glass-pill",
+                "color": "#3b82f6",
+                "colors": {
+                    "vote_open": "#3b82f6",
+                    "vote_closed": "#22c55e",
+                    "scheduled": "#6366f1",
+                    "running": "#ef4444",
+                    "default": "#6b7280",
+                },
+            },
+        },
+    },
 }

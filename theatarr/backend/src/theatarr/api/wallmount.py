@@ -68,6 +68,43 @@ def _build_mystery_info(session: Session) -> dict | None:
     }
 
 
+async def _build_vote_info(db, session: Session) -> dict | None:
+    """Build enriched vote_info dict for wallmount templates."""
+    if not session.linked_vote_session_id:
+        return None
+    result = await db.execute(
+        select(VoteSession)
+        .options(selectinload(VoteSession.votes), selectinload(VoteSession.tokens))
+        .where(VoteSession.id == session.linked_vote_session_id)
+    )
+    vs = result.scalar_one_or_none()
+    if not vs:
+        return None
+
+    options = []
+    if vs.movie_options:
+        for opt in vs.movie_options:
+            options.append({
+                "title": opt.get("title"),
+                "poster_url": opt.get("poster_url"),
+                "year": opt.get("year"),
+            })
+
+    return {
+        "total_votes": vs.total_votes,
+        "is_open": vs.is_open,
+        "status": vs.status.value if hasattr(vs.status, 'value') else vs.status,
+        "winning_movie_index": vs.winning_movie_index,
+        "closes_at": vs.closes_at.isoformat() if vs.closes_at else None,
+        "close_when_all_voted": vs.close_when_all_voted,
+        "total_tokens": len([t for t in vs.tokens if t.is_active]) if vs.tokens else 0,
+        "vote_counts": vs.get_vote_counts(),
+        "movie_options": options,
+        "vote_reveal_at": session.vote_reveal_at.isoformat() if session.vote_reveal_at else None,
+        "show_results_during_voting": vs.show_results_during_voting,
+    }
+
+
 @router.get(
     "/state",
     response_model=WallmountStateResponse,
@@ -228,22 +265,7 @@ async def get_wallmount_state(
             if template:
                 template_data = template.render_context({})
 
-        # Get vote info if session uses vote mode
-        vote_info = None
-        if session.linked_vote_session_id:
-            result = await db.execute(
-                select(VoteSession)
-                .options(selectinload(VoteSession.votes))
-                .where(VoteSession.id == session.linked_vote_session_id)
-            )
-            vote_session = result.scalar_one_or_none()
-            if vote_session:
-                vote_info = {
-                    "total_votes": vote_session.total_votes,
-                    "is_open": vote_session.is_open,
-                    "status": vote_session.status.value if hasattr(vote_session.status, 'value') else vote_session.status,
-                    "winning_movie_index": vote_session.winning_movie_index,
-                }
+        vote_info = await _build_vote_info(db, session)
 
         return WallmountStateResponse(
             session_id=session.id,
@@ -401,22 +423,7 @@ async def get_wallmount_state(
                     if template:
                         template_data = template.render_context({})
 
-                # Get vote info if session uses vote mode
-                vote_info = None
-                if scheduled_session.linked_vote_session_id:
-                    result = await db.execute(
-                        select(VoteSession)
-                        .options(selectinload(VoteSession.votes))
-                        .where(VoteSession.id == scheduled_session.linked_vote_session_id)
-                    )
-                    vote_session = result.scalar_one_or_none()
-                    if vote_session:
-                        vote_info = {
-                            "total_votes": vote_session.total_votes,
-                            "is_open": vote_session.is_open,
-                            "status": vote_session.status.value if hasattr(vote_session.status, 'value') else vote_session.status,
-                            "winning_movie_index": vote_session.winning_movie_index,
-                        }
+                vote_info = await _build_vote_info(db, scheduled_session)
 
                 return WallmountStateResponse(
                     session_id=scheduled_session.id,
@@ -553,22 +560,7 @@ async def get_wallmount_state(
         if template:
             template_data = template.render_context({})
 
-    # Get vote info if session uses vote mode
-    vote_info = None
-    if session.linked_vote_session_id:
-        result = await db.execute(
-            select(VoteSession)
-            .options(selectinload(VoteSession.votes))
-            .where(VoteSession.id == session.linked_vote_session_id)
-        )
-        vote_session = result.scalar_one_or_none()
-        if vote_session:
-            vote_info = {
-                "total_votes": vote_session.total_votes,
-                "is_open": vote_session.is_open,
-                "status": vote_session.status.value if hasattr(vote_session.status, 'value') else vote_session.status,
-                "winning_movie_index": vote_session.winning_movie_index,
-            }
+    vote_info = await _build_vote_info(db, session)
 
     status_val = session.status.value if hasattr(session.status, 'value') else session.status
     return WallmountStateResponse(
