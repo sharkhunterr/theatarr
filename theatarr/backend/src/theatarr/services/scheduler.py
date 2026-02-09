@@ -97,6 +97,13 @@ class SessionScheduler:
                     await engine.start_session(session.id)
                 except Exception as e:
                     logger.exception(f"Failed to start scheduled session {session.id}: {e}")
+                    # Move back to DRAFT to avoid infinite retry loop
+                    session.status = SessionStatus.DRAFT
+                    await db.commit()
+                    logger.warning(
+                        "Session %s moved back to DRAFT after failed start",
+                        session.id,
+                    )
 
     async def _check_mystery_reveals(self) -> None:
         """Check and reveal any mystery movies that are due."""
