@@ -582,6 +582,39 @@ function AudioForm({
 // ============================================================================
 // MEDIA FORM
 // ============================================================================
+interface AudioTrack {
+  id: number;
+  language: string;
+  language_code: string;
+  codec: string;
+  channels: number;
+  display_title: string;
+  selected: boolean;
+}
+
+interface SubtitleTrack {
+  id: number;
+  language: string;
+  language_code: string;
+  codec: string;
+  display_title: string;
+  forced: boolean;
+  selected: boolean;
+}
+
+interface MediaStreams {
+  audio_tracks: AudioTrack[];
+  subtitle_tracks: SubtitleTrack[];
+}
+
+const QUALITY_PRESETS = [
+  { value: 'original', label: 'Original (Direct Stream)' },
+  { value: '1080p-20', label: '1080p — 20 Mbps' },
+  { value: '1080p-12', label: '1080p — 12 Mbps' },
+  { value: '720p-4', label: '720p — 4 Mbps' },
+  { value: '480p-2', label: '480p — 2 Mbps' },
+];
+
 function MediaForm({
   action,
   onChange,
@@ -604,7 +637,12 @@ function MediaForm({
     change: language === 'fr' ? 'Changer' : 'Change',
     remove: language === 'fr' ? 'Retirer' : 'Remove',
     startPosition: language === 'fr' ? 'Position de départ (ms)' : 'Start Position (ms)',
-    subtitles: language === 'fr' ? 'Activer les sous-titres' : 'Enable subtitles',
+    audioTrack: language === 'fr' ? 'Piste audio' : 'Audio Track',
+    subtitleTrack: language === 'fr' ? 'Sous-titres' : 'Subtitles',
+    videoQuality: language === 'fr' ? 'Qualité vidéo' : 'Video Quality',
+    noSubtitles: language === 'fr' ? 'Aucun' : 'None',
+    defaultTrack: language === 'fr' ? 'Par défaut' : 'Default',
+    loadingStreams: language === 'fr' ? 'Chargement des pistes...' : 'Loading tracks...',
     noService: language === 'fr' ? 'Sélectionnez un service média pour rechercher des films' : 'Select a media service to search for movies',
   };
 
@@ -614,6 +652,14 @@ function MediaForm({
     { value: 'stop', label: language === 'fr' ? 'Arrêter' : 'Stop' },
     { value: 'resume', label: language === 'fr' ? 'Reprendre' : 'Resume' },
   ];
+
+  // Fetch media streams when a movie is selected
+  const mediaId = parameters.media_id as string | undefined;
+  const { data: mediaStreams, isLoading: isStreamsLoading } = useQuery<MediaStreams>({
+    queryKey: ['media-streams', service_id, mediaId],
+    queryFn: () => apiClient.get<MediaStreams>(`/services/${service_id}/media/${mediaId}/streams`),
+    enabled: !!service_id && !!mediaId && command === 'play',
+  });
 
   // Search movies
   const { data: searchResults, isLoading: isSearchLoading } = useQuery<Array<{
@@ -767,6 +813,69 @@ function MediaForm({
             )}
           </div>
 
+          {/* Audio / Subtitle / Quality streams */}
+          {service_id && mediaId && (
+            <div className="space-y-4">
+              {isStreamsLoading ? (
+                <div className="text-sm text-dark-muted p-2">{t.loadingStreams}</div>
+              ) : (
+                <>
+                  {/* Audio Track */}
+                  {mediaStreams && mediaStreams.audio_tracks.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-dark-text mb-1">{t.audioTrack}</label>
+                      <select
+                        value={(parameters.audio_stream_id as number) || ''}
+                        onChange={(e) => handleParametersChange({ audio_stream_id: e.target.value ? Number(e.target.value) : undefined })}
+                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+                      >
+                        <option value="">{t.defaultTrack}</option>
+                        {mediaStreams.audio_tracks.map((track) => (
+                          <option key={track.id} value={track.id}>
+                            {track.display_title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Subtitle Track */}
+                  {mediaStreams && mediaStreams.subtitle_tracks.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-dark-text mb-1">{t.subtitleTrack}</label>
+                      <select
+                        value={(parameters.subtitle_stream_id as number) || ''}
+                        onChange={(e) => handleParametersChange({ subtitle_stream_id: e.target.value ? Number(e.target.value) : undefined })}
+                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+                      >
+                        <option value="">{t.noSubtitles}</option>
+                        {mediaStreams.subtitle_tracks.map((track) => (
+                          <option key={track.id} value={track.id}>
+                            {track.display_title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Video Quality */}
+              <div>
+                <label className="block text-sm font-medium text-dark-text mb-1">{t.videoQuality}</label>
+                <select
+                  value={(parameters.video_quality as string) || 'original'}
+                  onChange={(e) => handleParametersChange({ video_quality: e.target.value })}
+                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+                >
+                  {QUALITY_PRESETS.map((preset) => (
+                    <option key={preset.value} value={preset.value}>{preset.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-dark-text mb-1">{t.startPosition}</label>
             <input
@@ -777,17 +886,6 @@ function MediaForm({
               min="0"
               step="1000"
             />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="subtitles"
-              checked={(parameters.subtitles as boolean) || false}
-              onChange={(e) => handleParametersChange({ subtitles: e.target.checked })}
-              className="w-4 h-4 accent-theatarr-500"
-            />
-            <label htmlFor="subtitles" className="text-sm text-dark-text">{t.subtitles}</label>
           </div>
         </>
       )}

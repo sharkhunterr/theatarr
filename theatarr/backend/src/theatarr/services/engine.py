@@ -437,9 +437,16 @@ class SequenceEngine:
                 and adapter
             ):
                 try:
+                    url_params = {"media_id": ws_params["media_id"]}
+                    if ws_params.get("audio_stream_id"):
+                        url_params["audio_stream_id"] = ws_params["audio_stream_id"]
+                    if ws_params.get("subtitle_stream_id"):
+                        url_params["subtitle_stream_id"] = ws_params["subtitle_stream_id"]
+                    if ws_params.get("video_quality"):
+                        url_params["video_quality"] = ws_params["video_quality"]
                     url_result = await adapter.execute(Command(
                         action="get_playback_url",
-                        parameters={"media_id": ws_params["media_id"]},
+                        parameters=url_params,
                     ))
                     if url_result.success and url_result.data:
                         playback_url = url_result.data.get("playback_url")

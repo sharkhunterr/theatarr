@@ -18,6 +18,15 @@ from theatarr.adapters.base import (
 from theatarr.adapters.registry import AdapterRegistry
 
 
+QUALITY_PRESETS = {
+    "original": {"maxVideoBitrate": "200000", "videoQuality": "100", "directStream": "1"},
+    "1080p-20": {"maxVideoBitrate": "20000", "videoQuality": "100", "directStream": "1"},
+    "1080p-12": {"maxVideoBitrate": "12000", "videoQuality": "75", "directStream": "0"},
+    "720p-4": {"maxVideoBitrate": "4000", "videoQuality": "75", "directStream": "0"},
+    "480p-2": {"maxVideoBitrate": "2000", "videoQuality": "60", "directStream": "0"},
+}
+
+
 @AdapterRegistry.register
 class PlexAdapter(ServiceAdapter):
     """Adapter for Plex Media Server."""
@@ -469,6 +478,14 @@ class PlexAdapter(ServiceAdapter):
             "X-Plex-Platform": "Chrome",
             "X-Plex-Product": "Theatarr",
         }
+
+        # Apply quality preset if specified
+        video_quality = parameters.get("video_quality")
+        if video_quality and video_quality in QUALITY_PRESETS:
+            preset = QUALITY_PRESETS[video_quality]
+            transcode_params["maxVideoBitrate"] = preset["maxVideoBitrate"]
+            transcode_params["videoQuality"] = preset["videoQuality"]
+            transcode_params["directStream"] = preset["directStream"]
 
         # Optional: select specific audio/subtitle streams
         audio_stream_id = parameters.get("audio_stream_id")
