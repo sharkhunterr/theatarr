@@ -109,6 +109,7 @@ export interface Session {
   mystery_config?: MysteryConfig;
   // Display
   display_code?: string;
+  pause_on_display_disconnect?: boolean;
   // Enriched fields from list
   participants_accepted?: number;
   participants_total?: number;

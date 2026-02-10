@@ -85,6 +85,7 @@ class SequenceEngine:
         self.db = db
         self._running_sessions: dict[str, asyncio.Task] = {}
         self._session_locks: dict[str, asyncio.Lock] = {}
+        self._display_states: dict[str, dict] = {}  # session_id -> last display action
 
         # Event callbacks
         self._on_session_state_change: Callable[[str, dict], None] | None = None
@@ -104,6 +105,10 @@ class SequenceEngine:
         self._on_sequence_transition = on_sequence_transition
         self._on_action_executed = on_action_executed
         self._on_action_failed = on_action_failed
+
+    def get_display_state(self, session_id: str) -> dict | None:
+        """Get the last broadcast display action for a session (for reconnection replay)."""
+        return self._display_states.get(session_id)
 
     async def _get_session(self, session_id: str) -> Session:
         """Get a session by ID with sequences and actions loaded."""
@@ -240,6 +245,7 @@ class SequenceEngine:
             session.completed_at = datetime.now(timezone.utc)
             await self.db.commit()
 
+            self._display_states.pop(session_id, None)
             logger.info(f"Stopped session {session_id}")
             await self._emit_state_change(session)
 
@@ -286,6 +292,7 @@ class SequenceEngine:
                     session.status = SessionStatus.COMPLETED
                     session.completed_at = datetime.now(timezone.utc)
                     await self.db.commit()
+                    self._display_states.pop(session_id, None)
                     await self._emit_state_change(session)
                     break
 
@@ -317,6 +324,7 @@ class SequenceEngine:
                 session = await self._get_session(session_id)
                 session.status = SessionStatus.INTERRUPTED
                 await self.db.commit()
+                self._display_states.pop(session_id, None)
                 await self._emit_state_change(session)
             except Exception:
                 pass
@@ -472,6 +480,13 @@ class SequenceEngine:
                 command=action.command,
                 parameters=ws_params,
             )
+            # Track last display action for reconnection replay
+            self._display_states[session_id] = {
+                "action_type": action_type_val,
+                "command": action.command,
+                "parameters": ws_params,
+                "broadcast_at": datetime.now(timezone.utc).isoformat(),
+            }
             logger.info("WS broadcast sent to %d display client(s)", sent)
             if sent > 0:
                 ws_msg = f"Sent to {sent} display client(s)"

@@ -64,6 +64,8 @@ interface ActionPayload {
   action_type: string;
   command: string;
   parameters: Record<string, unknown>;
+  is_replay?: boolean;
+  broadcast_at?: string;
 }
 
 // ============================================================================
@@ -394,6 +396,78 @@ function SessionDisplay() {
     []
   );
 
+  // Handle replayed action (reconnection) — same as normal but seeks video/audio to current position
+  const handleReplayAction = useCallback(
+    (payload: ActionPayload) => {
+      const { action_type, command, parameters, broadcast_at } = payload;
+      const elapsedSec = broadcast_at
+        ? (Date.now() - new Date(broadcast_at).getTime()) / 1000
+        : 0;
+
+      switch (action_type) {
+        case 'media':
+          if (command === 'play') {
+            const url = parameters.url as string;
+            if (url) {
+              setVideoUrl(url);
+              setShowVideo(true);
+              // Seek to current position once video is ready
+              const seekOnReady = () => {
+                const video = videoRef.current;
+                if (video && elapsedSec > 0) {
+                  video.currentTime = elapsedSec;
+                }
+              };
+              // Wait for the next useEffect cycle to set up the video, then seek
+              setTimeout(seekOnReady, 500);
+            } else {
+              setCurrentTemplate(null);
+              setShowVideo(false);
+            }
+          } else if (command === 'pause') {
+            // Session is paused with video — show video paused at position
+            const url = parameters.url as string;
+            if (url) {
+              setVideoUrl(url);
+              setShowVideo(true);
+              setTimeout(() => {
+                const video = videoRef.current;
+                if (video) {
+                  video.currentTime = elapsedSec;
+                  video.pause();
+                }
+              }, 500);
+            }
+          } else if (command === 'stop') {
+            setShowVideo(false);
+            setVideoUrl(null);
+          }
+          break;
+        case 'audio':
+          if (command === 'play') {
+            audioEngine.play(
+              parameters.url as string,
+              (parameters.volume as number) ?? 0.8,
+              0 // No fade on replay
+            );
+            // Audio seek if possible
+            if (elapsedSec > 0 && audioEngine.seek) {
+              setTimeout(() => audioEngine.seek?.(elapsedSec), 200);
+            }
+          }
+          break;
+        case 'display':
+          // Display actions are stateless (images/text) — replay normally
+          handleDisplayAction(command, parameters);
+          break;
+        default:
+          console.log('Replay: unknown action type:', action_type, command);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [audioEngine, handleDisplayAction]
+  );
+
   // WebSocket connection
   const { isConnected, send } = useWebSocket({
     autoConnect: !!session?.session_id,
@@ -407,7 +481,12 @@ function SessionDisplay() {
     },
     onMessage: (message) => {
       if (message.type === 'action_execute' && message.payload) {
-        handleAction(message.payload as unknown as ActionPayload);
+        const payload = message.payload as unknown as ActionPayload;
+        if (payload.is_replay) {
+          handleReplayAction(payload);
+        } else {
+          handleAction(payload);
+        }
         // Receiving an action means session is running — remove idle overlay
         setSession((prev) =>
           prev && prev.session_status !== 'running'

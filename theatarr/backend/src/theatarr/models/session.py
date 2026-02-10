@@ -89,6 +89,11 @@ class Session(UUIDMixin, TimestampMixin, Base):
         default=True,
         nullable=False,
     )
+    pause_on_display_disconnect: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
     workflow: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,

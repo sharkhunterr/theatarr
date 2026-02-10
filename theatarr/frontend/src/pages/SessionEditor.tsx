@@ -19,6 +19,7 @@ import {
   X,
   Palette,
   Vote,
+  ScreenShare,
   Shuffle,
   Info,
   Users,
@@ -315,6 +316,12 @@ export function SessionEditor() {
     name: language === 'fr' ? 'Nom' : 'Name',
     description: language === 'fr' ? 'Description' : 'Description',
     schedule: language === 'fr' ? 'Planification' : 'Schedule',
+    // Display options
+    displayOptions: language === 'fr' ? 'Options d\'affichage' : 'Display Options',
+    pauseOnDisplayDisconnect: language === 'fr' ? 'Pause si display déconnecté' : 'Pause on display disconnect',
+    pauseOnDisplayDisconnectHelp: language === 'fr'
+      ? 'Met la session en pause automatiquement si la page d\'affichage est fermée, et reprend quand elle se reconnecte'
+      : 'Automatically pauses the session if the display page is closed, and resumes when it reconnects',
     // Template
     wallmountTemplate: language === 'fr' ? 'Template Wallmount' : 'Wallmount Template',
     activeTemplateLabel: language === 'fr' ? 'Template actif (global)' : 'Active template (global)',
@@ -606,6 +613,7 @@ export function SessionEditor() {
         movie_selection_mode: mode,
         template_id: session.template_id || null,
         enrichment_options: Object.keys(enrichOpts).length > 0 ? enrichOpts : null,
+        pause_on_display_disconnect: session.pause_on_display_disconnect || false,
       };
 
       // Mode-specific fields
@@ -917,6 +925,26 @@ export function SessionEditor() {
                 />
               </div>
               <p className="text-xs text-dark-muted mt-2">{t.scheduledAtHelp}</p>
+            </div>
+
+            {/* Display Options */}
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
+              <label className="text-sm font-medium text-dark-text flex items-center gap-2 mb-3">
+                <ScreenShare size={16} className="text-theatarr-500" />
+                {t.displayOptions}
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={session.pause_on_display_disconnect || false}
+                  onChange={(e) => setSession({ ...session, pause_on_display_disconnect: e.target.checked })}
+                  className="mt-1 w-4 h-4 rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500 focus:ring-offset-0"
+                />
+                <div>
+                  <span className="text-sm text-dark-text">{t.pauseOnDisplayDisconnect}</span>
+                  <p className="text-xs text-dark-muted mt-0.5">{t.pauseOnDisplayDisconnectHelp}</p>
+                </div>
+              </label>
             </div>
 
             {/* Wallmount Template */}

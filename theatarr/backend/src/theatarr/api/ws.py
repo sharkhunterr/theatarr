@@ -104,12 +104,20 @@ class WebSocketManager:
 
     async def disconnect(self, websocket: WebSocket) -> None:
         """Handle client disconnection."""
+        display_sessions_to_check: list[str] = []
         async with self._lock:
             client = self._clients.pop(websocket, None)
             if client:
                 # Remove from all channels
                 for channel in client.subscriptions:
                     self._channels[channel].discard(websocket)
+                    # Track display channels that lost their last subscriber
+                    if channel.startswith(f"{Channel.DISPLAY.value}:") and len(self._channels[channel]) == 0:
+                        display_sessions_to_check.append(channel.split(":", 1)[1])
+
+        # Handle display disconnect outside the lock
+        for session_id in display_sessions_to_check:
+            await self._handle_display_disconnect(session_id)
 
     async def subscribe(self, websocket: WebSocket, channel: str) -> bool:
         """Subscribe a client to a channel."""
@@ -242,6 +250,9 @@ class WebSocketManager:
                 await self.subscribe(websocket, channel)
                 # Also subscribe to session state updates
                 await self.subscribe(websocket, Channel.SESSION.value)
+
+                # Replay current display state and auto-resume if needed
+                await self._handle_display_subscribe(websocket, session_id)
             else:
                 await self._send(
                     websocket,
@@ -308,6 +319,62 @@ class WebSocketManager:
                 },
             },
         )
+
+    async def _handle_display_subscribe(self, websocket: WebSocket, session_id: str) -> None:
+        """Replay display state on subscribe and auto-resume if session was paused on disconnect."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            from theatarr.services.engine import _engine
+            if not _engine:
+                return
+
+            # Replay last display action if session has one
+            display_state = _engine.get_display_state(session_id)
+            if display_state:
+                await self._send(websocket, {
+                    "type": "action_execute",
+                    "payload": {
+                        **display_state,
+                        "is_replay": True,
+                    },
+                })
+
+            # Auto-resume if session was paused and has pause_on_display_disconnect
+            session = await _engine._get_session(session_id)
+            from theatarr.models.session import SessionStatus
+            if (
+                session.pause_on_display_disconnect
+                and session.status == SessionStatus.PAUSED
+            ):
+                logger.info("Display reconnected for session %s — auto-resuming", session_id)
+                await _engine.resume_session(session_id)
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "Failed to handle display subscribe for session %s: %s", session_id, e
+            )
+
+    async def _handle_display_disconnect(self, session_id: str) -> None:
+        """Pause session if pause_on_display_disconnect is enabled and session is running."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            from theatarr.services.engine import _engine
+            if not _engine:
+                return
+
+            session = await _engine._get_session(session_id)
+            from theatarr.models.session import SessionStatus
+            if (
+                session.pause_on_display_disconnect
+                and session.status == SessionStatus.RUNNING
+            ):
+                logger.info("Display disconnected for session %s — auto-pausing", session_id)
+                await _engine.pause_session(session_id)
+        except Exception as e:
+            logger.warning("Failed to auto-pause session %s on display disconnect: %s", session_id, e)
 
     async def broadcast_wallmount_state(self, state: dict) -> int:
         """Broadcast wallmount state to all wallmount subscribers."""

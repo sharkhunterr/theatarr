@@ -166,6 +166,7 @@ class SessionBase(BaseSchema):
     movie_source: str | None = None
     scheduled_at: datetime | None = None
     auto_resume_enabled: bool = True
+    pause_on_display_disconnect: bool = False
     color_palette: dict | None = None
 
 
@@ -208,6 +209,7 @@ class SessionUpdate(BaseSchema):
     movie_source: str | None = None
     scheduled_at: datetime | None = None
     auto_resume_enabled: bool | None = None
+    pause_on_display_disconnect: bool | None = None
     sequences: list[SequenceInput] | None = None
     workflow: dict | None = None  # JSON workflow data (nodes, edges)
     color_palette: dict | None = None
