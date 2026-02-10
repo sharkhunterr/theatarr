@@ -12,6 +12,7 @@ import { WallmountPage } from './pages/WallmountPage';
 import { TemplateManager } from './pages/TemplateManager';
 import { VotePage } from './pages/VotePage';
 import { VoteSessionManager } from './pages/VoteSessionManager';
+import { DisplayCodeInput, SessionDisplay } from './pages/DisplayPage';
 import { TrailersManager } from './pages/TrailersManager';
 import { ConfigPage } from './pages/ConfigPage';
 import { SessionHistory } from './pages/SessionHistory';
@@ -134,6 +135,8 @@ function AppRoutes() {
       <Route path="/wallmount" element={<WallmountPage />} />
       <Route path="/wallmount/:sessionId" element={<WallmountPage />} />
       <Route path="/vote/:token" element={<VotePage />} />
+      <Route path="/display" element={<DisplayCodeInput />} />
+      <Route path="/display/:code" element={<SessionDisplay />} />
       <Route path="/login" element={<Login />} />
 
       {/* Protected routes */}

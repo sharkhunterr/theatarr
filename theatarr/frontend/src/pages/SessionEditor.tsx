@@ -5,8 +5,6 @@ import { Node } from 'reactflow';
 import {
   ArrowLeft,
   Save,
-  List,
-  GitBranch,
   Trash2,
   ChevronUp,
   ChevronDown,
@@ -179,6 +177,7 @@ function workflowToActions(workflow: WorkflowData): ActionItem[] {
       command: n.data.command || '',
       parameters: (n.data.parameters || {}) as Record<string, unknown>,
       delay_ms: n.data.delay_ms || 0,
+      duration_ms: n.data.duration_ms || 0,
       on_failure: n.data.on_failure || 'warn',
       service_id: n.data.service_id as string | undefined,
     }));
@@ -212,6 +211,7 @@ function actionsToWorkflow(actions: ActionItem[]): WorkflowData {
         command: action.command,
         parameters: action.parameters,
         delay_ms: action.delay_ms,
+        duration_ms: action.duration_ms,
         on_failure: action.on_failure,
         service_id: action.service_id,
       },
@@ -361,7 +361,7 @@ export function SessionEditor() {
   });
   const [isLoading, setIsLoading] = useState(!isNew);
   const [isSaving, setIsSaving] = useState(false);
-  const [editorMode, setEditorMode] = useState<EditorMode>('linear');
+  const [editorMode] = useState<EditorMode>('linear');
   const [selectedNode, setSelectedNode] = useState<Node<WorkflowNodeData> | null>(null);
   const [selectedActionIndex, setSelectedActionIndex] = useState<number | null>(null);
   const [actions, setActions] = useState<ActionItem[]>([]);
@@ -734,6 +734,7 @@ export function SessionEditor() {
       command: defaultCommands[type],
       parameters: {},
       delay_ms: 0,
+      duration_ms: 0,
       on_failure: 'warn',
     };
     const newActions = [...actions, newAction];
@@ -761,18 +762,6 @@ export function SessionEditor() {
     newActions.splice(toIndex, 0, moved);
     setActions(newActions);
     setSelectedActionIndex(toIndex);
-  };
-
-  const handleModeSwitch = (mode: EditorMode) => {
-    if (mode === 'node' && editorMode === 'linear') {
-      const newWorkflow = actionsToWorkflow(actions);
-      setSession((prev) => (prev ? { ...prev, workflow: newWorkflow } : null));
-    } else if (mode === 'linear' && editorMode === 'node' && session?.workflow) {
-      setActions(workflowToActions(session.workflow));
-    }
-    setEditorMode(mode);
-    setSelectedNode(null);
-    setSelectedActionIndex(null);
   };
 
   if (isLoading) {
@@ -1224,36 +1213,8 @@ export function SessionEditor() {
         {/* ACTIONS TAB */}
         {activeTab === 'actions' && (
           <div className="flex flex-col h-full">
-            {/* Mode toggle + Mobile panel switcher */}
+            {/* Mobile panel switcher */}
             <div className="flex items-center justify-between gap-2 mb-3 flex-shrink-0">
-              {/* Editor mode toggle (Linear/Nodes) */}
-              <div className="hidden md:flex rounded-lg overflow-hidden border border-dark-border">
-                <button
-                  onClick={() => handleModeSwitch('linear')}
-                  className={clsx(
-                    'px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors',
-                    editorMode === 'linear'
-                      ? 'bg-theatarr-500 text-white'
-                      : 'bg-dark-surface text-dark-muted hover:text-dark-text'
-                  )}
-                >
-                  <List size={14} />
-                  {t.linearMode}
-                </button>
-                <button
-                  onClick={() => handleModeSwitch('node')}
-                  className={clsx(
-                    'px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors',
-                    editorMode === 'node'
-                      ? 'bg-theatarr-500 text-white'
-                      : 'bg-dark-surface text-dark-muted hover:text-dark-text'
-                  )}
-                >
-                  <GitBranch size={14} />
-                  {t.nodeMode}
-                </button>
-              </div>
-
               {/* Mobile tab switcher for actions/properties */}
               <div className="md:hidden flex flex-1 gap-1">
                 <button

@@ -252,6 +252,9 @@ class SessionResponse(SessionBase, IDTimestampSchema):
     current_sequence_elapsed_ms: int
     total_sequences: int = 0
 
+    # Display code for pairing a browser to this session
+    display_code: str | None = None
+
     # Movie selection mode fields
     movie_selection_mode: MovieSelectionMode = MovieSelectionMode.FIXED
     movie_resolved: bool = False

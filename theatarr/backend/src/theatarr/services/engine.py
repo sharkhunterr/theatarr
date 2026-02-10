@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 TRANSITION_OVERHEAD_TARGET_MS = 200
 
 
+def _enum_val(v: Any) -> str:
+    """Safely extract .value from an enum or return string as-is."""
+    return v.value if hasattr(v, 'value') else v
+
+
 class EngineError(Exception):
     """Base exception for engine errors."""
 
@@ -118,10 +123,15 @@ class SequenceEngine:
 
     async def _emit_state_change(self, session: Session) -> None:
         """Emit session state change event."""
+        logger.info(
+            "Emitting state change: session=%s status=%s seq_index=%d/%d",
+            session.id, _enum_val(session.status),
+            session.current_sequence_index, session.total_sequences,
+        )
         if self._on_session_state_change:
             state = {
                 "session_id": session.id,
-                "status": session.status.value,
+                "status": _enum_val(session.status),
                 "current_sequence_index": session.current_sequence_index,
                 "current_sequence_elapsed_ms": session.current_sequence_elapsed_ms,
                 "total_sequences": session.total_sequences,
@@ -130,7 +140,7 @@ class SequenceEngine:
                 state["current_sequence"] = {
                     "id": session.current_sequence.id,
                     "name": session.current_sequence.name,
-                    "duration_type": session.current_sequence.duration_type.value,
+                    "duration_type": _enum_val(session.current_sequence.duration_type),
                     "duration_ms": session.current_sequence.duration_ms,
                 }
             await asyncio.to_thread(self._on_session_state_change, session.id, state)
@@ -281,6 +291,7 @@ class SequenceEngine:
 
                 sequence = session.current_sequence
                 if not sequence:
+                    logger.warning("Session %s: no current sequence at index %d", session_id, session.current_sequence_index)
                     break
 
                 # Execute sequence
@@ -289,9 +300,11 @@ class SequenceEngine:
                 # Check if still running after sequence
                 session = await self._get_session(session_id)
                 if session.status != SessionStatus.RUNNING:
+                    logger.info("Session %s: status changed to %s during sequence, stopping", session_id, _enum_val(session.status))
                     break
 
                 # Move to next sequence
+                logger.info("Session %s: transitioning from sequence %d to next", session_id, session.current_sequence_index)
                 await self._transition_to_next_sequence(session)
 
         except asyncio.CancelledError:
@@ -311,7 +324,13 @@ class SequenceEngine:
 
     async def _execute_sequence(self, session: Session, sequence: Sequence) -> None:
         """Execute a single sequence."""
-        logger.info(f"Executing sequence {sequence.name} ({sequence.id})")
+        duration_ms = sequence.effective_duration_ms
+        logger.info(
+            "Executing sequence %s (%s) — duration_type=%s duration_ms=%s effective=%dms, %d action(s)",
+            sequence.name, sequence.id,
+            _enum_val(sequence.duration_type), sequence.duration_ms,
+            duration_ms, len(sequence.actions),
+        )
 
         # Execute all actions at sequence start
         for action in sequence.actions:
@@ -319,13 +338,28 @@ class SequenceEngine:
                 await asyncio.sleep(action.delay_ms / 1000)
 
             result = await self._execute_action(action)
+            logger.info(
+                "Action %s result: success=%s message=%s",
+                action.id, result.success, result.message,
+            )
 
-            if not result.success and action.on_failure == OnFailure.ABORT:
+            if not result.success and _enum_val(action.on_failure) == OnFailure.ABORT.value:
                 raise EngineError(f"Action {action.id} failed: {result.error}")
 
         # Wait for sequence duration
-        duration_ms = sequence.effective_duration_ms
-        if duration_ms > 0:
+        dur_type = _enum_val(sequence.duration_type)
+        if dur_type == "manual":
+            # Manual sequence: wait indefinitely until status changes (skip/stop/pause)
+            logger.info("Sequence %s is MANUAL — waiting for external signal (skip/stop)", sequence.name)
+            while True:
+                await asyncio.sleep(1)
+                session = await self._get_session(session.id)
+                if session.status != SessionStatus.RUNNING:
+                    return
+                # If current_sequence_index changed (via skip), break out
+                if session.current_sequence_index != sequence.order_index:
+                    return
+        elif duration_ms > 0:
             elapsed = session.current_sequence_elapsed_ms
             remaining = max(0, duration_ms - elapsed)
 
@@ -347,33 +381,95 @@ class SequenceEngine:
                 remaining -= wait_ms
 
     async def _execute_action(self, action: Action) -> ActionResult:
-        """Execute a single action via the appropriate adapter."""
+        """Execute a single action via the appropriate adapter and/or display channel."""
         start_time = datetime.now(timezone.utc)
 
         try:
-            # Get adapter instance for the service
+            from theatarr.api.ws import ws_manager
+
+            session_id = action.sequence.session_id
+            success = True
+            message = ""
+
+            # 1) Execute via adapter if service_id is set
             if action.service_id:
                 adapter = AdapterRegistry.get_instance(action.service_id)
-            else:
-                # Use mock adapter for testing
-                adapter = AdapterRegistry.get_instance("mock")
+                if not adapter:
+                    # Adapter not in cache — try loading from DB
+                    from theatarr.models.service import Service
+                    svc_result = await self.db.execute(
+                        select(Service).where(Service.id == action.service_id)
+                    )
+                    svc = svc_result.scalar_one_or_none()
+                    if svc and svc.is_enabled:
+                        try:
+                            adapter = AdapterRegistry.create_adapter(
+                                svc.adapter_type,
+                                svc.config,
+                                instance_id=svc.id,
+                            )
+                            logger.info("Auto-loaded adapter %s for service %s", svc.adapter_type, svc.id)
+                        except Exception as e:
+                            logger.warning("Failed to create adapter for service %s: %s", svc.id, e)
+                    elif svc:
+                        logger.warning("Service %s is disabled, skipping adapter", svc.id)
+                    else:
+                        logger.warning("No service found with id %s for action %s", action.service_id, action.id)
 
-            if not adapter:
-                # No adapter available, log and continue
-                logger.warning(f"No adapter for action {action.id}, skipping")
-                return ActionResult(
-                    action_id=action.id,
-                    success=True,
-                    message="No adapter available, skipped",
-                )
+                if adapter:
+                    command = Command(
+                        action=action.command,
+                        parameters=action.parameters,
+                        targets=action.targets,
+                    )
+                    result = await adapter.execute(command)
+                    success = result.success
+                    message = result.message or ""
 
-            # Execute command
-            command = Command(
-                action=action.command,
-                parameters=action.parameters,
-                targets=action.targets,
+            # 2) Resolve stream URL for media:play if adapter can provide it
+            ws_params = dict(action.parameters or {})
+            action_type_val = _enum_val(action.action_type)
+            if (
+                action_type_val == "media"
+                and action.command == "play"
+                and "url" not in ws_params
+                and ws_params.get("media_id")
+                and adapter
+            ):
+                try:
+                    url_result = await adapter.execute(Command(
+                        action="get_playback_url",
+                        parameters={"media_id": ws_params["media_id"]},
+                    ))
+                    if url_result.success and url_result.data:
+                        playback_url = url_result.data.get("playback_url")
+                        if playback_url:
+                            ws_params["url"] = playback_url
+                            logger.info("Resolved playback URL for media_id %s", ws_params["media_id"])
+                except Exception as e:
+                    logger.warning("Failed to resolve playback URL: %s", e)
+
+            # 3) Always notify display clients via WebSocket
+            logger.info(
+                "Broadcasting WS action_execute: %s:%s to session %s (params keys: %s)",
+                action_type_val, action.command, session_id,
+                list(ws_params.keys()),
             )
-            result = await adapter.execute(command)
+            sent = await ws_manager.broadcast_display_action(
+                session_id=session_id,
+                action_type=action_type_val,
+                command=action.command,
+                parameters=ws_params,
+            )
+            logger.info("WS broadcast sent to %d display client(s)", sent)
+            if sent > 0:
+                ws_msg = f"Sent to {sent} display client(s)"
+                message = f"{message}; {ws_msg}" if message else ws_msg
+            elif sent == 0:
+                logger.warning(
+                    "Action %s: no display client connected (session %s)",
+                    action.id, session_id,
+                )
 
             duration_ms = int(
                 (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
@@ -381,35 +477,38 @@ class SequenceEngine:
 
             action_result = ActionResult(
                 action_id=action.id,
-                success=result.success,
-                message=result.message,
+                success=success,
+                message=message,
                 duration_ms=duration_ms,
-                error=result.message if not result.success else None,
+                error=message if not success else None,
             )
 
             # Emit event
-            if self._on_action_executed and result.success:
+            action_type_str = _enum_val(action.action_type)
+            on_failure_str = _enum_val(action.on_failure)
+
+            if self._on_action_executed and success:
                 await asyncio.to_thread(
                     self._on_action_executed,
                     action.sequence.session_id,
                     {
                         "action_id": action.id,
-                        "action_type": action.action_type.value,
+                        "action_type": action_type_str,
                         "command": action.command,
                         "success": True,
                         "duration_ms": duration_ms,
                     },
                 )
-            elif self._on_action_failed and not result.success:
+            elif self._on_action_failed and not success:
                 await asyncio.to_thread(
                     self._on_action_failed,
                     action.sequence.session_id,
                     {
                         "action_id": action.id,
-                        "action_type": action.action_type.value,
+                        "action_type": action_type_str,
                         "command": action.command,
-                        "error": result.message,
-                        "on_failure": action.on_failure.value,
+                        "error": message,
+                        "on_failure": on_failure_str,
                     },
                 )
 
@@ -436,6 +535,12 @@ class SequenceEngine:
         next_index = session.current_sequence_index + 1
 
         if next_index >= session.total_sequences:
+            # All sequences done — mark session as completed
+            session.status = SessionStatus.COMPLETED
+            session.completed_at = datetime.now(timezone.utc)
+            await self.db.commit()
+            logger.info(f"Session {session.id} completed (all sequences done)")
+            await self._emit_state_change(session)
             return
 
         next_sequence = session.sequences[next_index]
@@ -496,7 +601,7 @@ class SequenceEngine:
         session = await self._get_session(session_id)
         state = {
             "session_id": session.id,
-            "status": session.status.value,
+            "status": _enum_val(session.status),
             "current_sequence_index": session.current_sequence_index,
             "current_sequence_elapsed_ms": session.current_sequence_elapsed_ms,
             "total_sequences": session.total_sequences,
@@ -507,7 +612,7 @@ class SequenceEngine:
             state["current_sequence"] = {
                 "id": seq.id,
                 "name": seq.name,
-                "duration_type": seq.duration_type.value,
+                "duration_type": _enum_val(seq.duration_type),
                 "duration_ms": seq.duration_ms,
                 "remaining_ms": remaining,
             }
@@ -518,9 +623,27 @@ class SequenceEngine:
 _engine: SequenceEngine | None = None
 
 
+def _setup_ws_callbacks(engine: SequenceEngine) -> None:
+    """Wire engine callbacks to broadcast state changes via WebSocket."""
+    from theatarr.api.ws import ws_manager
+
+    loop = asyncio.get_event_loop()
+
+    def on_session_state_change(session_id: str, state: dict) -> None:
+        asyncio.run_coroutine_threadsafe(
+            ws_manager.broadcast_session_state(session_id, state),
+            loop,
+        )
+
+    engine.set_callbacks(
+        on_session_state_change=on_session_state_change,
+    )
+
+
 def get_engine(db: AsyncSession) -> SequenceEngine:
     """Get or create engine instance."""
     global _engine
     if _engine is None or _engine.db != db:
         _engine = SequenceEngine(db)
+        _setup_ws_callbacks(_engine)
     return _engine

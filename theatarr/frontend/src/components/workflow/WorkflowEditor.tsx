@@ -57,6 +57,7 @@ export interface WorkflowNodeData {
   command?: string;
   parameters?: Record<string, unknown>;
   delay_ms?: number;
+  duration_ms?: number;
   condition?: string;
   on_failure?: 'warn' | 'skip' | 'abort';
   service_id?: string;

@@ -16,6 +16,7 @@ class TemplateType(str, Enum):
     COUNTDOWN = "countdown"
     MOVIE_INFO = "movie_info"
     SESSION_STATUS = "session_status"
+    WAITING_SCREEN = "waiting_screen"
     CUSTOM = "custom"
 
 
@@ -842,6 +843,83 @@ BUILTIN_TEMPLATES = {
                     "default": "#6b7280",
                 },
             },
+        },
+    },
+    # ============================================================
+    # WAITING SCREEN TEMPLATES (Display/Kiosk mode)
+    # ============================================================
+    "waiting_poster_centered": {
+        "name": "Attente Affiche Centree",
+        "description": "Fond noir avec affiche centree grand format, titre en bas et badge A venir pulse",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-poster-centered",
+            "components": [
+                {"type": "backdrop", "opacity": 0.15, "blur": 10},
+                {"type": "session_info", "position": "top-center", "fields": ["name"]},
+                {"type": "poster", "position": "center", "size": "large"},
+                {"type": "title", "position": "bottom-center", "size": "xlarge"},
+                {"type": "badge", "text": "A venir", "position": "top-right", "style": "pulse"},
+            ]
+        },
+        "config": {
+            "theme": "dark",
+            "background_color": "#000000",
+            "use_palette_colors": True,
+            "badge": {
+                "text": "A venir",
+                "show_when": "always",
+                "style": "pulse",
+                "color": "palette.accent",
+            },
+        },
+    },
+    "waiting_ambient": {
+        "name": "Attente Ambiance",
+        "description": "Backdrop plein ecran floute avec affiche a gauche et informations detaillees a droite, ambiance cinema immersive",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-ambient",
+            "components": [
+                {"type": "backdrop", "opacity": 0.4, "blur": 20},
+                {"type": "poster", "position": "left", "size": "large"},
+                {"type": "title", "size": "xlarge"},
+                {"type": "tagline", "style": "italic"},
+                {"type": "genres", "style": "pills"},
+                {"type": "metadata", "fields": ["year", "runtime", "rating"]},
+                {"type": "session_info", "position": "bottom", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "dark",
+            "use_palette_colors": True,
+            "show_genres": True,
+            "show_rating": True,
+        },
+    },
+    "waiting_minimal": {
+        "name": "Attente Minimale",
+        "description": "Fond noir uni avec titre geant centre et nom de session, design ultra sobre pour ambiance cinema",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-minimal",
+            "components": [
+                {"type": "color_background", "color": "#000000"},
+                {"type": "title", "size": "giant", "position": "center", "style": "minimal"},
+                {"type": "session_info", "position": "center", "fields": ["name"]},
+                {"type": "custom_text", "text": "La seance va bientot commencer", "position": "bottom-center", "style": "minimal-label"},
+            ]
+        },
+        "config": {
+            "theme": "minimal",
+            "background_color": "#000000",
+            "text_color": "#ffffff",
+            "show_poster": False,
+            "show_metadata": False,
+            "typography": "mono",
         },
     },
 }

@@ -1,6 +1,8 @@
 """Plex Media Server adapter."""
 
+import uuid
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 
@@ -167,8 +169,13 @@ class PlexAdapter(ServiceAdapter):
             ),
             Capability(
                 name="get_playback_url",
+                parameters=["media_id", "audio_stream_id", "subtitle_stream_id"],
+                description="Get browser-compatible transcoded URL for media playback",
+            ),
+            Capability(
+                name="get_media_streams",
                 parameters=["media_id"],
-                description="Get URL for media playback",
+                description="List available audio and subtitle tracks for a media",
             ),
             Capability(
                 name="list_clients",
@@ -202,6 +209,8 @@ class PlexAdapter(ServiceAdapter):
                 return await self._search(command.parameters)
             elif command.action == "get_playback_url":
                 return await self._get_playback_url(command.parameters)
+            elif command.action == "get_media_streams":
+                return await self._get_media_streams(command.parameters)
             elif command.action == "list_clients":
                 return await self._list_clients()
             elif command.action == "play_on_client":
@@ -425,7 +434,12 @@ class PlexAdapter(ServiceAdapter):
         )
 
     async def _get_playback_url(self, parameters: dict[str, Any]) -> CommandResult:
-        """Get playback URL for media."""
+        """Get browser-compatible playback URL using Plex universal transcoder.
+
+        Uses directStream mode: video is direct-streamed (no transcode if codec
+        is compatible), audio is transcoded to AAC if needed, container is MP4.
+        This ensures browser compatibility (DTS/AC3/TrueHD → AAC).
+        """
         if not self._client:
             return CommandResult(success=False, message="Not connected")
 
@@ -433,7 +447,60 @@ class PlexAdapter(ServiceAdapter):
         if not media_id:
             return CommandResult(success=False, message="media_id is required")
 
-        # Get media info to find the part key
+        # Build Plex universal transcoder URL
+        session_id = str(uuid.uuid4())
+        transcode_params = {
+            "path": f"/library/metadata/{media_id}",
+            "mediaIndex": "0",
+            "partIndex": "0",
+            "protocol": "hls",
+            "fastSeek": "1",
+            "directPlay": "0",
+            "directStream": "1",
+            "directStreamAudio": "0",  # Force audio transcode → AAC
+            "videoQuality": "100",
+            "maxVideoBitrate": "40000",
+            "subtitleSize": "100",
+            "audioBoost": "100",
+            "location": "lan",
+            "session": session_id,
+            "X-Plex-Token": self.token,
+            "X-Plex-Client-Identifier": "theatarr",
+            "X-Plex-Platform": "Chrome",
+            "X-Plex-Product": "Theatarr",
+        }
+
+        # Optional: select specific audio/subtitle streams
+        audio_stream_id = parameters.get("audio_stream_id")
+        subtitle_stream_id = parameters.get("subtitle_stream_id")
+        if audio_stream_id:
+            transcode_params["audioStreamID"] = str(audio_stream_id)
+        if subtitle_stream_id:
+            transcode_params["subtitleStreamID"] = str(subtitle_stream_id)
+
+        playback_url = (
+            f"{self.server_url}/video/:/transcode/universal/start.m3u8"
+            f"?{urlencode(transcode_params)}"
+        )
+
+        return CommandResult(
+            success=True,
+            data={
+                "playback_url": playback_url,
+                "protocol": "hls",
+                "session_id": session_id,
+            },
+        )
+
+    async def _get_media_streams(self, parameters: dict[str, Any]) -> CommandResult:
+        """List available audio and subtitle tracks for a media."""
+        if not self._client:
+            return CommandResult(success=False, message="Not connected")
+
+        media_id = parameters.get("media_id")
+        if not media_id:
+            return CommandResult(success=False, message="media_id is required")
+
         response = await self._client.get(
             f"{self.server_url}/library/metadata/{media_id}"
         )
@@ -443,20 +510,45 @@ class PlexAdapter(ServiceAdapter):
         if not metadata:
             return CommandResult(success=False, message="Media not found")
 
-        media = metadata[0].get("Media", [])
-        if not media:
+        media_list = metadata[0].get("Media", [])
+        if not media_list:
             return CommandResult(success=False, message="No media files found")
 
-        part = media[0].get("Part", [])
-        if not part:
-            return CommandResult(success=False, message="No media parts found")
+        # Collect streams from first media entry
+        streams = media_list[0].get("Part", [{}])[0].get("Stream", [])
 
-        part_key = part[0].get("key")
-        playback_url = f"{self.server_url}{part_key}?X-Plex-Token={self.token}"
+        audio_tracks = []
+        subtitle_tracks = []
+
+        for stream in streams:
+            stream_type = stream.get("streamType")
+            if stream_type == 2:  # Audio
+                audio_tracks.append({
+                    "id": stream.get("id"),
+                    "language": stream.get("language", "Unknown"),
+                    "language_code": stream.get("languageCode", ""),
+                    "codec": stream.get("codec", ""),
+                    "channels": stream.get("channels", 0),
+                    "display_title": stream.get("displayTitle", ""),
+                    "selected": stream.get("selected", False),
+                })
+            elif stream_type == 3:  # Subtitle
+                subtitle_tracks.append({
+                    "id": stream.get("id"),
+                    "language": stream.get("language", "Unknown"),
+                    "language_code": stream.get("languageCode", ""),
+                    "codec": stream.get("codec", ""),
+                    "display_title": stream.get("displayTitle", ""),
+                    "forced": stream.get("forced", False),
+                    "selected": stream.get("selected", False),
+                })
 
         return CommandResult(
             success=True,
-            data={"playback_url": playback_url},
+            data={
+                "audio_tracks": audio_tracks,
+                "subtitle_tracks": subtitle_tracks,
+            },
         )
 
     async def _list_clients(self) -> CommandResult:

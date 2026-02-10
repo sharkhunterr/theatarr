@@ -21,6 +21,7 @@ class Channel(str, Enum):
     WALLMOUNT = "wallmount"
     VOTE = "vote"
     SERVICES = "services"
+    DISPLAY = "display"  # Per-session: display:{session_id}
 
 
 @dataclass
@@ -233,6 +234,38 @@ class WebSocketManager:
             else:
                 await self.subscribe(websocket, Channel.VOTE.value)
 
+        elif msg_type == "subscribe_display":
+            # Subscribe to display channel for a specific session
+            session_id = payload.get("session_id")
+            if session_id:
+                channel = f"{Channel.DISPLAY.value}:{session_id}"
+                await self.subscribe(websocket, channel)
+                # Also subscribe to session state updates
+                await self.subscribe(websocket, Channel.SESSION.value)
+            else:
+                await self._send(
+                    websocket,
+                    {
+                        "type": "error",
+                        "payload": {
+                            "code": "MISSING_SESSION_ID",
+                            "message": "session_id is required for subscribe_display",
+                        },
+                    },
+                )
+
+        elif msg_type == "playback_ended":
+            # Display client reports playback has ended
+            session_id = payload.get("session_id")
+            if session_id:
+                await self.broadcast(
+                    Channel.SESSION.value,
+                    {
+                        "type": "playback_ended",
+                        "payload": {"session_id": session_id},
+                    },
+                )
+
         else:
             await self._send(
                 websocket,
@@ -337,6 +370,30 @@ class WebSocketManager:
         )
 
         return general_count + session_count
+
+    async def broadcast_display_action(
+        self,
+        session_id: str,
+        action_type: str,
+        command: str,
+        parameters: dict,
+    ) -> int:
+        """Broadcast an action to the display channel for a session.
+
+        Used by the engine when an action has no service_id,
+        meaning it should be executed by the connected browser/kiosk.
+        """
+        return await self.broadcast(
+            f"{Channel.DISPLAY.value}:{session_id}",
+            {
+                "type": "action_execute",
+                "payload": {
+                    "action_type": action_type,
+                    "command": command,
+                    "parameters": parameters,
+                },
+            },
+        )
 
 
 # Global WebSocket manager instance

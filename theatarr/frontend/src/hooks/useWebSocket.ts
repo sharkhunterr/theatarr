@@ -58,6 +58,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Use refs for callbacks to avoid triggering reconnects when they change
+  const onMessageRef = useRef(onMessage);
+  const onConnectRef = useRef(onConnect);
+  const onDisconnectRef = useRef(onDisconnect);
+  const onErrorRef = useRef(onError);
+  onMessageRef.current = onMessage;
+  onConnectRef.current = onConnect;
+  onDisconnectRef.current = onDisconnect;
+  onErrorRef.current = onError;
+
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
@@ -86,7 +96,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       setIsConnected(true);
       setIsConnecting(false);
       reconnectCountRef.current = 0;
-      onConnect?.();
+      onConnectRef.current?.();
 
       // Start ping interval (every 30 seconds)
       pingIntervalRef.current = setInterval(() => {
@@ -99,7 +109,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     ws.onclose = () => {
       setIsConnected(false);
       setIsConnecting(false);
-      onDisconnect?.();
+      onDisconnectRef.current?.();
 
       // Clear ping interval
       if (pingIntervalRef.current) {
@@ -107,7 +117,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         pingIntervalRef.current = null;
       }
 
-      // Attempt reconnect
+      // Attempt reconnect with exponential backoff
       if (reconnectCountRef.current < reconnectAttempts) {
         const delay = Math.min(
           reconnectInterval * Math.pow(2, reconnectCountRef.current),
@@ -122,24 +132,20 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     };
 
     ws.onerror = (event) => {
-      onError?.(event);
+      onErrorRef.current?.(event);
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as WebSocketMessage;
         setLastMessage(message);
-        onMessage?.(message);
+        onMessageRef.current?.(message);
       } catch {
         console.error('Failed to parse WebSocket message:', event.data);
       }
     };
   }, [
     buildUrl,
-    onConnect,
-    onDisconnect,
-    onError,
-    onMessage,
     reconnectAttempts,
     reconnectInterval,
   ]);

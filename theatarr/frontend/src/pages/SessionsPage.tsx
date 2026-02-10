@@ -16,6 +16,9 @@ import {
   Trophy,
   Eye,
   Monitor,
+  ScreenShare,
+  Copy,
+  Check,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { getMysteryRevealCountdown, getVoteRevealCountdown } from '../utils/countdown';
@@ -41,6 +44,7 @@ export function SessionsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [voteResultsSession, setVoteResultsSession] = useState<VoteSessionSummary | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const t = {
     title: language === 'fr' ? 'Sessions' : 'Sessions',
@@ -73,6 +77,9 @@ export function SessionsPage() {
     votes: language === 'fr' ? 'votes' : 'votes',
     winner: language === 'fr' ? 'Gagnant' : 'Winner',
     wallmount: language === 'fr' ? 'Wallmount' : 'Wallmount',
+    display: language === 'fr' ? 'Display' : 'Display',
+    copyCode: language === 'fr' ? 'Copier le code' : 'Copy code',
+    codeCopied: language === 'fr' ? 'Copié !' : 'Copied!',
   };
 
   useEffect(() => {
@@ -395,6 +402,28 @@ export function SessionsPage() {
                         </span>
                       )}
 
+                      {/* Display code */}
+                      {session.display_code && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(session.display_code!);
+                            setCopiedCode(session.id);
+                            setTimeout(() => setCopiedCode(null), 2000);
+                          }}
+                          title={copiedCode === session.id ? t.codeCopied : t.copyCode}
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-dark-border hover:bg-dark-muted/50 transition-colors"
+                        >
+                          <ScreenShare size={10} className="text-theatarr-500" />
+                          <span className="font-mono text-[10px] text-dark-text tracking-wider">{session.display_code}</span>
+                          {copiedCode === session.id ? (
+                            <Check size={10} className="text-green-400" />
+                          ) : (
+                            <Copy size={10} className="text-dark-muted" />
+                          )}
+                        </button>
+                      )}
+
                       {/* Color palette preview */}
                       {session.color_palette && (
                         <div className="flex items-center gap-0.5">
@@ -415,6 +444,18 @@ export function SessionsPage() {
 
                   {/* Actions */}
                   <div className="flex flex-col justify-center gap-1 p-2 border-l border-dark-border">
+                    {/* Display button */}
+                    {session.display_code && (
+                      <a
+                        href={`/display/${session.display_code}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`${t.display} (${session.display_code})`}
+                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                      >
+                        <ScreenShare size={16} />
+                      </a>
+                    )}
                     {/* Wallmount button - show if session has a movie or is scheduled */}
                     {(session.movie_id || session.movie_title || session.scheduled_at) && (
                       <a

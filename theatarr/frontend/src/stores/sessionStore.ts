@@ -103,6 +103,8 @@ export interface Session {
   vote_reveal_at?: string;
   mystery_reveal_at?: string;
   mystery_config?: MysteryConfig;
+  // Display
+  display_code?: string;
   // Enriched fields from list
   participants_accepted?: number;
   participants_total?: number;

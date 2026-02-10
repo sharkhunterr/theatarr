@@ -157,6 +157,14 @@ class Session(UUIDMixin, TimestampMixin, Base):
         nullable=True,
     )
 
+    # Display code for pairing a browser to this session
+    display_code: Mapped[str | None] = mapped_column(
+        String(8),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
+
     # Template override (if None, uses the globally active template)
     template_id: Mapped[str | None] = mapped_column(
         String(36),

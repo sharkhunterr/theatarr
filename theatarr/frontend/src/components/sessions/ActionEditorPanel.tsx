@@ -18,6 +18,7 @@ export interface ActionItem {
   command: string;
   parameters: Record<string, unknown>;
   delay_ms: number;
+  duration_ms: number;
   on_failure: 'warn' | 'skip' | 'abort';
   service_id?: string;
 }
@@ -86,6 +87,8 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
     service: language === 'fr' ? 'Service' : 'Service',
     noService: language === 'fr' ? 'Aucun (manuel)' : 'None (manual)',
     delay: language === 'fr' ? 'Délai avant exécution (ms)' : 'Delay before execution (ms)',
+    duration: language === 'fr' ? 'Durée de maintien (secondes)' : 'Hold duration (seconds)',
+    durationHelp: language === 'fr' ? 'Temps d\'attente après cette action avant la suivante. 0 = passage immédiat.' : 'Wait time after this action before the next one. 0 = immediate.',
     onFailure: language === 'fr' ? 'En cas d\'échec' : 'On Failure',
     warn: language === 'fr' ? 'Avertir et continuer' : 'Warn and continue',
     skip: language === 'fr' ? 'Ignorer' : 'Skip silently',
@@ -178,6 +181,19 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
       {/* Common Settings */}
       <div className="border-t border-dark-border pt-4 space-y-4">
         <h4 className="text-sm font-medium text-dark-text">{t.actionSettings}</h4>
+
+        <div>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t.duration}</label>
+          <input
+            type="number"
+            value={(action.duration_ms || 0) / 1000}
+            onChange={(e) => onChange({ duration_ms: Math.round((parseFloat(e.target.value) || 0) * 1000) })}
+            className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+            min="0"
+            step="1"
+          />
+          <p className="text-xs text-dark-muted mt-1">{t.durationHelp}</p>
+        </div>
 
         <div>
           <label className="block text-sm font-medium text-dark-text mb-1">{t.delay}</label>
@@ -782,6 +798,16 @@ function MediaForm({
 // ============================================================================
 // DISPLAY FORM
 // ============================================================================
+interface TemplateListItem {
+  id: string;
+  name: string;
+  description?: string;
+  template_type: string;
+  layout?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+  is_builtin: boolean;
+}
+
 function DisplayForm({
   action,
   onChange,
@@ -793,6 +819,17 @@ function DisplayForm({
 }) {
   const { parameters, command } = action;
 
+  // Fetch waiting_screen templates when content_type is waiting_screen
+  const { data: templatesData } = useQuery<{ items: TemplateListItem[] }>({
+    queryKey: ['templates'],
+    queryFn: () => apiClient.get('/templates'),
+    enabled: command === 'show',
+  });
+
+  const waitingScreenTemplates = (templatesData?.items || []).filter(
+    (t) => t.template_type === 'waiting_screen'
+  );
+
   const t = {
     command: language === 'fr' ? 'Commande' : 'Command',
     inputSource: language === 'fr' ? 'Source d\'entrée' : 'Input Source',
@@ -800,7 +837,8 @@ function DisplayForm({
     contentType: language === 'fr' ? 'Type de contenu' : 'Content Type',
     textContent: language === 'fr' ? 'Contenu texte' : 'Text Content',
     imageUrl: language === 'fr' ? 'URL de l\'image' : 'Image URL',
-    duration: language === 'fr' ? 'Durée d\'affichage (ms)' : 'Display Duration (ms)',
+    selectTemplate: language === 'fr' ? 'Template d\'attente' : 'Waiting Screen Template',
+    noTemplates: language === 'fr' ? 'Aucun template disponible. Initialisez les templates intégrés.' : 'No templates available. Initialize built-in templates.',
   };
 
   const commands = [
@@ -817,6 +855,19 @@ function DisplayForm({
 
   const handleParametersChange = (updates: Record<string, unknown>) => {
     onChange({ parameters: { ...parameters, ...updates } });
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    const selected = waitingScreenTemplates.find((t) => t.id === templateId);
+    if (selected) {
+      handleParametersChange({
+        template_id: selected.id,
+        template_name: selected.name,
+        mode: 'waiting_screen',
+        layout: selected.layout,
+        config: selected.config,
+      });
+    }
   };
 
   return (
@@ -870,14 +921,63 @@ function DisplayForm({
             <label className="block text-sm font-medium text-dark-text mb-1">{t.contentType}</label>
             <select
               value={(parameters.content_type as string) || 'text'}
-              onChange={(e) => handleParametersChange({ content_type: e.target.value })}
+              onChange={(e) => {
+                const newType = e.target.value;
+                // Clear template-specific params when switching away from waiting_screen
+                if (newType !== 'waiting_screen') {
+                  const { template_id, template_name, mode, layout, config, ...rest } = parameters;
+                  onChange({ parameters: { ...rest, content_type: newType } });
+                } else {
+                  handleParametersChange({ content_type: newType });
+                }
+              }}
               className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
             >
+              <option value="waiting_screen">{language === 'fr' ? 'Waiting Screen' : 'Waiting Screen'}</option>
               <option value="text">{language === 'fr' ? 'Texte' : 'Text'}</option>
               <option value="image">Image</option>
               <option value="template">Template</option>
             </select>
           </div>
+
+          {/* Waiting Screen Template Selector */}
+          {(parameters.content_type as string) === 'waiting_screen' && (
+            <div>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t.selectTemplate}</label>
+              {waitingScreenTemplates.length > 0 ? (
+                <div className="space-y-2">
+                  {waitingScreenTemplates.map((tmpl) => (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => handleTemplateSelect(tmpl.id)}
+                      className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                        (parameters.template_id as string) === tmpl.id
+                          ? 'border-theatarr-500 bg-theatarr-500/10'
+                          : 'border-dark-border bg-dark-bg hover:border-dark-muted'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Monitor size={16} className={
+                          (parameters.template_id as string) === tmpl.id
+                            ? 'text-theatarr-400'
+                            : 'text-dark-muted'
+                        } />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-dark-text text-sm">{tmpl.name}</div>
+                          {tmpl.description && (
+                            <div className="text-xs text-dark-muted truncate">{tmpl.description}</div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">{t.noTemplates}</div>
+              )}
+            </div>
+          )}
 
           {(parameters.content_type as string) === 'text' && (
             <div>
@@ -902,17 +1002,7 @@ function DisplayForm({
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.duration}</label>
-            <input
-              type="number"
-              value={(parameters.duration_ms as number) || 5000}
-              onChange={(e) => handleParametersChange({ duration_ms: parseInt(e.target.value) || 5000 })}
-              className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
-              min="0"
-              step="1000"
-            />
-          </div>
+          {/* Duration is now controlled by the common "Hold duration" field in action settings */}
         </>
       )}
     </div>

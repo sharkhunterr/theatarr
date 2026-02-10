@@ -1,5 +1,8 @@
 """Sessions API router for Theatarr."""
 
+import logging
+import secrets
+import string
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
@@ -45,7 +48,32 @@ from theatarr.services.movie_resolution import (
 )
 from theatarr.services.movie_sync import ensure_movie_synced
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
+
+# Characters for display codes (excluding ambiguous: 0/O, 1/I/L)
+_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def _generate_display_code() -> str:
+    """Generate a 6-character alphanumeric display code."""
+    return "".join(secrets.choice(_CODE_CHARS) for _ in range(6))
+
+
+async def _unique_display_code(db) -> str:
+    """Generate a unique display code not already used."""
+    for _ in range(20):
+        code = _generate_display_code()
+        existing = await db.execute(
+            select(Session.id).where(Session.display_code == code)
+        )
+        if not existing.scalar_one_or_none():
+            return code
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Could not generate a unique display code",
+    )
 
 
 def _parse_dt(value: str | datetime | None) -> datetime | None:
@@ -120,6 +148,8 @@ def _session_to_response(
         template=template_summary,
         # Enrichment options
         enrichment_options=session.enrichment_options,
+        # Display code
+        display_code=session.display_code,
         # Enriched fields
         linked_vote_session=vote_summary,
         participants_accepted=participants_accepted,
@@ -166,7 +196,7 @@ def _sequence_to_summary(sequence: Sequence) -> SequenceSummary:
         id=sequence.id,
         name=sequence.name,
         order_index=sequence.order_index,
-        duration_type=sequence.duration_type.value,
+        duration_type=sequence.duration_type.value if hasattr(sequence.duration_type, 'value') else sequence.duration_type,
         duration_ms=sequence.duration_ms,
         transition_ms=sequence.transition_ms,
     )
@@ -180,6 +210,103 @@ def _count_actions_in_workflow(workflow: dict | None) -> int:
         1 for node in workflow.get("nodes", [])
         if node.get("data", {}).get("nodeType") == "action"
     )
+
+
+def _extract_ordered_actions_from_workflow(workflow: dict) -> list[dict]:
+    """Extract action nodes from workflow in execution order (following edges).
+
+    Returns a list of node data dicts, ordered by following edges from 'start'.
+    """
+    if not workflow or not workflow.get("nodes"):
+        return []
+
+    action_nodes = {
+        n["id"]: n
+        for n in workflow["nodes"]
+        if n.get("data", {}).get("nodeType") == "action"
+    }
+
+    if not action_nodes:
+        return []
+
+    # Build edge map: source -> target
+    edges_by_source: dict[str, str] = {}
+    for e in workflow.get("edges", []):
+        edges_by_source[e["source"]] = e["target"]
+
+    # Follow edges from 'start' to collect ordered action nodes
+    ordered = []
+    current_id = "start"
+    visited: set[str] = set()
+    while current_id in edges_by_source and current_id not in visited:
+        visited.add(current_id)
+        target_id = edges_by_source[current_id]
+        if target_id in action_nodes:
+            ordered.append(action_nodes[target_id]["data"])
+        current_id = target_id
+
+    # Fallback: if edge-following didn't find anything, use all action nodes
+    if not ordered:
+        ordered = [n["data"] for n in action_nodes.values()]
+
+    return ordered
+
+
+async def _sync_sequences_from_workflow(
+    db,
+    session: Session,
+    workflow: dict,
+) -> None:
+    """Auto-generate Sequence + Action records from workflow action nodes.
+
+    Each action node becomes one Sequence with one Action.
+    The sequence duration_ms comes from the node's duration_ms field.
+    """
+    action_datas = _extract_ordered_actions_from_workflow(workflow)
+
+    if not action_datas:
+        return
+
+    # Delete existing sequences (cascade deletes actions)
+    try:
+        existing = list(session.sequences) if session.sequences else []
+    except Exception:
+        existing = []
+    for seq in existing:
+        await db.delete(seq)
+    if existing:
+        await db.flush()
+
+    # Create one sequence per action
+    for order_index, data in enumerate(action_datas):
+        params = data.get("parameters", {})
+        duration_ms = data.get("duration_ms") or params.get("duration_ms") or 0
+
+        action_type_str = data.get("actionType", "display")
+        command_str = data.get("command", "")
+
+        sequence = Sequence(
+            session_id=session.id,
+            name=f"{action_type_str}:{command_str}",
+            order_index=order_index,
+            duration_type=DurationType.FIXED if duration_ms > 0 else DurationType.MANUAL,
+            duration_ms=duration_ms if duration_ms > 0 else None,
+            duration_fallback_ms=0,
+            transition_ms=0,
+        )
+        db.add(sequence)
+        await db.flush()
+
+        action = Action(
+            sequence_id=sequence.id,
+            action_type=action_type_str,
+            command=command_str,
+            parameters=params,
+            delay_ms=data.get("delay_ms", 0),
+            on_failure=data.get("on_failure", "warn"),
+            service_id=data.get("service_id"),
+        )
+        db.add(action)
 
 
 @router.get(
@@ -284,6 +411,9 @@ async def create_session(
             movie_poster_url=data.movie_poster_url,
         )
 
+    # Generate unique display code
+    display_code = await _unique_display_code(db)
+
     session = Session(
         name=data.name,
         description=data.description,
@@ -297,6 +427,7 @@ async def create_session(
         auto_resume_enabled=data.auto_resume_enabled,
         workflow=data.workflow,
         status=SessionStatus.SCHEDULED if data.scheduled_at else SessionStatus.DRAFT,
+        display_code=display_code,
         # Movie selection mode fields
         movie_selection_mode=data.movie_selection_mode.value,
         vote_reveal_at=data.vote_reveal_at,
@@ -352,34 +483,36 @@ async def create_session(
             await db.flush()
             session.linked_vote_session_id = vote_session.id
 
-    # Create sequences if provided
-    for order_index, seq_data in enumerate(data.sequences):
-        sequence = Sequence(
-            session_id=session.id,
-            name=seq_data.name,
-            description=seq_data.description,
-            order_index=order_index,
-            duration_type=DurationType(seq_data.duration_type),
-            duration_ms=seq_data.duration_ms,
-            duration_fallback_ms=seq_data.duration_fallback_ms,
-            transition_ms=seq_data.transition_ms,
-        )
-        db.add(sequence)
-        await db.flush()  # Get sequence.id
-
-        # Create actions for this sequence
-        for action_order, action_data in enumerate(seq_data.actions):
-            action = Action(
-                sequence_id=sequence.id,
-                action_type=action_data.action_type,
-                command=action_data.command,
-                parameters=action_data.parameters,
-                delay_ms=action_data.delay_ms,
-                on_failure=action_data.on_failure,
-                order_index=action_order,
-                service_id=action_data.service_id,
+    # Create sequences: from explicit sequences or auto-generated from workflow
+    if data.sequences:
+        for order_index, seq_data in enumerate(data.sequences):
+            sequence = Sequence(
+                session_id=session.id,
+                name=seq_data.name,
+                description=seq_data.description,
+                order_index=order_index,
+                duration_type=DurationType(seq_data.duration_type),
+                duration_ms=seq_data.duration_ms,
+                duration_fallback_ms=seq_data.duration_fallback_ms,
+                transition_ms=seq_data.transition_ms,
             )
-            db.add(action)
+            db.add(sequence)
+            await db.flush()
+
+            for action_order, action_data in enumerate(seq_data.actions):
+                action = Action(
+                    sequence_id=sequence.id,
+                    action_type=action_data.action_type,
+                    command=action_data.command,
+                    parameters=action_data.parameters,
+                    delay_ms=action_data.delay_ms,
+                    on_failure=action_data.on_failure,
+                    service_id=action_data.service_id,
+                )
+                db.add(action)
+    elif data.workflow:
+        # Auto-generate sequences from workflow action nodes
+        await _sync_sequences_from_workflow(db, session, data.workflow)
 
     await db.commit()
     await db.refresh(session)
@@ -476,6 +609,8 @@ async def get_session(
         template=template_summary,
         # Enrichment options
         enrichment_options=session.enrichment_options,
+        # Display code
+        display_code=session.display_code,
     )
 
 
@@ -606,7 +741,7 @@ async def update_session(
             await db.flush()
             session.linked_vote_session_id = vote_session.id
 
-    # Handle sequences update
+    # Handle sequences update: from explicit sequences or auto-generated from workflow
     if data.sequences is not None:
         # Delete existing sequences (cascade will delete actions)
         for seq in session.sequences:
@@ -625,9 +760,8 @@ async def update_session(
                 transition_ms=seq_data.transition_ms,
             )
             db.add(sequence)
-            await db.flush()  # Get sequence.id
+            await db.flush()
 
-            # Create actions for this sequence
             for action_order, action_data in enumerate(seq_data.actions):
                 action = Action(
                     sequence_id=sequence.id,
@@ -636,10 +770,12 @@ async def update_session(
                     parameters=action_data.parameters,
                     delay_ms=action_data.delay_ms,
                     on_failure=action_data.on_failure,
-                    order_index=action_order,
                     service_id=action_data.service_id,
                 )
                 db.add(action)
+    elif "workflow" in update_data and update_data["workflow"]:
+        # Auto-generate sequences from workflow action nodes
+        await _sync_sequences_from_workflow(db, session, update_data["workflow"])
 
     # Update status if scheduled_at changed
     if data.scheduled_at is not None:
@@ -670,21 +806,29 @@ async def delete_session(
     if not session:
         raise NotFoundError("Session", session_id)
 
-    # Cannot delete active sessions
+    # Auto-stop active sessions before deleting
     if session.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete an active session. Stop it first.",
-        )
+        engine = get_engine(db)
+        try:
+            await engine.stop_session(session_id)
+            # Refresh session after stop
+            result = await db.execute(select(Session).where(Session.id == session_id))
+            session = result.scalar_one_or_none()
+        except Exception:
+            logger.warning("Failed to stop session %s before delete, forcing cleanup", session_id)
+    else:
+        # Cancel any orphaned engine task even if session isn't "active"
+        engine = get_engine(db)
+        if session_id in engine._running_sessions:
+            engine._running_sessions[session_id].cancel()
+            del engine._running_sessions[session_id]
+            logger.info("Cancelled orphaned engine task for session %s", session_id)
 
     # Store linked vote session id before clearing reference
     linked_vote_session_id = session.linked_vote_session_id
 
     # Delete participants first (to avoid FK constraint issues)
     from theatarr.models.session_participant import SessionParticipant
-    await db.execute(
-        select(SessionParticipant).where(SessionParticipant.session_id == session_id)
-    )
     participants_result = await db.execute(
         select(SessionParticipant).where(SessionParticipant.session_id == session_id)
     )

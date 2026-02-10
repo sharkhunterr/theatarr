@@ -45,7 +45,7 @@ export function TemplateManager() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'builtin' | 'custom'>('all');
+  const [filter, setFilter] = useState<'all' | 'wallmount' | 'waiting_screen' | 'custom'>('all');
 
   const { data, isLoading, error } = useQuery<TemplateListResponse>({
     queryKey: ['templates'],
@@ -120,8 +120,11 @@ export function TemplateManager() {
     queryClient.invalidateQueries({ queryKey: ['templates'] });
   };
 
+  const WALLMOUNT_TYPES = ['countdown', 'movie_info', 'session_status'];
+
   const filteredTemplates = data?.items.filter((t) => {
-    if (filter === 'builtin') return t.is_builtin;
+    if (filter === 'wallmount') return t.is_builtin && WALLMOUNT_TYPES.includes(t.template_type);
+    if (filter === 'waiting_screen') return t.is_builtin && t.template_type === 'waiting_screen';
     if (filter === 'custom') return !t.is_builtin;
     return true;
   });
@@ -164,7 +167,7 @@ export function TemplateManager() {
 
       {/* Filters */}
       <div className="flex gap-2 mb-6">
-        {(['all', 'builtin', 'custom'] as const).map((f) => (
+        {(['all', 'wallmount', 'waiting_screen', 'custom'] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -174,7 +177,7 @@ export function TemplateManager() {
                 : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
             }`}
           >
-            {f === 'all' ? 'Tous' : f === 'builtin' ? 'Integres' : 'Personnalises'}
+            {f === 'all' ? 'Tous' : f === 'wallmount' ? 'Wallmount' : f === 'waiting_screen' ? 'Waiting Screen' : 'Personnalises'}
           </button>
         ))}
       </div>
