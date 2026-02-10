@@ -216,8 +216,8 @@ class SequenceEngine:
             logger.info(f"Resuming session {session_id}")
             await self._emit_state_change(session)
 
-            # Restart execution task
-            task = asyncio.create_task(self._run_session(session_id))
+            # Restart execution task (skip re-executing actions)
+            task = asyncio.create_task(self._run_session(session_id, resuming=True))
             self._running_sessions[session_id] = task
 
             return session
@@ -272,7 +272,7 @@ class SequenceEngine:
 
             return session
 
-    async def _run_session(self, session_id: str) -> None:
+    async def _run_session(self, session_id: str, resuming: bool = False) -> None:
         """Main session execution loop."""
         try:
             while True:
@@ -294,8 +294,9 @@ class SequenceEngine:
                     logger.warning("Session %s: no current sequence at index %d", session_id, session.current_sequence_index)
                     break
 
-                # Execute sequence
-                await self._execute_sequence(session, sequence)
+                # Execute sequence (skip actions on first iteration if resuming)
+                await self._execute_sequence(session, sequence, skip_actions=resuming)
+                resuming = False  # Only skip on the first sequence after resume
 
                 # Check if still running after sequence
                 session = await self._get_session(session_id)
@@ -322,29 +323,32 @@ class SequenceEngine:
         finally:
             self._running_sessions.pop(session_id, None)
 
-    async def _execute_sequence(self, session: Session, sequence: Sequence) -> None:
+    async def _execute_sequence(self, session: Session, sequence: Sequence, skip_actions: bool = False) -> None:
         """Execute a single sequence."""
         duration_ms = sequence.effective_duration_ms
         logger.info(
-            "Executing sequence %s (%s) — duration_type=%s duration_ms=%s effective=%dms, %d action(s)",
+            "Executing sequence %s (%s) — duration_type=%s duration_ms=%s effective=%dms, %d action(s), skip_actions=%s",
             sequence.name, sequence.id,
             _enum_val(sequence.duration_type), sequence.duration_ms,
-            duration_ms, len(sequence.actions),
+            duration_ms, len(sequence.actions), skip_actions,
         )
 
-        # Execute all actions at sequence start
-        for action in sequence.actions:
-            if action.delay_ms > 0:
-                await asyncio.sleep(action.delay_ms / 1000)
+        # Execute all actions at sequence start (skip when resuming from pause)
+        if skip_actions:
+            logger.info("Resuming sequence %s — skipping action execution (elapsed: %dms)", sequence.name, session.current_sequence_elapsed_ms)
+        else:
+            for action in sequence.actions:
+                if action.delay_ms > 0:
+                    await asyncio.sleep(action.delay_ms / 1000)
 
-            result = await self._execute_action(action)
-            logger.info(
-                "Action %s result: success=%s message=%s",
-                action.id, result.success, result.message,
-            )
+                result = await self._execute_action(action)
+                logger.info(
+                    "Action %s result: success=%s message=%s",
+                    action.id, result.success, result.message,
+                )
 
-            if not result.success and _enum_val(action.on_failure) == OnFailure.ABORT.value:
-                raise EngineError(f"Action {action.id} failed: {result.error}")
+                if not result.success and _enum_val(action.on_failure) == OnFailure.ABORT.value:
+                    raise EngineError(f"Action {action.id} failed: {result.error}")
 
         # Wait for sequence duration
         dur_type = _enum_val(sequence.duration_type)

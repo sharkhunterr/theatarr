@@ -39,7 +39,7 @@ export function SessionsPage() {
   const navigate = useNavigate();
   const { language } = useLayoutStore();
   const { sessions, isLoading } = useSessionStore();
-  const { fetchSessions, play, pause, stop } = useSession();
+  const { fetchSessions } = useSession();
   const [deleteSession, setDeleteSession] = useState<Session | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -53,6 +53,7 @@ export function SessionsPage() {
     noSessions: language === 'fr' ? 'Aucune session' : 'No sessions',
     createFirst: language === 'fr' ? 'Créer votre première session' : 'Create your first session',
     play: language === 'fr' ? 'Lancer' : 'Play',
+    resume: language === 'fr' ? 'Reprendre' : 'Resume',
     pause: language === 'fr' ? 'Pause' : 'Pause',
     stop: language === 'fr' ? 'Arrêter' : 'Stop',
     delete: language === 'fr' ? 'Supprimer' : 'Delete',
@@ -86,19 +87,37 @@ export function SessionsPage() {
     fetchSessions();
   }, [fetchSessions]);
 
+  const [controllingId, setControllingId] = useState<string | null>(null);
+  const [controlError, setControlError] = useState<string | null>(null);
+
   const handlePlayPause = async (session: Session) => {
-    useSessionStore.getState().setCurrentSession(session);
-    if (session.status === 'running') {
-      await pause();
-    } else {
-      await play();
+    setControlError(null);
+    setControllingId(session.id);
+    try {
+      const action = session.status === 'running' ? 'pause' : 'play';
+      await apiClient.post(`/sessions/${session.id}/control`, { action });
+    } catch (error: any) {
+      console.error('Session control failed:', error);
+      setControlError(error?.message || (language === 'fr' ? 'Erreur de contrôle' : 'Control error'));
+      setTimeout(() => setControlError(null), 4000);
+    } finally {
+      setControllingId(null);
     }
     fetchSessions();
   };
 
   const handleStop = async (session: Session) => {
-    useSessionStore.getState().setCurrentSession(session);
-    await stop();
+    setControlError(null);
+    setControllingId(session.id);
+    try {
+      await apiClient.post(`/sessions/${session.id}/control`, { action: 'stop' });
+    } catch (error: any) {
+      console.error('Session stop failed:', error);
+      setControlError(error?.message || (language === 'fr' ? 'Erreur lors de l\'arrêt' : 'Stop error'));
+      setTimeout(() => setControlError(null), 4000);
+    } finally {
+      setControllingId(null);
+    }
     fetchSessions();
   };
 
@@ -238,6 +257,13 @@ export function SessionsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Control Error Banner */}
+      {controlError && (
+        <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+          {controlError}
+        </div>
+      )}
 
       {/* Sessions List */}
       {sessions.length === 0 ? (
@@ -468,34 +494,41 @@ export function SessionsPage() {
                         <Monitor size={16} />
                       </a>
                     )}
-                    {session.status === 'running' ? (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handlePlayPause(session)}
-                          title={t.pause}
-                        >
-                          <Pause size={16} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleStop(session)}
-                          title={t.stop}
-                        >
-                          <Square size={16} />
-                        </Button>
-                      </>
-                    ) : (
+                    {/* Play/Resume button */}
+                    {(session.status === 'draft' || session.status === 'scheduled' || session.status === 'interrupted' || session.status === 'paused') && (
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handlePlayPause(session)}
-                        title={t.play}
-                        disabled={(session.actions_count ?? 0) === 0}
+                        title={session.status === 'paused' ? t.resume : t.play}
+                        disabled={controllingId === session.id || (session.actions_count ?? 0) === 0}
                       >
-                        <Play size={16} />
+                        <Play size={16} className={session.status === 'paused' ? 'text-yellow-400' : ''} />
+                      </Button>
+                    )}
+                    {/* Pause button */}
+                    {session.status === 'running' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePlayPause(session)}
+                        title={t.pause}
+                        disabled={controllingId === session.id}
+                      >
+                        <Pause size={16} />
+                      </Button>
+                    )}
+                    {/* Stop button */}
+                    {(session.status === 'running' || session.status === 'paused') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleStop(session)}
+                        title={t.stop}
+                        disabled={controllingId === session.id}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      >
+                        <Square size={16} />
                       </Button>
                     )}
                     <Button

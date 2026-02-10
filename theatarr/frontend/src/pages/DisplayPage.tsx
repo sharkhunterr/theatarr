@@ -502,6 +502,43 @@ function SessionDisplay() {
     };
   }, [showVideo, videoUrl]);
 
+  // React to session status changes (pause/stop/resume from admin)
+  const prevStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const status = session?.session_status;
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = status || null;
+
+    if (!status || !prev || status === prev) return;
+
+    const video = videoRef.current;
+
+    if (status === 'paused') {
+      if (video && !video.paused) {
+        video.pause();
+      }
+      audioEngine.pause();
+    } else if (status === 'completed' || status === 'interrupted') {
+      if (video) {
+        video.pause();
+        video.currentTime = 0;
+      }
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      setShowVideo(false);
+      setVideoUrl(null);
+      setVideoMuted(false);
+      audioEngine.stop(0);
+    } else if (status === 'running' && prev === 'paused') {
+      if (video && video.paused && showVideo) {
+        video.play().catch(() => {});
+      }
+      audioEngine.resume();
+    }
+  }, [session?.session_status, showVideo, audioEngine]);
+
   // Video ended handler
   const handleVideoEnded = useCallback(() => {
     if (hlsRef.current) {
