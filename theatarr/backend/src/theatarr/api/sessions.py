@@ -192,6 +192,10 @@ def _vote_session_to_summary(vs: VoteSession, include_vote_counts: bool = True) 
 
 def _sequence_to_summary(sequence: Sequence) -> SequenceSummary:
     """Convert Sequence model to summary schema."""
+    action_types = list({
+        a.action_type.value if hasattr(a.action_type, 'value') else a.action_type
+        for a in sequence.actions
+    })
     return SequenceSummary(
         id=sequence.id,
         name=sequence.name,
@@ -199,6 +203,8 @@ def _sequence_to_summary(sequence: Sequence) -> SequenceSummary:
         duration_type=sequence.duration_type.value if hasattr(sequence.duration_type, 'value') else sequence.duration_type,
         duration_ms=sequence.duration_ms,
         transition_ms=sequence.transition_ms,
+        actions_count=len(sequence.actions),
+        action_types=action_types,
     )
 
 

@@ -308,7 +308,7 @@ export function SessionsPage() {
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <Link
-              to={`/sessions/${session.id}/edit`}
+              to={`/sessions/${session.id}`}
               className="text-base sm:text-lg font-semibold text-dark-text hover:text-theatarr-500 transition-colors truncate"
             >
               {session.name}

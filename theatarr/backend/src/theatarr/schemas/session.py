@@ -120,6 +120,8 @@ class SequenceSummary(BaseSchema):
     duration_type: str
     duration_ms: int | None
     transition_ms: int
+    actions_count: int = 0
+    action_types: list[str] = []
 
 
 class ActionInput(BaseSchema):

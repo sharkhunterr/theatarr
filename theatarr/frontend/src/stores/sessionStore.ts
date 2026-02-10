@@ -19,9 +19,13 @@ export type MysterySource = 'random' | 'filtered' | 'curated';
 export interface Sequence {
   id: string;
   name: string;
+  order_index?: number;
   duration_type: 'fixed' | 'dynamic' | 'manual';
   duration_ms: number | null;
+  transition_ms?: number;
   remaining_ms?: number;
+  actions_count?: number;
+  action_types?: string[];
 }
 
 export interface ColorPalette {

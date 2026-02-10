@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { SessionsPage } from './pages/SessionsPage';
+import { SessionDetailPage } from './pages/SessionDetailPage';
 import { SessionEditor } from './pages/SessionEditor';
 import { ServicesConfig } from './pages/ServicesConfig';
 import { WallmountPage } from './pages/WallmountPage';
@@ -161,6 +162,14 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <SessionEditor />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/sessions/:id"
+        element={
+          <RequireAuth>
+            <SessionDetailPage />
           </RequireAuth>
         }
       />

@@ -1,0 +1,1005 @@
+/**
+ * Admin session detail page with real-time timeline.
+ */
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
+import {
+  ArrowLeft,
+  Calendar,
+  Check,
+  Clock,
+  Copy,
+  Edit3,
+  Eye,
+  Film,
+  Lightbulb,
+  Monitor,
+  Music,
+  Pause,
+  Play,
+  ScreenShare,
+  Settings,
+  Shuffle,
+  SkipForward,
+  Sparkles,
+  Square,
+  Trophy,
+  Users,
+  Vote,
+  X,
+  Zap,
+} from 'lucide-react';
+
+import { Button, MysteryPoster, VotePoster, VotePosterCollage } from '../components/common';
+import { apiClient } from '../api/client';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { useCountdown } from '../hooks/useCountdown';
+import { useSetting } from '../hooks/useSettings';
+import { useLayoutStore } from '../stores/layoutStore';
+import {
+  type Session,
+  type SessionState,
+  type Sequence,
+} from '../stores/sessionStore';
+import {
+  getMysteryRevealCountdown,
+  getVoteRevealCountdown,
+  getSessionStartCountdown,
+} from '../utils/countdown';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface Participant {
+  id: string;
+  user_id: string;
+  username: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  invitation_status: 'pending' | 'accepted' | 'declined';
+  invited_at: string | null;
+  responded_at: string | null;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const ACTION_TYPE_COLORS: Record<string, string> = {
+  media: '#3b82f6',
+  lighting: '#eab308',
+  audio: '#22c55e',
+  display: '#a855f7',
+  actuator: '#f97316',
+};
+
+const ACTION_TYPE_ICONS: Record<string, typeof Film> = {
+  media: Film,
+  lighting: Lightbulb,
+  audio: Music,
+  display: ScreenShare,
+  actuator: Settings,
+};
+
+const DEFAULT_SEQUENCE_DURATION = 60000;
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function getSequenceColor(seq: Sequence): string {
+  const types = seq.action_types || [];
+  if (types.length === 0) return '#6b7280';
+  if (types.length === 1) return ACTION_TYPE_COLORS[types[0]] || '#6b7280';
+  // Multiple types: use the first one's color
+  return ACTION_TYPE_COLORS[types[0]] || '#6b7280';
+}
+
+function getSequenceDuration(seq: Sequence): number {
+  if (seq.duration_ms && seq.duration_ms > 0) return seq.duration_ms;
+  return DEFAULT_SEQUENCE_DURATION;
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remainMinutes = minutes % 60;
+    return `${hours}h${remainMinutes.toString().padStart(2, '0')}m`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatDateShort(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getStatusBadge(status: string, language: string) {
+  const labels: Record<string, { fr: string; en: string }> = {
+    draft: { fr: 'Brouillon', en: 'Draft' },
+    scheduled: { fr: 'Programmee', en: 'Scheduled' },
+    running: { fr: 'En cours', en: 'Running' },
+    paused: { fr: 'En pause', en: 'Paused' },
+    completed: { fr: 'Terminee', en: 'Completed' },
+    interrupted: { fr: 'Interrompue', en: 'Interrupted' },
+  };
+  const colors: Record<string, string> = {
+    draft: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+    scheduled: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    running: 'bg-green-500/20 text-green-400 border-green-500/30',
+    paused: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    completed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    interrupted: 'bg-red-500/20 text-red-400 border-red-500/30',
+  };
+  return {
+    label: language === 'fr' ? labels[status]?.fr : labels[status]?.en || status,
+    color: colors[status] || colors.draft,
+  };
+}
+
+// ============================================================================
+// Timeline Component
+// ============================================================================
+
+function SessionTimeline({
+  sequences,
+  currentIndex,
+  elapsedMs,
+  status,
+  language,
+}: {
+  sequences: Sequence[];
+  currentIndex: number;
+  elapsedMs: number;
+  status: string;
+  language: string;
+}) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const totalDuration = useMemo(
+    () => sequences.reduce((sum, seq) => sum + getSequenceDuration(seq), 0),
+    [sequences]
+  );
+
+  if (sequences.length === 0) {
+    return (
+      <div className="text-sm text-dark-muted text-center py-4">
+        {language === 'fr' ? 'Aucune sequence' : 'No sequences'}
+      </div>
+    );
+  }
+
+  const isActive = status === 'running' || status === 'paused';
+  const isComplete = status === 'completed';
+  const currentSeq = sequences[currentIndex];
+  const currentDuration = currentSeq ? getSequenceDuration(currentSeq) : 0;
+  const progress = currentDuration > 0 ? Math.min(elapsedMs / currentDuration, 1) : 0;
+
+  return (
+    <div className="space-y-2">
+      {/* Progress bar */}
+      <div className="relative h-8 sm:h-10 flex rounded-lg overflow-hidden bg-dark-bg border border-dark-border">
+        {sequences.map((seq, index) => {
+          const duration = getSequenceDuration(seq);
+          const widthPercent = totalDuration > 0 ? (duration / totalDuration) * 100 : 100 / sequences.length;
+          const color = getSequenceColor(seq);
+          const isCurrent = index === currentIndex;
+          const isPast = isComplete ? true : index < currentIndex;
+          const isHovered = hoveredIndex === index;
+
+          return (
+            <div
+              key={seq.id}
+              className="relative h-full flex items-center justify-center cursor-default group"
+              style={{ width: `${widthPercent}%`, minWidth: '8px' }}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              {/* Background */}
+              <div
+                className={clsx(
+                  'absolute inset-0 transition-opacity',
+                  isCurrent && isActive && 'animate-pulse',
+                )}
+                style={{
+                  backgroundColor: color,
+                  opacity: isPast ? 0.6 : isCurrent ? 0.4 : 0.15,
+                }}
+              />
+
+              {/* Fill for current sequence */}
+              {isCurrent && isActive && (
+                <div
+                  className="absolute inset-y-0 left-0 transition-[width] duration-1000 ease-linear"
+                  style={{
+                    width: `${progress * 100}%`,
+                    backgroundColor: color,
+                    opacity: 0.7,
+                  }}
+                />
+              )}
+
+              {/* Sequence name (visible on wider segments) */}
+              <span className={clsx(
+                'relative z-10 text-[10px] sm:text-xs font-medium truncate px-1',
+                isPast || isCurrent ? 'text-white' : 'text-dark-muted',
+              )}>
+                {widthPercent > 12 ? seq.name : ''}
+              </span>
+
+              {/* Right border separator */}
+              {index < sequences.length - 1 && (
+                <div className="absolute right-0 inset-y-0 w-px bg-dark-bg/50" />
+              )}
+
+              {/* Cursor on current segment */}
+              {isCurrent && isActive && (
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_4px_rgba(255,255,255,0.8)] z-20 transition-[left] duration-1000 ease-linear"
+                  style={{ left: `${progress * 100}%` }}
+                />
+              )}
+
+              {/* Tooltip */}
+              {isHovered && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 pointer-events-none">
+                  <div className="bg-dark-surface border border-dark-border rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
+                    <div className="text-xs font-medium text-dark-text">{seq.name}</div>
+                    <div className="text-[10px] text-dark-muted mt-0.5">
+                      {seq.duration_type === 'manual'
+                        ? (language === 'fr' ? 'Manuel' : 'Manual')
+                        : formatDuration(getSequenceDuration(seq))}
+                      {(seq.actions_count ?? 0) > 0 && (
+                        <span className="ml-2">
+                          {seq.actions_count} action{(seq.actions_count ?? 0) > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    {seq.action_types && seq.action_types.length > 0 && (
+                      <div className="flex items-center gap-1 mt-1">
+                        {seq.action_types.map((type) => {
+                          const Icon = ACTION_TYPE_ICONS[type] || Zap;
+                          return (
+                            <span
+                              key={type}
+                              className="inline-flex items-center gap-0.5 text-[10px]"
+                              style={{ color: ACTION_TYPE_COLORS[type] || '#6b7280' }}
+                            >
+                              <Icon size={10} />
+                              {type}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Current sequence info */}
+      {currentSeq && (isActive || isComplete) && (
+        <div className="flex items-center justify-between text-xs text-dark-muted">
+          <span>
+            {language === 'fr' ? 'Sequence' : 'Sequence'} {currentIndex + 1}/{sequences.length}
+            {' — '}
+            <span className="text-dark-text">{currentSeq.name}</span>
+          </span>
+          {currentSeq.duration_type !== 'manual' && (
+            <span>
+              {formatDuration(elapsedMs)} / {formatDuration(currentDuration)}
+            </span>
+          )}
+          {currentSeq.duration_type === 'manual' && (
+            <span className="italic">{language === 'fr' ? 'Manuel' : 'Manual'}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Participants Component
+// ============================================================================
+
+function ParticipantsSection({
+  participants,
+  isLoading,
+  language,
+}: {
+  participants: Participant[];
+  isLoading: boolean;
+  language: string;
+}) {
+  const t = {
+    title: language === 'fr' ? 'Participants' : 'Participants',
+    accepted: language === 'fr' ? 'acceptes' : 'accepted',
+    invited: language === 'fr' ? 'invites' : 'invited',
+    pending: language === 'fr' ? 'En attente' : 'Pending',
+    acceptedLabel: language === 'fr' ? 'Accepte' : 'Accepted',
+    declined: language === 'fr' ? 'Refuse' : 'Declined',
+    noParticipants: language === 'fr' ? 'Aucun participant invite' : 'No participants invited',
+  };
+
+  if (isLoading) {
+    return (
+      <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
+        <div className="h-6 w-32 bg-dark-border rounded animate-pulse mb-3" />
+        <div className="flex gap-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-10 w-24 bg-dark-border rounded-lg animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const accepted = participants.filter((p) => p.invitation_status === 'accepted');
+  const pending = participants.filter((p) => p.invitation_status === 'pending');
+  const declined = participants.filter((p) => p.invitation_status === 'declined');
+
+  if (participants.length === 0) {
+    return (
+      <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
+        <h3 className="text-sm font-medium text-dark-text mb-2">{t.title}</h3>
+        <p className="text-sm text-dark-muted">{t.noParticipants}</p>
+      </div>
+    );
+  }
+
+  const getInitials = (p: Participant) => {
+    if (p.first_name && p.last_name) return `${p.first_name[0]}${p.last_name[0]}`.toUpperCase();
+    return p.username.slice(0, 2).toUpperCase();
+  };
+
+  const getDisplayName = (p: Participant) => {
+    if (p.first_name && p.last_name) return `${p.first_name} ${p.last_name}`;
+    return p.username;
+  };
+
+  const renderGroup = (
+    items: Participant[],
+    icon: typeof Check,
+    iconColor: string,
+    bgColor: string,
+    label: string,
+  ) => {
+    if (items.length === 0) return null;
+    const Icon = icon;
+    return (
+      <div>
+        <div className="flex items-center gap-1.5 mb-2">
+          <Icon size={12} className={iconColor} />
+          <span className="text-xs text-dark-muted">{label} ({items.length})</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {items.map((p) => (
+            <div
+              key={p.id}
+              className={clsx(
+                'flex items-center gap-2 px-2.5 py-1.5 rounded-lg border',
+                bgColor,
+              )}
+              title={p.email || p.username}
+            >
+              <div className={clsx(
+                'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium',
+                bgColor.includes('green') ? 'bg-green-500/30 text-green-300' :
+                bgColor.includes('yellow') ? 'bg-yellow-500/30 text-yellow-300' :
+                'bg-red-500/30 text-red-300',
+              )}>
+                {getInitials(p)}
+              </div>
+              <span className="text-xs text-dark-text">{getDisplayName(p)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium text-dark-text flex items-center gap-2">
+          <Users size={14} className="text-dark-muted" />
+          {t.title}
+        </h3>
+        <span className="text-xs text-dark-muted">
+          {accepted.length} {t.accepted} / {participants.length} {t.invited}
+        </span>
+      </div>
+      <div className="space-y-3">
+        {renderGroup(accepted, Check, 'text-green-400', 'bg-green-500/10 border-green-500/20', t.acceptedLabel)}
+        {renderGroup(pending, Clock, 'text-yellow-400', 'bg-yellow-500/10 border-yellow-500/20', t.pending)}
+        {renderGroup(declined, X, 'text-red-400', 'bg-red-500/10 border-red-500/20', t.declined)}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Main Page Component
+// ============================================================================
+
+export function SessionDetailPage() {
+  useCountdown();
+  const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
+  const { id } = useParams<{ id: string }>();
+  const { language } = useLayoutStore();
+
+  // Fetch session
+  const {
+    data: session,
+    isLoading: isSessionLoading,
+    refetch: refetchSession,
+  } = useQuery({
+    queryKey: ['session-detail', id],
+    queryFn: () => apiClient.get<Session>(`/sessions/${id}`),
+    enabled: !!id,
+    refetchInterval: false,
+  });
+
+  // Fetch participants
+  const { data: participantsData, isLoading: isParticipantsLoading } = useQuery({
+    queryKey: ['session-participants', id],
+    queryFn: () => apiClient.get<{ items: Participant[]; total: number }>(`/sessions/${id}/participants`),
+    enabled: !!id,
+  });
+
+  // Real-time state via WebSocket
+  const [liveState, setLiveState] = useState<SessionState | null>(null);
+  const token = localStorage.getItem('theatarr_token');
+
+  const { isConnected } = useWebSocket({
+    token,
+    autoConnect: true,
+    onMessage: (message) => {
+      if (message.type === 'session_state' && message.payload?.session_id === id) {
+        setLiveState(message.payload as unknown as SessionState);
+      }
+    },
+  });
+
+  // Subscribe to session channel
+  const { subscribe, unsubscribe } = useWebSocket({
+    token,
+    autoConnect: true,
+  });
+
+  useEffect(() => {
+    if (isConnected && id) {
+      subscribe('session');
+      return () => unsubscribe('session');
+    }
+  }, [isConnected, id, subscribe, unsubscribe]);
+
+  // Session control
+  const [controllingAction, setControllingAction] = useState<string | null>(null);
+  const [controlError, setControlError] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleControl = useCallback(
+    async (action: 'play' | 'pause' | 'stop' | 'skip') => {
+      if (!id) return;
+      setControllingAction(action);
+      setControlError(null);
+      try {
+        await apiClient.post(`/sessions/${id}/control`, { action });
+        refetchSession();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setControlError(msg);
+        setTimeout(() => setControlError(null), 5000);
+      } finally {
+        setControllingAction(null);
+      }
+    },
+    [id, refetchSession]
+  );
+
+  // Computed values
+  const currentStatus = liveState?.status || session?.status || 'draft';
+  const currentIndex = liveState?.current_sequence_index ?? session?.current_sequence_index ?? 0;
+  const elapsedMs = liveState?.current_sequence_elapsed_ms ?? session?.current_sequence_elapsed_ms ?? 0;
+  const sequences = session?.sequences || [];
+
+  const isMysteryHidden = session?.movie_selection_mode === 'mystery' && !session?.movie_resolved;
+  const isVoteHidden = session?.movie_selection_mode === 'vote' && !session?.movie_resolved;
+  const isVoteRevealed = session?.movie_selection_mode === 'vote' && session?.movie_resolved;
+  const isMysteryRevealed = session?.movie_selection_mode === 'mystery' && session?.movie_resolved;
+  const canPlay = currentStatus === 'draft' || currentStatus === 'scheduled' || currentStatus === 'interrupted' || currentStatus === 'paused';
+  const canPause = currentStatus === 'running';
+  const canStop = currentStatus === 'running' || currentStatus === 'paused';
+  const canSkip = currentStatus === 'running';
+
+  const statusBadge = getStatusBadge(currentStatus, language);
+  const bgColor = session?.color_palette?.primary || '#1a1a1a';
+
+  const t = {
+    back: language === 'fr' ? 'Sessions' : 'Sessions',
+    edit: language === 'fr' ? 'Modifier' : 'Edit',
+    play: language === 'fr' ? 'Lancer' : 'Play',
+    resume: language === 'fr' ? 'Reprendre' : 'Resume',
+    pause: 'Pause',
+    stop: language === 'fr' ? 'Arreter' : 'Stop',
+    skip: language === 'fr' ? 'Suivant' : 'Skip',
+    details: language === 'fr' ? 'Details' : 'Details',
+    description: 'Description',
+    created: language === 'fr' ? 'Creee le' : 'Created',
+    started: language === 'fr' ? 'Demarree le' : 'Started',
+    ended: language === 'fr' ? 'Terminee le' : 'Ended',
+    scheduled: language === 'fr' ? 'Programmee le' : 'Scheduled',
+    displayCode: language === 'fr' ? 'Code display' : 'Display code',
+    sequences: language === 'fr' ? 'sequences' : 'sequences',
+    actions: language === 'fr' ? 'actions' : 'actions',
+    mysteryMovie: language === 'fr' ? 'Film mystere' : 'Mystery movie',
+    voteOpen: language === 'fr' ? 'Vote en cours' : 'Vote in progress',
+    voteClosed: language === 'fr' ? 'Vote clos' : 'Vote closed',
+    votePending: language === 'fr' ? 'Vote en attente' : 'Vote pending',
+    linked: language === 'fr' ? 'Vote lie' : 'Linked vote',
+    display: 'Display',
+    wallmount: 'Wallmount',
+    notFound: language === 'fr' ? 'Session non trouvee' : 'Session not found',
+    loading: language === 'fr' ? 'Chargement...' : 'Loading...',
+  };
+
+  // ---- Loading / Error states ----
+
+  if (isSessionLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+        <div className="h-8 w-32 bg-dark-surface rounded animate-pulse" />
+        <div className="h-48 bg-dark-surface rounded-xl animate-pulse" />
+        <div className="h-20 bg-dark-surface rounded-xl animate-pulse" />
+        <div className="h-32 bg-dark-surface rounded-xl animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <Link
+          to="/sessions"
+          className="inline-flex items-center gap-2 text-dark-muted hover:text-dark-text transition-colors mb-4"
+        >
+          <ArrowLeft size={18} />
+          <span>{t.back}</span>
+        </Link>
+        <div className="text-center py-12">
+          <p className="text-dark-muted">{t.notFound}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const participants = participantsData?.items || [];
+  const voteSession = session.linked_vote_session;
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+      {/* Header: Back + Edit */}
+      <div className="flex items-center justify-between">
+        <Link
+          to="/sessions"
+          className="inline-flex items-center gap-2 text-dark-muted hover:text-dark-text transition-colors"
+        >
+          <ArrowLeft size={18} />
+          <span>{t.back}</span>
+        </Link>
+        <Link
+          to={`/sessions/${id}/edit`}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-surface border border-dark-border text-sm text-dark-text hover:border-theatarr-500/50 hover:text-theatarr-500 transition-colors"
+        >
+          <Edit3 size={14} />
+          {t.edit}
+        </Link>
+      </div>
+
+      {/* Hero */}
+      <div
+        className="relative rounded-xl overflow-hidden"
+        style={{
+          backgroundColor: isMysteryHidden ? '#1a0a2e' : isVoteHidden ? '#0a1628' : bgColor,
+        }}
+      >
+        {/* Background */}
+        {isMysteryHidden ? (
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-transparent to-purple-900/20" />
+        ) : isVoteHidden ? (
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-900/30 via-transparent to-blue-900/20" />
+        ) : session.movie_poster_url && (
+          <div className="absolute inset-0">
+            <img
+              src={session.movie_poster_url}
+              alt={session.movie_title || session.name}
+              className="w-full h-full object-cover opacity-30 blur-sm"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+          </div>
+        )}
+
+        <div className="relative p-4 sm:p-6 flex gap-4">
+          {/* Poster */}
+          {isMysteryHidden ? (
+            <MysteryPoster className="w-24 h-36 sm:w-28 sm:h-42 flex-shrink-0 rounded-lg shadow-lg" />
+          ) : isVoteHidden ? (
+            posterDisplay === 'posters' && voteSession?.movie_options?.length ? (
+              <VotePosterCollage
+                posters={voteSession.movie_options.map((o) => o.poster_url).filter((u): u is string => !!u)}
+                className="w-24 h-36 sm:w-28 sm:h-42 flex-shrink-0 rounded-lg shadow-lg"
+              />
+            ) : (
+              <VotePoster className="w-24 h-36 sm:w-28 sm:h-42 flex-shrink-0 rounded-lg shadow-lg" />
+            )
+          ) : (
+            <div className="w-24 h-36 sm:w-28 sm:h-42 flex-shrink-0 rounded-lg overflow-hidden bg-dark-border shadow-lg">
+              {session.movie_poster_url ? (
+                <img
+                  src={session.movie_poster_url}
+                  alt={session.movie_title || session.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-dark-muted">
+                  <Film size={32} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Info */}
+          <div className="flex-1 flex flex-col justify-end min-w-0">
+            {/* Status badges */}
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className={clsx('px-2 py-0.5 rounded-full text-xs font-medium border', statusBadge.color)}>
+                {statusBadge.label}
+              </span>
+              {currentStatus === 'running' && (
+                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              )}
+              {/* Session start countdown */}
+              {session.scheduled_at && (currentStatus === 'scheduled' || currentStatus === 'draft') && (() => {
+                const countdown = getSessionStartCountdown(session.scheduled_at);
+                if (countdown.urgency === 'low') return null;
+                return (
+                  <span
+                    className={clsx('px-2 py-0.5 rounded-full text-xs font-medium', countdown.pulse && 'animate-pulse')}
+                    style={{ backgroundColor: `${countdown.color}20`, color: countdown.color }}
+                  >
+                    {countdown.text}
+                  </span>
+                );
+              })()}
+            </div>
+
+            {/* Title */}
+            <h1 className="text-xl sm:text-2xl font-bold text-white truncate">{session.name}</h1>
+
+            {/* Movie info */}
+            {isMysteryHidden ? (
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <Shuffle size={14} className="text-purple-400" />
+                  <span className="text-purple-300 font-medium text-sm">{t.mysteryMovie}</span>
+                </div>
+                {session.mystery_reveal_at && (() => {
+                  const reveal = getMysteryRevealCountdown(session.mystery_reveal_at);
+                  return (
+                    <span
+                      className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', reveal.pulse && 'animate-pulse')}
+                      style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
+                    >
+                      <Eye size={10} />
+                      {reveal.text}
+                    </span>
+                  );
+                })()}
+              </div>
+            ) : isVoteHidden ? (
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <Vote size={14} className="text-blue-400" />
+                  <span className="text-blue-300 font-medium text-sm">
+                    {voteSession?.is_open === false ? t.voteClosed : t.voteOpen}
+                  </span>
+                </div>
+                {session.vote_reveal_at && (() => {
+                  const reveal = getVoteRevealCountdown(session.vote_reveal_at);
+                  return (
+                    <span
+                      className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', reveal.pulse && 'animate-pulse')}
+                      style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
+                    >
+                      <Eye size={10} />
+                      {reveal.text}
+                    </span>
+                  );
+                })()}
+              </div>
+            ) : isMysteryRevealed ? (
+              <div className="flex items-center gap-1.5 mt-1">
+                <Sparkles size={14} className="text-purple-400" />
+                <p className="text-white/80 text-sm">{session.movie_title}</p>
+              </div>
+            ) : isVoteRevealed ? (
+              <div className="flex items-center gap-1.5 mt-1">
+                <Trophy size={14} className="text-yellow-500" />
+                <p className="text-white/80 text-sm">{session.movie_title}</p>
+              </div>
+            ) : session.movie_title ? (
+              <p className="text-white/80 mt-1 text-sm">{session.movie_title}</p>
+            ) : null}
+
+            {/* Quick meta */}
+            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-white/50">
+              {session.scheduled_at && (
+                <span className="flex items-center gap-1">
+                  <Calendar size={12} />
+                  {formatDateShort(session.scheduled_at)}
+                </span>
+              )}
+              {sequences.length > 0 && (
+                <span className="flex items-center gap-1">
+                  <Zap size={12} />
+                  {sequences.length} {t.sequences}
+                </span>
+              )}
+              {session.display_code && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(session.display_code!);
+                    setCopiedCode(true);
+                    setTimeout(() => setCopiedCode(false), 2000);
+                  }}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 transition-colors"
+                >
+                  <ScreenShare size={10} />
+                  <span className="font-mono tracking-wider">{session.display_code}</span>
+                  {copiedCode ? <Check size={10} className="text-green-400" /> : <Copy size={10} />}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls + Timeline */}
+      {sequences.length > 0 && (
+        <div className="bg-dark-surface rounded-xl border border-dark-border p-4 space-y-3">
+          {/* Control buttons */}
+          <div className="flex items-center gap-2">
+            {canPlay && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleControl(currentStatus === 'paused' ? 'play' : 'play')}
+                disabled={controllingAction !== null}
+                isLoading={controllingAction === 'play'}
+              >
+                <Play size={14} className="mr-1" />
+                {currentStatus === 'paused' ? t.resume : t.play}
+              </Button>
+            )}
+            {canPause && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleControl('pause')}
+                disabled={controllingAction !== null}
+                isLoading={controllingAction === 'pause'}
+              >
+                <Pause size={14} className="mr-1" />
+                {t.pause}
+              </Button>
+            )}
+            {canSkip && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleControl('skip')}
+                disabled={controllingAction !== null}
+                isLoading={controllingAction === 'skip'}
+              >
+                <SkipForward size={14} className="mr-1" />
+                {t.skip}
+              </Button>
+            )}
+            {canStop && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleControl('stop')}
+                disabled={controllingAction !== null}
+                isLoading={controllingAction === 'stop'}
+                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+              >
+                <Square size={14} className="mr-1" />
+                {t.stop}
+              </Button>
+            )}
+
+            {/* Quick links */}
+            <div className="flex-1" />
+            {session.display_code && (
+              <a
+                href={`/display/${session.display_code}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={t.display}
+                className="p-1.5 rounded-lg text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+              >
+                <ScreenShare size={16} />
+              </a>
+            )}
+            {(session.movie_id || session.movie_title || session.scheduled_at) && (
+              <a
+                href={`/wallmount/${session.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={t.wallmount}
+                className="p-1.5 rounded-lg text-dark-muted hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
+              >
+                <Monitor size={16} />
+              </a>
+            )}
+          </div>
+
+          {/* Error banner */}
+          {controlError && (
+            <div className="p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs">
+              {controlError}
+            </div>
+          )}
+
+          {/* Timeline */}
+          <SessionTimeline
+            sequences={sequences}
+            currentIndex={currentIndex}
+            elapsedMs={elapsedMs}
+            status={currentStatus}
+            language={language}
+          />
+        </div>
+      )}
+
+      {/* Participants */}
+      <ParticipantsSection
+        participants={participants}
+        isLoading={isParticipantsLoading}
+        language={language}
+      />
+
+      {/* Details */}
+      <div className="bg-dark-surface rounded-xl border border-dark-border p-4 space-y-4">
+        <h3 className="text-sm font-medium text-dark-text">{t.details}</h3>
+
+        {session.description && (
+          <p className="text-sm text-dark-muted">{session.description}</p>
+        )}
+
+        {/* Vote session link */}
+        {voteSession && (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-dark-bg border border-dark-border">
+            <div className={clsx(
+              'w-8 h-8 rounded-full flex items-center justify-center',
+              voteSession.is_open ? 'bg-green-500/20' : 'bg-blue-500/20',
+            )}>
+              {voteSession.is_open ? (
+                <Vote size={16} className="text-green-400" />
+              ) : (
+                <Trophy size={16} className="text-blue-400" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-dark-text">{t.linked}: {voteSession.name}</p>
+              <p className="text-xs text-dark-muted">
+                {voteSession.total_votes} vote{voteSession.total_votes !== 1 ? 's' : ''}
+                {voteSession.is_open ? ` — ${t.voteOpen}` : ` — ${t.voteClosed}`}
+              </p>
+            </div>
+            <Link
+              to="/votes"
+              className="text-xs text-theatarr-500 hover:text-theatarr-400 transition-colors"
+            >
+              <Eye size={14} />
+            </Link>
+          </div>
+        )}
+
+        {/* Dates */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          {session.scheduled_at && (
+            <div className="flex items-center gap-2 text-dark-muted">
+              <Calendar size={14} className="text-purple-400 flex-shrink-0" />
+              <div>
+                <span className="text-dark-text">{t.scheduled}</span>
+                <p className="text-xs">{formatDate(session.scheduled_at)}</p>
+              </div>
+            </div>
+          )}
+          {session.started_at && (
+            <div className="flex items-center gap-2 text-dark-muted">
+              <Play size={14} className="text-green-400 flex-shrink-0" />
+              <div>
+                <span className="text-dark-text">{t.started}</span>
+                <p className="text-xs">{formatDate(session.started_at)}</p>
+              </div>
+            </div>
+          )}
+          {session.completed_at && (
+            <div className="flex items-center gap-2 text-dark-muted">
+              <Check size={14} className="text-blue-400 flex-shrink-0" />
+              <div>
+                <span className="text-dark-text">{t.ended}</span>
+                <p className="text-xs">{formatDate(session.completed_at)}</p>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-dark-muted">
+            <Clock size={14} className="text-dark-muted flex-shrink-0" />
+            <div>
+              <span className="text-dark-text">{t.created}</span>
+              <p className="text-xs">{formatDate(session.created_at)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Color palette */}
+        {session.color_palette && (
+          <div className="flex items-center gap-1.5">
+            {[
+              session.color_palette.primary,
+              session.color_palette.secondary,
+              session.color_palette.accent,
+              session.color_palette.vibrant,
+              session.color_palette.vibrant_light,
+              session.color_palette.vibrant_dark,
+              session.color_palette.muted,
+            ]
+              .filter(Boolean)
+              .map((color, i) => (
+                <div
+                  key={i}
+                  className="w-6 h-6 rounded border border-dark-border"
+                  style={{ backgroundColor: color }}
+                  title={color}
+                />
+              ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
