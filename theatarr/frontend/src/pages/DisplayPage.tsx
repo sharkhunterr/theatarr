@@ -88,6 +88,11 @@ function CodeInput() {
     if (char && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
+
+    // Auto-validate within user gesture (keeps audio unlock working)
+    if (newDigits.every((d) => d.length === 1)) {
+      validateCodeDirect(newDigits.join(''));
+    }
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
@@ -116,10 +121,14 @@ function CodeInput() {
     // Focus last filled input
     const lastIdx = Math.min(pasted.length, 5);
     inputRefs.current[lastIdx]?.focus();
+
+    // Auto-validate within user gesture
+    if (newDigits.every((d) => d.length === 1)) {
+      validateCodeDirect(newDigits.join(''));
+    }
   };
 
-  const validateCode = async () => {
-    const code = digits.join('');
+  const validateCodeDirect = async (code: string) => {
     if (code.length !== 6) {
       setError('Entrez les 6 caracteres');
       return;
@@ -135,6 +144,14 @@ function CodeInput() {
         setError(data.detail || 'Code invalide');
         return;
       }
+      // Unlock audio for later video playback (must happen within user gesture)
+      try {
+        const ctx = new AudioContext();
+        await ctx.resume();
+        ctx.close();
+      } catch {
+        // AudioContext may not be available
+      }
       // Enter fullscreen (user gesture from click/Enter triggers this)
       try {
         await document.documentElement.requestFullscreen();
@@ -149,13 +166,7 @@ function CodeInput() {
     }
   };
 
-  // Auto-validate when all 6 chars are entered
-  useEffect(() => {
-    if (digits.every((d) => d.length === 1)) {
-      validateCode();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [digits]);
+  const validateCode = () => validateCodeDirect(digits.join(''));
 
   // Auto-focus first input
   useEffect(() => {
