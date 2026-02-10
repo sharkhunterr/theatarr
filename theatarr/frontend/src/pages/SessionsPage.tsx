@@ -45,6 +45,7 @@ export function SessionsPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [voteResultsSession, setVoteResultsSession] = useState<VoteSessionSummary | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const t = {
     title: language === 'fr' ? 'Sessions' : 'Sessions',
@@ -81,6 +82,7 @@ export function SessionsPage() {
     display: language === 'fr' ? 'Display' : 'Display',
     copyCode: language === 'fr' ? 'Copier le code' : 'Copy code',
     codeCopied: language === 'fr' ? 'Copié !' : 'Copied!',
+    all: language === 'fr' ? 'Toutes' : 'All',
   };
 
   useEffect(() => {
@@ -230,6 +232,303 @@ export function SessionsPage() {
     };
   };
 
+  const STATUS_ORDER = ['running', 'paused', 'scheduled', 'draft', 'completed', 'interrupted'];
+
+  const statusFilters = [
+    { key: 'all', label: t.all },
+    { key: 'running', label: t.running },
+    { key: 'paused', label: t.paused },
+    { key: 'scheduled', label: t.scheduled },
+    { key: 'draft', label: t.draft },
+    { key: 'completed', label: t.completed },
+    { key: 'interrupted', label: t.interrupted },
+  ];
+
+  // Filter sessions
+  const filteredSessions = statusFilter === 'all'
+    ? sessions
+    : sessions.filter((s) => s.status === statusFilter);
+
+  // Group sessions by status (for "all" view)
+  const groupedSessions = statusFilter === 'all'
+    ? STATUS_ORDER
+        .map((status) => ({
+          status,
+          label: getStatusBadge(status).label,
+          sessions: filteredSessions.filter((s) => s.status === status),
+        }))
+        .filter((g) => g.sessions.length > 0)
+    : null;
+
+  // Count per status for filter badges
+  const statusCounts = sessions.reduce<Record<string, number>>((acc, s) => {
+    acc[s.status] = (acc[s.status] || 0) + 1;
+    return acc;
+  }, {});
+
+  const renderSessionCard = (
+    session: Session,
+    statusBadge: { color: string; label: string },
+    movieDisplay: ReturnType<typeof getMovieDisplay>,
+    MovieIcon: typeof Film,
+    voteSession: VoteSessionSummary | undefined,
+  ) => (
+    <div className="flex">
+      {/* Movie Poster / Placeholder */}
+      <div className="w-20 sm:w-24 flex-shrink-0">
+        {movieDisplay.type === 'mystery' ? (
+          <MysteryPoster className="w-full h-full" particles={6} questionMarkSize="text-2xl" />
+        ) : movieDisplay.type === 'vote' ? (
+          posterDisplay === 'posters' && voteSession?.movie_options?.length ? (
+            <VotePosterCollage
+              posters={voteSession.movie_options
+                .map((opt) => opt.poster_url)
+                .filter((url): url is string => !!url)}
+              className="w-full h-full"
+            />
+          ) : (
+            <VotePoster className="w-full h-full" particles={6} iconSize="text-2xl" />
+          )
+        ) : movieDisplay.poster ? (
+          <img
+            src={movieDisplay.poster}
+            alt={movieDisplay.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-dark-border">
+            <MovieIcon size={32} className={movieDisplay.iconColor} />
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 p-3 sm:p-4 flex flex-col justify-between min-w-0">
+        {/* Top row: Title + Status */}
+        <div>
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <Link
+              to={`/sessions/${session.id}/edit`}
+              className="text-base sm:text-lg font-semibold text-dark-text hover:text-theatarr-500 transition-colors truncate"
+            >
+              {session.name}
+            </Link>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${statusBadge.color}`}>
+              {statusBadge.label}
+            </span>
+          </div>
+
+          {/* Movie info */}
+          <div className="flex items-center gap-1.5 text-sm text-dark-muted mb-2">
+            <MovieIcon size={14} className={movieDisplay.iconColor} />
+            <span className="truncate">{movieDisplay.title}</span>
+            {/* Mystery reveal countdown */}
+            {session.movie_selection_mode === 'mystery' && !session.movie_resolved && session.mystery_reveal_at && (() => {
+              const reveal = getMysteryRevealCountdown(session.mystery_reveal_at);
+              return (
+                <span
+                  className={clsx('flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium', reveal.pulse && 'animate-pulse')}
+                  style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
+                >
+                  <Eye size={10} />
+                  {reveal.text}
+                </span>
+              );
+            })()}
+            {/* Vote reveal countdown */}
+            {session.movie_selection_mode === 'vote' && !session.movie_resolved && session.vote_reveal_at && (() => {
+              const reveal = getVoteRevealCountdown(session.vote_reveal_at);
+              return (
+                <span
+                  className={clsx('flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium', reveal.pulse && 'animate-pulse')}
+                  style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
+                >
+                  <Eye size={10} />
+                  {reveal.text}
+                </span>
+              );
+            })()}
+          </div>
+
+          {/* Vote badge */}
+          {voteSession && (
+            <div className="flex items-center gap-2 mb-2">
+              {(() => {
+                const voteBadge = getVoteStatusBadge(voteSession);
+                const VoteIcon = voteBadge.icon;
+                return (
+                  <>
+                    <Link
+                      to="/votes"
+                      className={clsx(
+                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                        voteBadge.color
+                      )}
+                    >
+                      <VoteIcon size={12} />
+                      {voteBadge.label}
+                      {voteSession.total_votes > 0 && (
+                        <span className="ml-1">({voteSession.total_votes})</span>
+                      )}
+                    </Link>
+                    {voteSession.status === 'closed' && voteSession.movie_options && (
+                      <button
+                        onClick={() => setVoteResultsSession(voteSession)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-dark-border text-dark-text hover:bg-dark-muted/50 transition-colors"
+                      >
+                        <Eye size={12} />
+                        {t.seeResults}
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+
+        {/* Bottom row: Meta info */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-dark-muted">
+          {/* Scheduled date */}
+          {session.scheduled_at && (
+            <span className="flex items-center gap-1 text-purple-400">
+              <Calendar size={12} />
+              {formatDate(session.scheduled_at)}
+            </span>
+          )}
+
+          {/* Participants */}
+          {(session.participants_total ?? 0) > 0 && (
+            <span className="flex items-center gap-1">
+              <Users size={12} />
+              {session.participants_accepted ?? 0}/{session.participants_total} {t.participants}
+            </span>
+          )}
+
+          {/* Actions count */}
+          {(session.actions_count ?? 0) > 0 && (
+            <span className="flex items-center gap-1">
+              <Zap size={12} />
+              {session.actions_count} {t.actions}
+            </span>
+          )}
+
+          {/* Display code */}
+          {session.display_code && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(session.display_code!);
+                setCopiedCode(session.id);
+                setTimeout(() => setCopiedCode(null), 2000);
+              }}
+              title={copiedCode === session.id ? t.codeCopied : t.copyCode}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-dark-border hover:bg-dark-muted/50 transition-colors"
+            >
+              <ScreenShare size={10} className="text-theatarr-500" />
+              <span className="font-mono text-[10px] text-dark-text tracking-wider">{session.display_code}</span>
+              {copiedCode === session.id ? (
+                <Check size={10} className="text-green-400" />
+              ) : (
+                <Copy size={10} className="text-dark-muted" />
+              )}
+            </button>
+          )}
+
+          {/* Color palette preview */}
+          {session.color_palette && (
+            <div className="flex items-center gap-0.5">
+              {[session.color_palette.primary, session.color_palette.accent, session.color_palette.vibrant]
+                .filter(Boolean)
+                .slice(0, 3)
+                .map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-3 h-3 rounded-sm border border-dark-border"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col justify-center gap-1 p-2 border-l border-dark-border">
+        {/* Display button */}
+        {session.display_code && (
+          <a
+            href={`/display/${session.display_code}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`${t.display} (${session.display_code})`}
+            className="inline-flex items-center justify-center p-1.5 rounded-lg text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+          >
+            <ScreenShare size={16} />
+          </a>
+        )}
+        {/* Wallmount button */}
+        {(session.movie_id || session.movie_title || session.scheduled_at) && (
+          <a
+            href={`/wallmount/${session.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={t.wallmount}
+            className="inline-flex items-center justify-center p-1.5 rounded-lg text-dark-muted hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
+          >
+            <Monitor size={16} />
+          </a>
+        )}
+        {/* Play/Resume button */}
+        {(session.status === 'draft' || session.status === 'scheduled' || session.status === 'interrupted' || session.status === 'paused') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handlePlayPause(session)}
+            title={session.status === 'paused' ? t.resume : t.play}
+            disabled={controllingId === session.id || (session.actions_count ?? 0) === 0}
+          >
+            <Play size={16} className={session.status === 'paused' ? 'text-yellow-400' : ''} />
+          </Button>
+        )}
+        {/* Pause button */}
+        {session.status === 'running' && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handlePlayPause(session)}
+            title={t.pause}
+            disabled={controllingId === session.id}
+          >
+            <Pause size={16} />
+          </Button>
+        )}
+        {/* Stop button */}
+        {(session.status === 'running' || session.status === 'paused') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleStop(session)}
+            title={t.stop}
+            disabled={controllingId === session.id}
+            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+          >
+            <Square size={16} />
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setDeleteSession(session)}
+          title={t.delete}
+          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+        >
+          <Trash2 size={16} />
+        </Button>
+      </div>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -265,6 +564,36 @@ export function SessionsPage() {
         </div>
       )}
 
+      {/* Status Filters */}
+      {sessions.length > 0 && (
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {statusFilters.map((f) => {
+            const count = f.key === 'all' ? sessions.length : (statusCounts[f.key] || 0);
+            if (f.key !== 'all' && count === 0) return null;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
+                  statusFilter === f.key
+                    ? 'bg-theatarr-500 text-white'
+                    : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
+                }`}
+              >
+                {f.label}
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  statusFilter === f.key
+                    ? 'bg-white/20 text-white'
+                    : 'bg-dark-border text-dark-muted'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Sessions List */}
       {sessions.length === 0 ? (
         <Card className="p-12 text-center">
@@ -275,273 +604,61 @@ export function SessionsPage() {
             {t.createFirst}
           </Button>
         </Card>
+      ) : filteredSessions.length === 0 ? (
+        <Card className="p-8 text-center">
+          <p className="text-dark-muted">{language === 'fr' ? 'Aucune session avec ce statut' : 'No sessions with this status'}</p>
+        </Card>
+      ) : groupedSessions ? (
+        /* Grouped "All" view */
+        <div className="space-y-6">
+          {groupedSessions.map((group, groupIndex) => (
+            <div key={group.status}>
+              {/* Group separator */}
+              {groupIndex > 0 && (
+                <div className="mb-4 border-t border-dark-border/50" />
+              )}
+              {/* Group header */}
+              <div className="flex items-center gap-3 mb-3">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadge(group.status).color}`}>
+                  {group.label}
+                </span>
+                <div className="flex-1 h-px bg-dark-border/30" />
+                <span className="text-xs text-dark-muted">{group.sessions.length}</span>
+              </div>
+              {/* Group sessions */}
+              <div className="space-y-3">
+                {group.sessions.map((session) => {
+                  const statusBadge = getStatusBadge(session.status);
+                  const movieDisplay = getMovieDisplay(session);
+                  const MovieIcon = movieDisplay.icon;
+                  const voteSession = session.linked_vote_session;
+                  return (
+                    <div
+                      key={session.id}
+                      className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden hover:border-dark-muted/50 transition-colors"
+                    >
+                      {renderSessionCard(session, statusBadge, movieDisplay, MovieIcon, voteSession)}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
+        /* Filtered view (single status) */
         <div className="space-y-3">
-          {sessions.map((session) => {
+          {filteredSessions.map((session) => {
             const statusBadge = getStatusBadge(session.status);
             const movieDisplay = getMovieDisplay(session);
             const MovieIcon = movieDisplay.icon;
             const voteSession = session.linked_vote_session;
-
             return (
               <div
                 key={session.id}
                 className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden hover:border-dark-muted/50 transition-colors"
               >
-                <div className="flex">
-                  {/* Movie Poster / Placeholder */}
-                  <div className="w-20 sm:w-24 flex-shrink-0">
-                    {movieDisplay.type === 'mystery' ? (
-                      <MysteryPoster className="w-full h-full" particles={6} questionMarkSize="text-2xl" />
-                    ) : movieDisplay.type === 'vote' ? (
-                      posterDisplay === 'posters' && voteSession?.movie_options?.length ? (
-                        <VotePosterCollage
-                          posters={voteSession.movie_options
-                            .map((opt) => opt.poster_url)
-                            .filter((url): url is string => !!url)}
-                          className="w-full h-full"
-                        />
-                      ) : (
-                        <VotePoster className="w-full h-full" particles={6} iconSize="text-2xl" />
-                      )
-                    ) : movieDisplay.poster ? (
-                      <img
-                        src={movieDisplay.poster}
-                        alt={movieDisplay.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-dark-border">
-                        <MovieIcon size={32} className={movieDisplay.iconColor} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 p-3 sm:p-4 flex flex-col justify-between min-w-0">
-                    {/* Top row: Title + Status */}
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <Link
-                          to={`/sessions/${session.id}/edit`}
-                          className="text-base sm:text-lg font-semibold text-dark-text hover:text-theatarr-500 transition-colors truncate"
-                        >
-                          {session.name}
-                        </Link>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${statusBadge.color}`}>
-                          {statusBadge.label}
-                        </span>
-                      </div>
-
-                      {/* Movie info */}
-                      <div className="flex items-center gap-1.5 text-sm text-dark-muted mb-2">
-                        <MovieIcon size={14} className={movieDisplay.iconColor} />
-                        <span className="truncate">{movieDisplay.title}</span>
-                        {/* Mystery reveal countdown */}
-                        {session.movie_selection_mode === 'mystery' && !session.movie_resolved && session.mystery_reveal_at && (() => {
-                          const reveal = getMysteryRevealCountdown(session.mystery_reveal_at);
-                          return (
-                            <span
-                              className={clsx('flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium', reveal.pulse && 'animate-pulse')}
-                              style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
-                            >
-                              <Eye size={10} />
-                              {reveal.text}
-                            </span>
-                          );
-                        })()}
-                        {/* Vote reveal countdown */}
-                        {session.movie_selection_mode === 'vote' && !session.movie_resolved && session.vote_reveal_at && (() => {
-                          const reveal = getVoteRevealCountdown(session.vote_reveal_at);
-                          return (
-                            <span
-                              className={clsx('flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium', reveal.pulse && 'animate-pulse')}
-                              style={{ backgroundColor: `${reveal.color}20`, color: reveal.color }}
-                            >
-                              <Eye size={10} />
-                              {reveal.text}
-                            </span>
-                          );
-                        })()}
-                      </div>
-
-                      {/* Vote badge */}
-                      {voteSession && (
-                        <div className="flex items-center gap-2 mb-2">
-                          {(() => {
-                            const voteBadge = getVoteStatusBadge(voteSession);
-                            const VoteIcon = voteBadge.icon;
-                            return (
-                              <>
-                                <Link
-                                  to="/votes"
-                                  className={clsx(
-                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
-                                    voteBadge.color
-                                  )}
-                                >
-                                  <VoteIcon size={12} />
-                                  {voteBadge.label}
-                                  {voteSession.total_votes > 0 && (
-                                    <span className="ml-1">({voteSession.total_votes})</span>
-                                  )}
-                                </Link>
-                                {voteSession.status === 'closed' && voteSession.movie_options && (
-                                  <button
-                                    onClick={() => setVoteResultsSession(voteSession)}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-dark-border text-dark-text hover:bg-dark-muted/50 transition-colors"
-                                  >
-                                    <Eye size={12} />
-                                    {t.seeResults}
-                                  </button>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Bottom row: Meta info */}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-dark-muted">
-                      {/* Scheduled date */}
-                      {session.scheduled_at && (
-                        <span className="flex items-center gap-1 text-purple-400">
-                          <Calendar size={12} />
-                          {formatDate(session.scheduled_at)}
-                        </span>
-                      )}
-
-                      {/* Participants */}
-                      {(session.participants_total ?? 0) > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Users size={12} />
-                          {session.participants_accepted ?? 0}/{session.participants_total} {t.participants}
-                        </span>
-                      )}
-
-                      {/* Actions count */}
-                      {(session.actions_count ?? 0) > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Zap size={12} />
-                          {session.actions_count} {t.actions}
-                        </span>
-                      )}
-
-                      {/* Display code */}
-                      {session.display_code && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigator.clipboard.writeText(session.display_code!);
-                            setCopiedCode(session.id);
-                            setTimeout(() => setCopiedCode(null), 2000);
-                          }}
-                          title={copiedCode === session.id ? t.codeCopied : t.copyCode}
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-dark-border hover:bg-dark-muted/50 transition-colors"
-                        >
-                          <ScreenShare size={10} className="text-theatarr-500" />
-                          <span className="font-mono text-[10px] text-dark-text tracking-wider">{session.display_code}</span>
-                          {copiedCode === session.id ? (
-                            <Check size={10} className="text-green-400" />
-                          ) : (
-                            <Copy size={10} className="text-dark-muted" />
-                          )}
-                        </button>
-                      )}
-
-                      {/* Color palette preview */}
-                      {session.color_palette && (
-                        <div className="flex items-center gap-0.5">
-                          {[session.color_palette.primary, session.color_palette.accent, session.color_palette.vibrant]
-                            .filter(Boolean)
-                            .slice(0, 3)
-                            .map((color, i) => (
-                              <div
-                                key={i}
-                                className="w-3 h-3 rounded-sm border border-dark-border"
-                                style={{ backgroundColor: color }}
-                              />
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-col justify-center gap-1 p-2 border-l border-dark-border">
-                    {/* Display button */}
-                    {session.display_code && (
-                      <a
-                        href={`/display/${session.display_code}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`${t.display} (${session.display_code})`}
-                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-                      >
-                        <ScreenShare size={16} />
-                      </a>
-                    )}
-                    {/* Wallmount button - show if session has a movie or is scheduled */}
-                    {(session.movie_id || session.movie_title || session.scheduled_at) && (
-                      <a
-                        href={`/wallmount/${session.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={t.wallmount}
-                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-dark-muted hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
-                      >
-                        <Monitor size={16} />
-                      </a>
-                    )}
-                    {/* Play/Resume button */}
-                    {(session.status === 'draft' || session.status === 'scheduled' || session.status === 'interrupted' || session.status === 'paused') && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handlePlayPause(session)}
-                        title={session.status === 'paused' ? t.resume : t.play}
-                        disabled={controllingId === session.id || (session.actions_count ?? 0) === 0}
-                      >
-                        <Play size={16} className={session.status === 'paused' ? 'text-yellow-400' : ''} />
-                      </Button>
-                    )}
-                    {/* Pause button */}
-                    {session.status === 'running' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handlePlayPause(session)}
-                        title={t.pause}
-                        disabled={controllingId === session.id}
-                      >
-                        <Pause size={16} />
-                      </Button>
-                    )}
-                    {/* Stop button */}
-                    {(session.status === 'running' || session.status === 'paused') && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleStop(session)}
-                        title={t.stop}
-                        disabled={controllingId === session.id}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                      >
-                        <Square size={16} />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeleteSession(session)}
-                      title={t.delete}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                </div>
+                {renderSessionCard(session, statusBadge, movieDisplay, MovieIcon, voteSession)}
               </div>
             );
           })}
