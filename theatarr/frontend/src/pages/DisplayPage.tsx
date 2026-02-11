@@ -253,6 +253,8 @@ function SessionDisplay() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [showVideo, setShowVideo] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
+  const [sequenceDurationMs, setSequenceDurationMs] = useState<number | null>(null);
+  const [sequenceStartedAt, setSequenceStartedAt] = useState<number | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -335,11 +337,33 @@ function SessionDisplay() {
 
   const handleDisplayAction = useCallback(
     (command: string, params: Record<string, unknown>) => {
+      // Capture sequence timing for countdown support (universal, all template types)
+      if (params.sequence_duration_ms) {
+        setSequenceDurationMs(params.sequence_duration_ms as number);
+        setSequenceStartedAt(
+          params.sequence_started_at
+            ? new Date(params.sequence_started_at as string).getTime()
+            : Date.now()
+        );
+      } else {
+        setSequenceDurationMs(null);
+        setSequenceStartedAt(null);
+      }
+
       switch (command) {
         case 'show': {
           const contentType = params.content_type as string | undefined;
-          if (contentType === 'waiting_screen') {
-            // Use the session's configured template for waiting screen
+          if (contentType === 'waiting_screen' && params.layout) {
+            // Use the action's waiting screen template
+            setCurrentTemplate({
+              name: (params.template_name as string) || 'Waiting Screen',
+              template_type: 'waiting_screen',
+              layout: params.layout,
+              config: params.config,
+            });
+            setShowVideo(false);
+          } else if (contentType === 'waiting_screen') {
+            // Fallback to session template
             setCurrentTemplate(session?.template || null);
             setShowVideo(false);
           } else if (params.template_id || params.layout) {
@@ -730,6 +754,8 @@ function SessionDisplay() {
           session: {
             name: session.session_name,
             status: session.session_status,
+            current_sequence_duration_ms: sequenceDurationMs ?? undefined,
+            current_sequence_started_at: sequenceStartedAt ?? undefined,
           },
           palette: session.color_palette || undefined,
         }}

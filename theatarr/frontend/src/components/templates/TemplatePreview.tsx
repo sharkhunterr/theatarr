@@ -142,63 +142,61 @@ export function TemplatePreview({ template, onClose }: TemplatePreviewProps) {
   return (
     <div className="h-full flex flex-col">
       {/* Controls */}
-      <div className="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-700">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={handleCycleMovie}>
+      <div className="flex items-center justify-between gap-2 p-2 sm:p-3 bg-gray-900 border-b border-gray-700">
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
+          <Button variant="secondary" size="sm" onClick={handleCycleMovie} title="Changer de film">
             <RefreshCw size={14} />
-            <span className="ml-1">Change Movie</span>
+            <span className="ml-1 hidden sm:inline">Film</span>
           </Button>
 
-          <Button variant="outline" size="sm" onClick={handleCyclePalette}>
+          <Button variant="secondary" size="sm" onClick={handleCyclePalette} title="Changer de palette">
             <div
-              className="w-4 h-4 rounded mr-1"
+              className="w-3.5 h-3.5 rounded-full sm:mr-1"
               style={{ backgroundColor: palette.primary }}
             />
-            <span>Change Palette</span>
+            <span className="hidden sm:inline">Palette</span>
           </Button>
 
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-1.5 text-xs sm:text-sm cursor-pointer">
             <input
               type="checkbox"
               checked={showSession}
               onChange={(e) => setShowSession(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-indigo-500"
+              className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-indigo-500"
             />
-            Show Session
+            <span className="hidden sm:inline">Session</span>
+            <span className="sm:hidden">Sess.</span>
           </label>
 
           {template.template_type === 'countdown' && (
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-400">Countdown:</label>
-              <select
-                value={countdownMinutes}
-                onChange={(e) => setCountdownMinutes(parseInt(e.target.value))}
-                className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm"
-              >
-                <option value={5}>5 min</option>
-                <option value={15}>15 min</option>
-                <option value={30}>30 min</option>
-                <option value={60}>1 hour</option>
-              </select>
-            </div>
+            <select
+              value={countdownMinutes}
+              onChange={(e) => setCountdownMinutes(parseInt(e.target.value))}
+              className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-xs sm:text-sm"
+            >
+              <option value={5}>5 min</option>
+              <option value={15}>15 min</option>
+              <option value={30}>30 min</option>
+              <option value={60}>1h</option>
+            </select>
           )}
         </div>
 
-        <Button variant="ghost" size="sm" onClick={onClose}>
+        <Button variant="ghost" size="sm" onClick={onClose} className="flex-shrink-0">
           <X size={16} />
-          <span className="ml-1">Close</span>
         </Button>
       </div>
 
       {/* Preview Area */}
       <div className="flex-1 relative bg-black">
-        <div className="absolute inset-4 rounded-lg overflow-hidden shadow-2xl border border-gray-800">
+        <div className="absolute inset-2 sm:inset-4 rounded-lg overflow-hidden shadow-2xl border border-gray-800">
           <TemplateRenderer
             template={{
               name: template.name,
               template_type: template.template_type,
               content: template.content,
               styles: template.styles,
+              script: template.script,
               layout: template.layout,
               config: template.config,
             }}
@@ -213,17 +211,15 @@ export function TemplatePreview({ template, onClose }: TemplatePreviewProps) {
       </div>
 
       {/* Info */}
-      <div className="p-4 bg-gray-900 border-t border-gray-700">
-        <div className="flex items-center justify-between text-sm text-gray-400">
-          <div>
+      <div className="px-3 py-2 sm:p-3 bg-gray-900 border-t border-gray-700">
+        <div className="flex items-center justify-between text-xs sm:text-sm text-gray-400 gap-2">
+          <div className="truncate">
             <span className="font-medium text-white">{template.name}</span>
-            <span className="mx-2">|</span>
-            <span>Type: {template.template_type}</span>
-            <span className="mx-2">|</span>
-            <span>Components: {template.layout?.components?.length || 0}</span>
+            <span className="mx-1.5 hidden sm:inline">|</span>
+            <span className="hidden sm:inline">{template.template_type}</span>
           </div>
-          <div>
-            Preview movie: {movie.title} ({movie.year})
+          <div className="text-gray-500 flex-shrink-0">
+            {movie.title}
           </div>
         </div>
       </div>

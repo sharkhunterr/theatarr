@@ -23,6 +23,7 @@ import {
   Shuffle,
   Info,
   Users,
+  Sparkles,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { Button, Spinner } from '../components/common';
@@ -772,6 +773,92 @@ export function SessionEditor() {
     setSelectedActionIndex(toIndex);
   };
 
+  // Smart preset: adds a complete sequence of 4 actions
+  const addSmartActions = () => {
+    const smartActions: ActionItem[] = [
+      {
+        id: generateId(),
+        action_type: 'display',
+        command: 'show',
+        parameters: {
+          content_type: 'waiting_screen',
+          template_name: 'Salle de Cinema',
+          layout: {
+            style: 'waiting-cinema',
+            components: [
+              { type: 'session_info', position: 'center', fields: ['name'] },
+              { type: 'custom_text', text: 'La seance va bientot commencer', position: 'center', style: 'cinema-label' },
+            ],
+          },
+          config: { theme: 'cinema' },
+        },
+        delay_ms: 0,
+        duration_ms: 10000,
+        on_failure: 'warn',
+      },
+      {
+        id: generateId(),
+        action_type: 'display',
+        command: 'show',
+        parameters: {
+          content_type: 'waiting_screen',
+          template_name: 'Bandes-Annonces',
+          layout: {
+            style: 'waiting-trailers',
+            components: [
+              { type: 'badge', text: 'Bandes-Annonces', position: 'top-center', style: 'glass-pill' },
+              { type: 'session_info', position: 'bottom-center', fields: ['name'] },
+            ],
+          },
+          config: { theme: 'cinema' },
+        },
+        delay_ms: 0,
+        duration_ms: 10000,
+        on_failure: 'warn',
+      },
+      {
+        id: generateId(),
+        action_type: 'display',
+        command: 'show',
+        parameters: {
+          content_type: 'waiting_screen',
+          template_name: 'Teaser',
+          layout: {
+            style: 'waiting-teaser',
+            components: [
+              { type: 'backdrop', opacity: 1, blur: 0 },
+              { type: 'logo', position: 'center', size: 'large' },
+              { type: 'genres', style: 'pills' },
+              { type: 'session_info', position: 'bottom-center', fields: ['name'] },
+            ],
+          },
+          config: {
+            theme: 'dark',
+            use_palette_colors: true,
+            use_logo_image: true,
+            rotate_backdrops: true,
+            rotate_interval: 20,
+          },
+        },
+        delay_ms: 0,
+        duration_ms: 10000,
+        on_failure: 'warn',
+      },
+      {
+        id: generateId(),
+        action_type: 'media',
+        command: 'play',
+        parameters: {},
+        delay_ms: 0,
+        duration_ms: 0,
+        on_failure: 'warn',
+      },
+    ];
+    const newActions = [...actions, ...smartActions];
+    setActions(newActions);
+    setSelectedActionIndex(newActions.length - smartActions.length);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1297,6 +1384,14 @@ export function SessionEditor() {
                           </button>
                         );
                       })}
+                      <button
+                        onClick={() => { addSmartActions(); setMobilePanel('properties'); }}
+                        className="px-2 py-1.5 rounded text-xs font-medium flex items-center gap-1 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 hover:opacity-80 transition-opacity border border-amber-500/30"
+                        title={language === 'fr' ? 'Preset Smart : séance complète' : 'Smart preset: complete session'}
+                      >
+                        <Sparkles size={12} />
+                        <span className="hidden sm:inline">Smart</span>
+                      </button>
                     </div>
                   </div>
 

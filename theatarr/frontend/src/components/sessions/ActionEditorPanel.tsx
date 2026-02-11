@@ -955,6 +955,14 @@ function DisplayForm({
     onChange({ parameters: { ...parameters, ...updates } });
   };
 
+  const isTemplateSelected = (tmpl: { id: string; layout?: Record<string, unknown> }) => {
+    if (parameters.template_id && parameters.template_id === tmpl.id) return true;
+    const paramStyle = (parameters.layout as Record<string, unknown>)?.style;
+    const tmplStyle = tmpl.layout?.style;
+    if (paramStyle && tmplStyle && paramStyle === tmplStyle) return true;
+    return false;
+  };
+
   const handleTemplateSelect = (templateId: string) => {
     const selected = waitingScreenTemplates.find((t) => t.id === templateId);
     if (selected) {
@@ -1050,14 +1058,14 @@ function DisplayForm({
                       type="button"
                       onClick={() => handleTemplateSelect(tmpl.id)}
                       className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                        (parameters.template_id as string) === tmpl.id
+                        isTemplateSelected(tmpl)
                           ? 'border-theatarr-500 bg-theatarr-500/10'
                           : 'border-dark-border bg-dark-bg hover:border-dark-muted'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <Monitor size={16} className={
-                          (parameters.template_id as string) === tmpl.id
+                          isTemplateSelected(tmpl)
                             ? 'text-theatarr-400'
                             : 'text-dark-muted'
                         } />

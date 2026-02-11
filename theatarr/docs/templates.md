@@ -15,9 +15,11 @@
 11. [Animations](#animations)
 12. [Badges dynamiques](#badges-dynamiques)
 13. [Templates built-in](#templates-built-in)
-14. [Images alternatives (fanart, backdrops)](#images-alternatives)
-15. [Enrichissement TMDB + Fanart.tv](#enrichissement-tmdb--fanarttv)
-16. [Exemples complets](#exemples-complets)
+14. [Waiting Screens](#waiting-screens)
+15. [Compte a rebours de sequence](#compte-a-rebours-de-sequence)
+16. [Images alternatives (fanart, backdrops)](#images-alternatives)
+17. [Enrichissement TMDB + Fanart.tv](#enrichissement-tmdb--fanarttv)
+18. [Exemples complets](#exemples-complets)
 
 ---
 
@@ -174,6 +176,24 @@ Le `layout.style` determine la disposition generale. Voici les styles disponible
 | `panorama-slide` | Backdrops glissant horizontalement avec logo et infos a gauche | Paysage |
 | `modern-enriched` | Design moderne avec badges animes, etoiles, genres pills, casting defilant | Paysage |
 | `debug-tmdb` | Template de debug affichant toutes les donnees TMDB/Fanart explicitement | Paysage |
+
+### Styles Waiting Screen
+
+| Style | Description | Contenu requis |
+|-------|-------------|----------------|
+| `waiting-poster-centered` | Fond noir, affiche centree, badge "A venir" | Film |
+| `waiting-ambient` | Backdrop Ken Burns, logo/titre, infos minimalistes | Film |
+| `waiting-minimal` | Fond noir uni, titre geant centre | Film optionnel |
+| `waiting-cinema` | Ambiance salle de cinema, gradients animes, bandes pellicule | Aucun (generique) |
+| `waiting-annonce` | Carte glass-morphism, particules, message personnalisable | Aucun (generique) |
+| `waiting-spotlight` | Projecteur radial sur poster centre, fond noir | Film |
+| `waiting-panoramic` | Split 40/60 poster gauche, details droite, backdrop floute | Film |
+| `waiting-teaser` | Backdrops rotatifs plein ecran, logo centre avec glow | Film |
+| `waiting-trailers` | Annonce bandes-annonces, faisceaux projecteur, icone play | Aucun (generique) |
+| `waiting-trailers-retro` | Annonce retro bandes-annonces, grain film, cercle decompte | Aucun (generique) |
+| `waiting-intermission` | Entracte elegant, gradient anime, countdown grand format | Aucun + countdown |
+| `waiting-intermission-fun` | Pause ludique, icones popcorn/boissons/WC, confetti, countdown | Aucun + countdown |
+| `waiting-intermission-minimal` | Pause ultra-minimaliste, countdown geant sur fond noir | Aucun + countdown |
 
 ---
 
@@ -373,7 +393,8 @@ Voici la structure complete des donnees envoyees au `TemplateRenderer` via `GET 
   total_sequences?: number;            // Nombre total de sequences
   current_sequence_name?: string;      // Nom de la sequence en cours
   current_sequence_elapsed_ms?: number; // Temps ecoule dans la sequence
-  current_sequence_duration_ms?: number; // Duree totale de la sequence
+  current_sequence_duration_ms?: number; // Duree totale de la sequence (ms)
+  current_sequence_started_at?: number; // Timestamp JS (ms) du debut de la sequence (mode Display)
 }
 ```
 
@@ -722,7 +743,9 @@ Valeurs : `"always"`, `"scheduled"`, `"running"`, `"countdown_under_24h"`, `"nev
 
 ## Templates built-in
 
-Theatarr inclut 21 templates pre-configures :
+Theatarr inclut 37 templates pre-configures :
+
+### Templates Wallmount (affichage film/session)
 
 | Cle | Nom | Style | Description |
 |-----|-----|-------|-------------|
@@ -748,10 +771,113 @@ Theatarr inclut 21 templates pre-configures :
 | `modern_enriched` | Moderne Enrichi | `modern-enriched` | Design moderne avec badge gradient-border, etoiles, genres, casting |
 | `debug_tmdb` | Debug TMDB | `debug-tmdb` | Affiche toutes les donnees enrichies pour debug |
 
+### Templates Waiting Screen (ecrans d'attente)
+
+| Cle | Nom | Style | Necessite film |
+|-----|-----|-------|----------------|
+| `waiting_poster_centered` | Attente Affiche Centree | `waiting-poster-centered` | Oui |
+| `waiting_ambient` | Attente Ambiance | `waiting-ambient` | Oui |
+| `waiting_minimal` | Attente Minimale | `waiting-minimal` | Optionnel |
+| `waiting_cinema` | Salle de Cinema | `waiting-cinema` | Non |
+| `waiting_annonce` | Annonces | `waiting-annonce` | Non |
+| `waiting_spotlight` | Spotlight | `waiting-spotlight` | Oui |
+| `waiting_panoramic` | Panoramique | `waiting-panoramic` | Oui |
+| `waiting_teaser` | Teaser | `waiting-teaser` | Oui |
+| `waiting_trailers` | Bandes-Annonces | `waiting-trailers` | Non |
+| `waiting_trailers_retro` | Bandes-Annonces Retro | `waiting-trailers-retro` | Non |
+| `waiting_intermission` | Entracte | `waiting-intermission` | Non + countdown |
+| `waiting_intermission_fun` | Pause Detente | `waiting-intermission-fun` | Non + countdown |
+| `waiting_intermission_minimal` | Pause Minimale | `waiting-intermission-minimal` | Non + countdown |
+
 Pour reinitialiser les templates built-in :
 ```
 POST /templates/init-builtins
 ```
+
+---
+
+## Waiting Screens
+
+Les waiting screens sont des templates d'attente utilises dans les actions `display:show` avec `content_type=waiting_screen`. Ils s'affichent sur la page Display (mode kiosk) pendant les sequences de la session.
+
+### Categories
+
+**Generiques (sans contenu film)** : utilisables sans film attribue a la session.
+- `waiting-cinema` : ambiance salle de cinema avec gradients animes et bandes pellicule
+- `waiting-annonce` : carte glass-morphism avec message personnalisable
+- `waiting-trailers` : annonce de bandes-annonces avec faisceaux projecteur
+- `waiting-trailers-retro` : annonce retro avec grain film et decompte pellicule vintage
+
+**Avec contenu film** : requierent un film attribue pour afficher poster, logo, titre, etc.
+- `waiting-ambient` : backdrop Ken Burns + logo/titre en bas a gauche (style cinematic immersive)
+- `waiting-poster-centered` : poster centre sur fond sombre
+- `waiting-spotlight` : projecteur radial sur poster centre
+- `waiting-panoramic` : split layout 40/60 avec poster et details
+- `waiting-teaser` : backdrops rotatifs plein ecran + logo centre avec glow
+
+**Entracte (avec countdown)** : affichent un compte a rebours de la duree de la sequence.
+- `waiting-intermission` : entracte elegant avec countdown grand format et barre de progression
+- `waiting-intermission-fun` : pause ludique avec icones popcorn/boissons/WC et confetti
+- `waiting-intermission-minimal` : countdown geant sur fond noir pur
+
+### Usage dans les actions
+
+```json
+{
+  "action_type": "display",
+  "command": "show",
+  "parameters": {
+    "content_type": "waiting_screen",
+    "template_name": "Bandes-Annonces",
+    "layout": { "style": "waiting-trailers", "components": [...] },
+    "config": { "theme": "cinema" }
+  }
+}
+```
+
+La page Display utilise le `layout` et `config` definis dans l'action, pas le template global de la session.
+
+---
+
+## Compte a rebours de sequence
+
+Le systeme de countdown de sequence permet aux templates d'afficher un compte a rebours du temps restant dans la sequence en cours. Cette fonctionnalite est **universelle** : elle est disponible pour tous les types de templates (wallmount, waiting screen, et futurs types).
+
+### Fonctionnement
+
+1. **Backend** : quand le moteur execute une action, il injecte `sequence_duration_ms` (duree totale de la sequence en ms) et `sequence_started_at` (timestamp ISO 8601) dans les parametres WebSocket
+2. **DisplayPage** : capture ces valeurs et les passe au `TemplateRenderer` via `session.current_sequence_duration_ms` et `session.current_sequence_started_at`
+3. **TemplateRenderer** : calcule automatiquement `sequenceRemaining` (secondes restantes) et `sequenceProgress` (ratio 0..1) via un timer interne actualise chaque seconde
+
+### Donnees disponibles dans les handlers
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `sequenceRemaining` | `number \| null` | Secondes restantes, `null` si pas de countdown |
+| `sequenceProgress` | `number \| null` | Ratio de progression (0 = debut, 1 = fin) |
+| `formatSeqCountdown(seconds)` | `string` | Formatte en `"5:23"` ou `"45s"` |
+
+### Templates utilisant le countdown
+
+Les templates d'entracte (`waiting-intermission*`) utilisent le countdown nativement. Mais tout template peut y acceder :
+
+```typescript
+// Dans un handler de template
+{sequenceRemaining !== null && sequenceRemaining > 0 && (
+  <span className="text-4xl font-mono">{formatSeqCountdown(sequenceRemaining)}</span>
+)}
+
+// Barre de progression
+{sequenceProgress !== null && (
+  <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
+    <div className="h-full bg-accent" style={{ width: `${sequenceProgress * 100}%` }} />
+  </div>
+)}
+```
+
+### Configuration du countdown dans les sequences
+
+La duree est definie au niveau de la sequence (pas de l'action). Dans l'editeur de session, chaque sequence a une duree qui controle combien de temps elle reste affichee. Cette duree est automatiquement transmise aux templates via `sequence_duration_ms`.
 
 ---
 

@@ -922,4 +922,191 @@ BUILTIN_TEMPLATES = {
             "typography": "mono",
         },
     },
+    "waiting_cinema": {
+        "name": "Salle de Cinema",
+        "description": "Ambiance salle de cinema, fond sombre anime avec bandes decoratives, pas de contenu film",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-cinema",
+            "components": [
+                {"type": "session_info", "position": "center", "fields": ["name"]},
+                {"type": "custom_text", "text": "La seance va bientot commencer", "position": "center", "style": "cinema-label"},
+            ]
+        },
+        "config": {
+            "theme": "cinema",
+        },
+    },
+    "waiting_annonce": {
+        "name": "Annonces",
+        "description": "Ecran d'annonces et messages avant la seance, carte glass-morphism",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-annonce",
+            "components": [
+                {"type": "badge", "text": "Prochainement", "position": "top-center", "style": "glass-pill"},
+                {"type": "custom_text", "text": "Bienvenue ! La seance debute dans quelques instants.", "position": "center", "style": "glass-card"},
+                {"type": "session_info", "position": "bottom-center", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "glass",
+        },
+    },
+    "waiting_spotlight": {
+        "name": "Spotlight",
+        "description": "Focus sur l'affiche avec effet projecteur et halo lumineux",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-spotlight",
+            "components": [
+                {"type": "poster", "position": "center", "size": "xlarge"},
+                {"type": "title", "size": "xlarge"},
+                {"type": "genres", "style": "pills"},
+                {"type": "session_info", "position": "top-right", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "dark",
+            "use_palette_colors": True,
+        },
+    },
+    "waiting_panoramic": {
+        "name": "Panoramique",
+        "description": "Mise en page splitscreen avec affiche et details complets du film",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-panoramic",
+            "components": [
+                {"type": "backdrop", "opacity": 0.3, "blur": 20},
+                {"type": "poster", "position": "left", "size": "full-height"},
+                {"type": "title", "size": "xlarge"},
+                {"type": "tagline", "style": "italic"},
+                {"type": "genres", "style": "pills"},
+                {"type": "metadata", "fields": ["year", "runtime", "rating"]},
+                {"type": "overview", "max_lines": 4},
+                {"type": "session_info", "position": "bottom-right", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "dark",
+            "use_palette_colors": True,
+            "use_logo_image": True,
+        },
+    },
+    "waiting_teaser": {
+        "name": "Teaser",
+        "description": "Impact visuel maximum avec backdrops rotatifs et logo centre lumineux",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-teaser",
+            "components": [
+                {"type": "backdrop", "opacity": 1, "blur": 0},
+                {"type": "logo", "position": "center", "size": "large"},
+                {"type": "genres", "style": "pills"},
+                {"type": "session_info", "position": "bottom-center", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "dark",
+            "use_palette_colors": True,
+            "use_logo_image": True,
+            "rotate_backdrops": True,
+            "rotate_interval": 20,
+        },
+    },
+    # ============================================================
+    # TRAILER ANNOUNCEMENT TEMPLATES (generiques, sans contenu film)
+    # ============================================================
+    "waiting_trailers": {
+        "name": "Bandes-Annonces",
+        "description": "Annonce des bandes-annonces avec visuel cinema, bobine et projecteur",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-trailers",
+            "components": [
+                {"type": "badge", "text": "Bandes-Annonces", "position": "top-center", "style": "glass-pill"},
+                {"type": "session_info", "position": "bottom-center", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "cinema",
+        },
+    },
+    "waiting_trailers_retro": {
+        "name": "Bandes-Annonces Retro",
+        "description": "Annonce retro des bandes-annonces avec decompte pellicule et style vintage",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-trailers-retro",
+            "components": [
+                {"type": "badge", "text": "Bandes-Annonces", "position": "top-center", "style": "vintage"},
+                {"type": "session_info", "position": "bottom-center", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "retro",
+        },
+    },
+    # ============================================================
+    # INTERMISSION TEMPLATES (pause avec compte a rebours)
+    # ============================================================
+    "waiting_intermission": {
+        "name": "Entracte",
+        "description": "Ecran d'entracte elegant avec compte a rebours de la duree de la sequence",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-intermission",
+            "components": [
+                {"type": "custom_text", "text": "Entracte", "position": "center", "style": "elegant-title"},
+                {"type": "session_info", "position": "bottom-center", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "elegant",
+            "show_countdown": True,
+        },
+    },
+    "waiting_intermission_fun": {
+        "name": "Pause Detente",
+        "description": "Pause ludique avec icones popcorn, boissons et WC, animations dynamiques et compte a rebours",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-intermission-fun",
+            "components": [
+                {"type": "custom_text", "text": "Pause", "position": "center", "style": "fun-title"},
+                {"type": "session_info", "position": "bottom-center", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "fun",
+            "show_countdown": True,
+        },
+    },
+    "waiting_intermission_minimal": {
+        "name": "Pause Minimale",
+        "description": "Ecran de pause ultra-minimaliste avec compte a rebours grand format",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-intermission-minimal",
+            "components": [
+                {"type": "custom_text", "text": "Pause", "position": "center", "style": "minimal-title"},
+                {"type": "session_info", "position": "bottom-center", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "minimal",
+            "show_countdown": True,
+        },
+    },
 }

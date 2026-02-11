@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MovieInfo } from './MovieInfo';
 import { CountdownTimer } from './CountdownTimer';
 import { formatCountdownShort } from '../../utils/countdown';
@@ -308,6 +308,7 @@ interface TemplateRendererProps {
     template_type: string;
     content?: string;
     styles?: string;
+    script?: string;
     layout?: TemplateLayout;
     config?: TemplateConfig;
   };
@@ -341,6 +342,7 @@ interface TemplateRendererProps {
       current_sequence_name?: string;
       current_sequence_elapsed_ms?: number;
       current_sequence_duration_ms?: number;
+      current_sequence_started_at?: number; // JS timestamp (ms) for live countdown
     };
     countdown_to?: string;
     palette?: {
@@ -448,6 +450,46 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
     }, interval);
     return () => clearInterval(timer);
   }, [config?.rotate_posters, config?.poster_rotate_interval, allPosters.length]);
+
+  // ====================================================================
+  // UNIVERSAL SEQUENCE COUNTDOWN — available to all template types
+  // ====================================================================
+  // Computes remaining seconds from sequence_duration_ms + sequence_started_at.
+  // Updated every second. Returns null when no countdown data available.
+  const [sequenceRemaining, setSequenceRemaining] = useState<number | null>(null);
+  useEffect(() => {
+    const durationMs = session?.current_sequence_duration_ms;
+    const startedAt = session?.current_sequence_started_at;
+    if (!durationMs || !startedAt) {
+      setSequenceRemaining(null);
+      return;
+    }
+    const update = () => {
+      const elapsed = Date.now() - startedAt;
+      const remaining = Math.max(0, Math.ceil((durationMs - elapsed) / 1000));
+      setSequenceRemaining(remaining);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [session?.current_sequence_duration_ms, session?.current_sequence_started_at]);
+
+  // Format sequence countdown: "5:23" or "45s"
+  const formatSeqCountdown = (seconds: number): string => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m > 0) return `${m}:${String(s).padStart(2, '0')}`;
+    return `${s}s`;
+  };
+
+  // Progress ratio 0..1 (0 = just started, 1 = done)
+  const sequenceProgress = useMemo(() => {
+    const durationMs = session?.current_sequence_duration_ms;
+    const startedAt = session?.current_sequence_started_at;
+    if (!durationMs || !startedAt || sequenceRemaining === null) return null;
+    const elapsed = durationMs / 1000 - sequenceRemaining;
+    return Math.min(1, Math.max(0, elapsed / (durationMs / 1000)));
+  }, [session?.current_sequence_duration_ms, session?.current_sequence_started_at, sequenceRemaining]);
 
   const renderComponent = (component: TemplateLayout['components'][0], index: number) => {
     switch (component.type) {
@@ -820,16 +862,19 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
     }
   };
 
-  // If template has raw HTML content, render it
+  // If template has raw HTML content, render it in sandboxed iframe
   if (template.content) {
     return (
-      <div
-        className="relative w-full h-full"
-        style={cssVars as React.CSSProperties}
-      >
-        {template.styles && <style>{template.styles}</style>}
-        <div dangerouslySetInnerHTML={{ __html: template.content }} />
-      </div>
+      <CustomHtmlRenderer
+        content={template.content}
+        styles={template.styles}
+        script={template.script}
+        data={{ movie, session, countdown_to, palette, vote_info, mystery_info }}
+        config={config}
+        sequenceRemaining={sequenceRemaining}
+        sequenceProgress={sequenceProgress}
+        templateName={template.name}
+      />
     );
   }
 
@@ -4952,6 +4997,764 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
       );
     }
 
+    // ====================================================================
+    // WAITING SCREEN layouts — dispatcher
+    // ====================================================================
+    if (layoutStyle.startsWith('waiting-')) {
+      const hasComp = (type: string) => layout.components.some((c) => c.type === type);
+      const bg = palette?.background || '#0a0a0f';
+      const accent = palette?.accent || palette?.vibrant || '#6366f1';
+      const txt = palette?.text || '#ffffff';
+
+      // --- WAITING-CINEMA: generic cinema ambiance, no movie data ---
+      if (layoutStyle === 'waiting-cinema') {
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={{ ...baseStyles, backgroundColor: '#050510' }}>
+            <style>{`
+              @keyframes wc-gradient { 0%,100%{ background-position:0% 50% } 50%{ background-position:100% 50% } }
+              @keyframes wc-fade-in { from{ opacity:0; transform:translateY(30px) } to{ opacity:1; transform:translateY(0) } }
+              @keyframes wc-strip { 0%{ transform:translateX(0) } 100%{ transform:translateX(-50%) } }
+              .wc-info { animation: wc-fade-in 1.2s ease-out both; }
+            `}</style>
+            {/* Animated gradient background */}
+            <div className="absolute inset-0" style={{
+              background: 'linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 25%, #0a1a2e 50%, #0a0a1a 75%, #1a0a1a 100%)',
+              backgroundSize: '400% 400%',
+              animation: 'wc-gradient 20s ease-in-out infinite',
+            }} />
+            {/* Film strip decoration top */}
+            <div className="absolute top-0 left-0 right-0 h-12 overflow-hidden opacity-15">
+              <div className="flex" style={{ width: '200%', animation: 'wc-strip 30s linear infinite' }}>
+                {Array.from({ length: 40 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-16 h-12 border-x-2 border-white/30 flex items-center justify-center">
+                    <div className="w-10 h-7 rounded-sm bg-white/10" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Film strip decoration bottom */}
+            <div className="absolute bottom-0 left-0 right-0 h-12 overflow-hidden opacity-15">
+              <div className="flex" style={{ width: '200%', animation: 'wc-strip 30s linear infinite reverse' }}>
+                {Array.from({ length: 40 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-16 h-12 border-x-2 border-white/30 flex items-center justify-center">
+                    <div className="w-10 h-7 rounded-sm bg-white/10" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Center content */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+              {session?.name && (
+                <h1 className="wc-info text-5xl font-light tracking-[0.15em] text-white/90 mb-6" style={{ animationDelay: '0.3s' }}>
+                  {session.name}
+                </h1>
+              )}
+              <div className="wc-info w-24 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent mb-6" style={{ animationDelay: '0.6s' }} />
+              <p className="wc-info text-lg text-white/40 tracking-[0.2em] uppercase" style={{ animationDelay: '0.9s' }}>
+                La seance va bientot commencer
+              </p>
+              {/* Sequence countdown */}
+              {sequenceRemaining !== null && sequenceRemaining > 0 && (
+                <div className="wc-info mt-10 flex flex-col items-center" style={{ animationDelay: '1.2s' }}>
+                  <span className="text-6xl font-extralight tracking-[0.1em] text-white/60">
+                    {formatSeqCountdown(sequenceRemaining)}
+                  </span>
+                  {sequenceProgress !== null && (
+                    <div className="mt-4 w-48 h-px bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full bg-white/30 transition-all duration-1000" style={{ width: `${sequenceProgress * 100}%` }} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // --- WAITING-ANNONCE: glass card with message ---
+      if (layoutStyle === 'waiting-annonce') {
+        const customText = layout.components.find((c) => c.type === 'custom_text');
+        const msgText = (customText as any)?.text || 'Bienvenue !';
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={{ ...baseStyles, backgroundColor: '#080818' }}>
+            <style>{`
+              @keyframes wa-particle { 0%{ transform:translateY(100vh) scale(0); opacity:0 } 10%{ opacity:0.4 } 90%{ opacity:0.4 } 100%{ transform:translateY(-5vh) scale(1); opacity:0 } }
+              @keyframes wa-fade-in { from{ opacity:0; transform:translateY(20px) scale(0.98) } to{ opacity:1; transform:translateY(0) scale(1) } }
+              .wa-info { animation: wa-fade-in 0.8s ease-out both; }
+            `}</style>
+            {/* Particles */}
+            {Array.from({ length: 20 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute rounded-full"
+                style={{
+                  width: 3 + Math.random() * 4, height: 3 + Math.random() * 4,
+                  left: `${Math.random() * 100}%`,
+                  background: `${accent}60`,
+                  animation: `wa-particle ${8 + Math.random() * 12}s linear infinite`,
+                  animationDelay: `${Math.random() * 10}s`,
+                }}
+              />
+            ))}
+            {/* Badge "Prochainement" */}
+            <div className="absolute top-10 left-1/2 -translate-x-1/2 z-20 wa-info" style={{ animationDelay: '0.2s' }}>
+              <span className="px-5 py-2 rounded-full text-sm font-medium backdrop-blur-md" style={{
+                backgroundColor: `${accent}25`, color: txt, border: `1px solid ${accent}40`,
+              }}>
+                Prochainement
+              </span>
+            </div>
+            {/* Glass card */}
+            <div className="relative z-10 w-full h-full flex items-center justify-center p-12">
+              <div className="wa-info max-w-xl w-full rounded-2xl p-10 text-center" style={{
+                animationDelay: '0.4s',
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+              }}>
+                <p className="text-2xl leading-relaxed" style={{ color: txt }}>{msgText}</p>
+              </div>
+            </div>
+            {/* Session info bottom */}
+            {session?.name && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 wa-info" style={{ animationDelay: '0.8s' }}>
+                <span className="text-sm uppercase tracking-[0.3em] opacity-40" style={{ color: txt }}>{session.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // --- WAITING-TRAILERS: cinematic trailer announcement ---
+      if (layoutStyle === 'waiting-trailers') {
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={{ ...baseStyles, backgroundColor: '#030318' }}>
+            <style>{`
+              @keyframes wtr-beam { 0%,100%{ opacity:0.3; transform:rotate(-8deg) scaleY(1) } 50%{ opacity:0.6; transform:rotate(-5deg) scaleY(1.05) } }
+              @keyframes wtr-beam2 { 0%,100%{ opacity:0.2; transform:rotate(6deg) scaleY(1) } 50%{ opacity:0.5; transform:rotate(8deg) scaleY(1.05) } }
+              @keyframes wtr-fade-in { from{ opacity:0; transform:translateY(20px) } to{ opacity:1; transform:translateY(0) } }
+              @keyframes wtr-pulse-ring { 0%{ transform:scale(0.95); opacity:0.5 } 50%{ transform:scale(1.05); opacity:1 } 100%{ transform:scale(0.95); opacity:0.5 } }
+              @keyframes wtr-count { 0%{ transform:scale(1.2); opacity:0 } 20%{ transform:scale(1); opacity:1 } 80%{ transform:scale(1); opacity:1 } 100%{ transform:scale(0.8); opacity:0 } }
+              .wtr-info { animation: wtr-fade-in 1s ease-out both; }
+            `}</style>
+            {/* Projector beams */}
+            <div className="absolute top-0 left-1/4 w-[600px] h-full origin-top opacity-30" style={{
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 70%)',
+              animation: 'wtr-beam 8s ease-in-out infinite', filter: 'blur(40px)',
+            }} />
+            <div className="absolute top-0 right-1/4 w-[400px] h-full origin-top opacity-20" style={{
+              background: 'linear-gradient(180deg, rgba(180,160,255,0.12) 0%, transparent 60%)',
+              animation: 'wtr-beam2 10s ease-in-out infinite', filter: 'blur(30px)',
+            }} />
+            {/* Floating particles (dust in projector light) */}
+            {Array.from({ length: 15 }).map((_, i) => (
+              <div key={i} className="absolute rounded-full bg-white/20" style={{
+                width: 2 + Math.random() * 3, height: 2 + Math.random() * 3,
+                left: `${20 + Math.random() * 60}%`, top: `${Math.random() * 80}%`,
+                animation: `wa-particle ${10 + Math.random() * 15}s linear infinite`,
+                animationDelay: `${Math.random() * 8}s`,
+              }} />
+            ))}
+            {/* Center content */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+              {/* Play icon with pulse ring */}
+              <div className="wtr-info relative mb-8" style={{ animationDelay: '0.2s' }}>
+                <div className="absolute inset-0 rounded-full border-2 border-white/20" style={{ animation: 'wtr-pulse-ring 3s ease-in-out infinite' }} />
+                <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="white" className="ml-1">
+                    <polygon points="5,3 19,12 5,21" />
+                  </svg>
+                </div>
+              </div>
+              {/* Title */}
+              <h1 className="wtr-info text-5xl font-light tracking-[0.15em] text-white/90 mb-4" style={{ animationDelay: '0.5s' }}>
+                Bandes-Annonces
+              </h1>
+              <div className="wtr-info w-32 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent mb-5" style={{ animationDelay: '0.7s' }} />
+              <p className="wtr-info text-lg text-white/40 tracking-wider" style={{ animationDelay: '0.9s' }}>
+                Les bandes-annonces vont commencer
+              </p>
+              {/* Sequence countdown if available */}
+              {sequenceRemaining !== null && sequenceRemaining > 0 && (
+                <div className="wtr-info mt-8 flex flex-col items-center" style={{ animationDelay: '1.1s' }}>
+                  <span className="text-4xl font-mono font-light text-white/70 tracking-widest">
+                    {formatSeqCountdown(sequenceRemaining)}
+                  </span>
+                </div>
+              )}
+            </div>
+            {/* Session name bottom */}
+            {session?.name && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 wtr-info" style={{ animationDelay: '1.2s' }}>
+                <span className="text-xs uppercase tracking-[0.3em] opacity-30 text-white">{session.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // --- WAITING-TRAILERS-RETRO: vintage film strip countdown ---
+      if (layoutStyle === 'waiting-trailers-retro') {
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={{ ...baseStyles, backgroundColor: '#1a1008' }}>
+            <style>{`
+              @keyframes wtr2-grain { 0%,100%{ transform:translate(0,0) } 10%{ transform:translate(-1%,-1%) } 30%{ transform:translate(1%,2%) } 50%{ transform:translate(-2%,1%) } 70%{ transform:translate(2%,-1%) } }
+              @keyframes wtr2-vignette-pulse { 0%,100%{ opacity:0.7 } 50%{ opacity:0.5 } }
+              @keyframes wtr2-number { 0%{ transform:scale(2) rotate(-10deg); opacity:0 } 15%{ transform:scale(1) rotate(0); opacity:1 } 85%{ transform:scale(1) rotate(0); opacity:1 } 100%{ transform:scale(0.5) rotate(10deg); opacity:0 } }
+              @keyframes wtr2-fade-in { from{ opacity:0 } to{ opacity:1 } }
+              @keyframes wtr2-strip { 0%{ transform:translateX(0) } 100%{ transform:translateX(-50%) } }
+              .wtr2-info { animation: wtr2-fade-in 1s ease-out both; }
+            `}</style>
+            {/* Film grain overlay */}
+            <div className="absolute inset-0 opacity-10" style={{
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'256\' height=\'256\' filter=\'url(%23noise)\' opacity=\'0.5\'/%3E%3C/svg%3E")',
+              animation: 'wtr2-grain 0.5s steps(4) infinite',
+            }} />
+            {/* Sepia vignette */}
+            <div className="absolute inset-0" style={{
+              background: 'radial-gradient(ellipse at center, transparent 30%, rgba(20,10,0,0.8) 100%)',
+              animation: 'wtr2-vignette-pulse 4s ease-in-out infinite',
+            }} />
+            {/* Film strips top/bottom */}
+            <div className="absolute top-0 left-0 right-0 h-14 overflow-hidden opacity-25">
+              <div className="flex" style={{ width: '200%', animation: 'wtr2-strip 20s linear infinite' }}>
+                {Array.from({ length: 40 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-16 h-14 border-x-2 border-amber-700/50 flex items-center justify-center">
+                    <div className="w-10 h-8 rounded-sm bg-amber-900/30" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-14 overflow-hidden opacity-25">
+              <div className="flex" style={{ width: '200%', animation: 'wtr2-strip 20s linear infinite reverse' }}>
+                {Array.from({ length: 40 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-16 h-14 border-x-2 border-amber-700/50 flex items-center justify-center">
+                    <div className="w-10 h-8 rounded-sm bg-amber-900/30" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Center content */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+              {/* Cross-hair circle like retro film countdown */}
+              <div className="wtr2-info relative w-52 h-52 mb-8 rounded-full border-4 border-amber-600/50" style={{ animationDelay: '0.3s' }}>
+                <div className="absolute inset-0 rounded-full flex items-center justify-center">
+                  {/* Crosshair lines */}
+                  <div className="absolute w-full h-px bg-amber-600/30" />
+                  <div className="absolute w-px h-full bg-amber-600/30" />
+                  {/* Inner circle */}
+                  <div className="w-40 h-40 rounded-full border-2 border-amber-600/30 flex items-center justify-center">
+                    {sequenceRemaining !== null && sequenceRemaining > 0 ? (
+                      <span className="text-7xl font-bold text-amber-400/90 font-mono" style={{ textShadow: '0 0 20px rgba(245,158,11,0.4)' }}>
+                        {Math.min(9, Math.ceil(sequenceRemaining / ((session?.current_sequence_duration_ms || 60000) / 1000 / 9)))}
+                      </span>
+                    ) : (
+                      <span className="text-7xl font-bold text-amber-400/90 font-mono">3</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {/* Title */}
+              <h1 className="wtr2-info text-4xl font-serif tracking-wider text-amber-200/80 mb-3" style={{ animationDelay: '0.6s', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                Bandes-Annonces
+              </h1>
+              {sequenceRemaining !== null && sequenceRemaining > 0 && (
+                <span className="wtr2-info text-xl font-mono text-amber-400/60" style={{ animationDelay: '0.8s' }}>
+                  {formatSeqCountdown(sequenceRemaining)}
+                </span>
+              )}
+            </div>
+            {/* Session name */}
+            {session?.name && (
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 wtr2-info" style={{ animationDelay: '1s' }}>
+                <span className="text-xs uppercase tracking-[0.3em] text-amber-600/40">{session.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // --- WAITING-INTERMISSION: elegant pause with countdown ---
+      if (layoutStyle === 'waiting-intermission') {
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={{ ...baseStyles, backgroundColor: '#0a0a1a' }}>
+            <style>{`
+              @keyframes wi-gradient { 0%,100%{ background-position:0% 50% } 50%{ background-position:100% 50% } }
+              @keyframes wi-fade-in { from{ opacity:0; transform:translateY(30px) } to{ opacity:1; transform:translateY(0) } }
+              @keyframes wi-countdown-pulse { 0%,100%{ transform:scale(1); opacity:0.9 } 50%{ transform:scale(1.02); opacity:1 } }
+              @keyframes wi-progress { from{ width:0% } }
+              .wi-info { animation: wi-fade-in 1s ease-out both; }
+            `}</style>
+            {/* Subtle animated gradient */}
+            <div className="absolute inset-0" style={{
+              background: `linear-gradient(135deg, #0a0a2e 0%, #1a0a3e 25%, #0a1a3e 50%, ${accent}08 75%, #0a0a2e 100%)`,
+              backgroundSize: '400% 400%',
+              animation: 'wi-gradient 25s ease-in-out infinite',
+            }} />
+            {/* Center content */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+              {/* Decorative line */}
+              <div className="wi-info w-16 h-px mb-8" style={{ animationDelay: '0.2s', backgroundColor: `${accent}40` }} />
+              {/* Title */}
+              <h1 className="wi-info text-6xl font-extralight tracking-[0.2em] text-white/85 mb-4" style={{ animationDelay: '0.4s' }}>
+                ENTRACTE
+              </h1>
+              <div className="wi-info w-24 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent mb-8" style={{ animationDelay: '0.5s' }} />
+              <p className="wi-info text-base text-white/40 tracking-wider mb-10" style={{ animationDelay: '0.6s' }}>
+                La seance reprend dans quelques instants
+              </p>
+              {/* Countdown display */}
+              {sequenceRemaining !== null && sequenceRemaining > 0 && (
+                <div className="wi-info flex flex-col items-center" style={{ animationDelay: '0.8s' }}>
+                  <span className="text-8xl font-extralight tracking-[0.15em] mb-4" style={{
+                    color: `${accent}dd`,
+                    animation: 'wi-countdown-pulse 2s ease-in-out infinite',
+                    textShadow: `0 0 60px ${accent}30`,
+                  }}>
+                    {formatSeqCountdown(sequenceRemaining)}
+                  </span>
+                  {/* Progress bar */}
+                  {sequenceProgress !== null && (
+                    <div className="w-64 h-1 rounded-full overflow-hidden" style={{ backgroundColor: `${accent}15` }}>
+                      <div className="h-full rounded-full transition-all duration-1000" style={{
+                        width: `${sequenceProgress * 100}%`,
+                        background: `linear-gradient(90deg, ${accent}60, ${accent})`,
+                      }} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Session name */}
+            {session?.name && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 wi-info" style={{ animationDelay: '1s' }}>
+                <span className="text-xs uppercase tracking-[0.3em] opacity-30 text-white">{session.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // --- WAITING-INTERMISSION-FUN: playful pause with icons ---
+      if (layoutStyle === 'waiting-intermission-fun') {
+        const funItems = [
+          { icon: '\uD83C\uDF7F', label: 'Popcorn', delay: 0.3 },
+          { icon: '\uD83E\uDD64', label: 'Boissons', delay: 0.5 },
+          { icon: '\uD83D\uDEBB', label: 'Toilettes', delay: 0.7 },
+          { icon: '\uD83D\uDCF1', label: 'Selfie time', delay: 0.9 },
+        ];
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={{ ...baseStyles, backgroundColor: '#080820' }}>
+            <style>{`
+              @keyframes wif-fade-in { from{ opacity:0; transform:translateY(25px) scale(0.95) } to{ opacity:1; transform:translateY(0) scale(1) } }
+              @keyframes wif-bounce { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-8px) } }
+              @keyframes wif-confetti { 0%{ transform:translateY(-10px) rotate(0deg); opacity:0 } 10%{ opacity:0.6 } 90%{ opacity:0.6 } 100%{ transform:translateY(100vh) rotate(720deg); opacity:0 } }
+              @keyframes wif-countdown-glow { 0%,100%{ text-shadow:0 0 20px rgba(167,139,250,0.3) } 50%{ text-shadow:0 0 40px rgba(167,139,250,0.5), 0 0 80px rgba(167,139,250,0.2) } }
+              .wif-info { animation: wif-fade-in 0.8s ease-out both; }
+              .wif-icon { animation: wif-bounce 3s ease-in-out infinite; }
+            `}</style>
+            {/* Confetti particles */}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="absolute" style={{
+                left: `${Math.random() * 100}%`,
+                width: 6 + Math.random() * 4, height: 6 + Math.random() * 4,
+                borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                backgroundColor: ['#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#60a5fa'][i % 5],
+                opacity: 0.4,
+                animation: `wif-confetti ${8 + Math.random() * 10}s linear infinite`,
+                animationDelay: `${Math.random() * 8}s`,
+              }} />
+            ))}
+            {/* Center content */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+              {/* Title */}
+              <h1 className="wif-info text-5xl font-bold tracking-wider text-white/90 mb-2" style={{ animationDelay: '0.1s' }}>
+                Pause !
+              </h1>
+              <p className="wif-info text-base text-white/40 mb-10" style={{ animationDelay: '0.2s' }}>
+                Profitez-en pour...
+              </p>
+              {/* Fun icons row */}
+              <div className="flex gap-10 mb-12">
+                {funItems.map((item, i) => (
+                  <div key={i} className="wif-info flex flex-col items-center gap-3" style={{ animationDelay: `${item.delay}s` }}>
+                    <span className="wif-icon text-5xl" style={{ animationDelay: `${i * 0.5}s` }}>{item.icon}</span>
+                    <span className="text-sm text-white/50 tracking-wide">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Countdown */}
+              {sequenceRemaining !== null && sequenceRemaining > 0 && (
+                <div className="wif-info flex flex-col items-center" style={{ animationDelay: '1.1s' }}>
+                  <span className="text-sm uppercase tracking-widest text-white/40 mb-3">Reprise dans</span>
+                  <span className="text-7xl font-mono font-light text-purple-300/90" style={{
+                    animation: 'wif-countdown-glow 3s ease-in-out infinite',
+                  }}>
+                    {formatSeqCountdown(sequenceRemaining)}
+                  </span>
+                  {/* Progress bar */}
+                  {sequenceProgress !== null && (
+                    <div className="mt-6 w-48 h-1.5 rounded-full overflow-hidden bg-white/10">
+                      <div className="h-full rounded-full transition-all duration-1000" style={{
+                        width: `${sequenceProgress * 100}%`,
+                        background: 'linear-gradient(90deg, #a78bfa, #f472b6)',
+                      }} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Session name */}
+            {session?.name && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 wif-info" style={{ animationDelay: '1.3s' }}>
+                <span className="text-xs uppercase tracking-[0.3em] opacity-30 text-white">{session.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // --- WAITING-INTERMISSION-MINIMAL: ultra-minimal countdown ---
+      if (layoutStyle === 'waiting-intermission-minimal') {
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={{ ...baseStyles, backgroundColor: '#000' }}>
+            <style>{`
+              @keyframes wim-fade-in { from{ opacity:0 } to{ opacity:1 } }
+              @keyframes wim-tick { 0%,100%{ opacity:1 } 50%{ opacity:0.7 } }
+              .wim-info { animation: wim-fade-in 1.5s ease-out both; }
+            `}</style>
+            {/* Center content */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+              <span className="wim-info text-lg uppercase tracking-[0.4em] text-white/30 mb-8 font-light" style={{ animationDelay: '0.2s' }}>
+                Pause
+              </span>
+              {sequenceRemaining !== null && sequenceRemaining > 0 ? (
+                <span className="wim-info font-mono text-white/80" style={{
+                  animationDelay: '0.5s',
+                  fontSize: 'clamp(5rem, 15vw, 12rem)',
+                  letterSpacing: '0.1em',
+                  animation: 'wim-tick 2s ease-in-out infinite',
+                }}>
+                  {formatSeqCountdown(sequenceRemaining)}
+                </span>
+              ) : (
+                <span className="wim-info text-2xl text-white/40 font-light" style={{ animationDelay: '0.5s' }}>
+                  En pause
+                </span>
+              )}
+              {/* Minimal progress line */}
+              {sequenceProgress !== null && (
+                <div className="wim-info mt-12 w-1/3 h-px bg-white/10" style={{ animationDelay: '0.8s' }}>
+                  <div className="h-full bg-white/40 transition-all duration-1000" style={{ width: `${sequenceProgress * 100}%` }} />
+                </div>
+              )}
+            </div>
+            {/* Session name */}
+            {session?.name && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 wim-info" style={{ animationDelay: '1s' }}>
+                <span className="text-xs tracking-[0.3em] text-white/15">{session.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // --- WAITING-SPOTLIGHT: poster center with radial spotlight ---
+      if (layoutStyle === 'waiting-spotlight') {
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={{ ...baseStyles, backgroundColor: '#000' }}>
+            <style>{`
+              @keyframes ws-spot-breathe { 0%,100%{ opacity:0.6; transform:scale(1) } 50%{ opacity:0.8; transform:scale(1.05) } }
+              @keyframes ws-fade-in { from{ opacity:0; transform:translateY(20px) } to{ opacity:1; transform:translateY(0) } }
+              .ws-spot-info { animation: ws-fade-in 1s ease-out both; }
+            `}</style>
+            {/* Radial spotlight */}
+            <div className="absolute inset-0" style={{
+              background: `radial-gradient(ellipse 50% 60% at 50% 45%, ${accent}18 0%, transparent 70%)`,
+              animation: 'ws-spot-breathe 6s ease-in-out infinite',
+            }} />
+            {/* Content */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-12">
+              {/* Large poster */}
+              {effectivePoster && (
+                <div className="ws-spot-info mb-8" style={{ animationDelay: '0.2s' }}>
+                  <img
+                    src={effectivePoster}
+                    alt={movie?.title || ''}
+                    className="h-[55vh] max-h-[500px] rounded-xl object-cover"
+                    style={{ boxShadow: `0 30px 80px -20px ${accent}40, 0 10px 40px -10px rgba(0,0,0,0.8)` }}
+                  />
+                </div>
+              )}
+              {/* Title */}
+              {movie?.title && (
+                <h1 className="ws-spot-info text-4xl font-bold text-center mb-3" style={{
+                  animationDelay: '0.5s', color: txt, textShadow: `0 0 40px ${accent}30, 0 4px 20px rgba(0,0,0,0.8)`,
+                }}>
+                  {movie.title}
+                  {movie.year && <span className="ml-3 text-xl font-light opacity-50">({movie.year})</span>}
+                </h1>
+              )}
+              {/* Genres */}
+              {hasComp('genres') && movie?.genres && movie.genres.length > 0 && (
+                <div className="ws-spot-info flex gap-2 mt-2" style={{ animationDelay: '0.7s' }}>
+                  {movie.genres.slice(0, 4).map((g, i) => (
+                    <span key={i} className="px-3 py-1 rounded-full text-xs border" style={{
+                      borderColor: `${accent}30`, color: `${txt}cc`, backgroundColor: `${accent}10`,
+                    }}>{g}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Session info top-right */}
+            {session?.name && (
+              <div className="absolute top-6 right-6 z-20 ws-spot-info" style={{ animationDelay: '0.9s' }}>
+                <span className="text-xs uppercase tracking-[0.2em] opacity-40" style={{ color: txt }}>{session.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // --- WAITING-PANORAMIC: split layout poster left, details right ---
+      if (layoutStyle === 'waiting-panoramic') {
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+            <style>{`
+              @keyframes wp-fade-in { from{ opacity:0; transform:translateX(20px) } to{ opacity:1; transform:translateX(0) } }
+              @keyframes wp-slide-in { from{ opacity:0; transform:translateX(-30px) } to{ opacity:1; transform:translateX(0) } }
+              .wp-info { animation: wp-fade-in 0.8s ease-out both; }
+              .wp-poster { animation: wp-slide-in 1s ease-out both; }
+            `}</style>
+            {/* Blurred backdrop behind right side */}
+            {effectiveBackdrop && (
+              <div className="absolute inset-0 bg-cover bg-center" style={{
+                backgroundImage: `url(${effectiveBackdrop})`,
+                filter: 'blur(30px) brightness(0.3)',
+              }} />
+            )}
+            <div className="absolute inset-0" style={{ backgroundColor: `${bg}cc` }} />
+            {/* Split layout */}
+            <div className="relative z-10 w-full h-full flex">
+              {/* Left: Poster */}
+              {effectivePoster && (
+                <div className="wp-poster flex-shrink-0 w-[38%] h-full p-8 flex items-center justify-center">
+                  <img
+                    src={effectivePoster}
+                    alt={movie?.title || ''}
+                    className="max-h-full max-w-full rounded-xl object-contain"
+                    style={{ boxShadow: `0 30px 60px -15px ${palette?.primary || '#000'}80` }}
+                  />
+                </div>
+              )}
+              {/* Right: Details */}
+              <div className="flex-1 h-full flex flex-col justify-center p-12 pl-4 overflow-hidden">
+                {/* Logo or Title */}
+                <div className="wp-info mb-4" style={{ animationDelay: '0.2s' }}>
+                  {config?.use_logo_image && effectiveLogo ? (
+                    <img src={effectiveLogo} alt="" className="max-w-[300px] max-h-[100px] object-contain mb-2 drop-shadow-2xl" />
+                  ) : movie?.title ? (
+                    <h1 className="text-5xl font-bold tracking-tight" style={{ color: txt, textShadow: '0 2px 20px rgba(0,0,0,0.5)' }}>
+                      {movie.title}
+                      {movie.year && <span className="ml-3 text-2xl font-light opacity-50">({movie.year})</span>}
+                    </h1>
+                  ) : null}
+                </div>
+                {/* Tagline */}
+                {hasComp('tagline') && movie?.tagline && (
+                  <p className="wp-info text-lg italic opacity-60 mb-5" style={{ animationDelay: '0.4s', color: txt }}>
+                    {movie.tagline}
+                  </p>
+                )}
+                {/* Genres + Metadata row */}
+                <div className="wp-info flex flex-wrap items-center gap-4 mb-5" style={{ animationDelay: '0.5s' }}>
+                  {hasComp('genres') && movie?.genres?.slice(0, 4).map((g, i) => (
+                    <span key={i} className="px-3 py-1 rounded-full text-sm border" style={{
+                      borderColor: `${accent}40`, color: txt, backgroundColor: `${accent}15`,
+                    }}>{g}</span>
+                  ))}
+                  {hasComp('metadata') && movie?.runtime_minutes && (
+                    <span className="text-sm opacity-70" style={{ color: txt }}>
+                      {Math.floor(movie.runtime_minutes / 60)}h{String(movie.runtime_minutes % 60).padStart(2, '0')}
+                    </span>
+                  )}
+                  {hasComp('metadata') && movie?.rating && (
+                    <span className="flex items-center gap-1 text-sm">
+                      <span style={{ color: accent }}>★</span>
+                      <span className="opacity-80" style={{ color: txt }}>{movie.rating.toFixed(1)}</span>
+                    </span>
+                  )}
+                </div>
+                {/* Overview */}
+                {hasComp('overview') && movie?.overview && (
+                  <p className="wp-info text-sm leading-relaxed opacity-60 mb-6" style={{
+                    animationDelay: '0.6s', color: txt,
+                    display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                  }}>
+                    {movie.overview}
+                  </p>
+                )}
+                {/* Session info */}
+                {session?.name && (
+                  <div className="wp-info text-xs uppercase tracking-[0.3em] opacity-40 mt-auto" style={{ animationDelay: '0.8s', color: txt }}>
+                    {session.name}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // --- WAITING-TEASER: full bleed backdrops + centered logo with glow ---
+      if (layoutStyle === 'waiting-teaser') {
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+            <style>{`
+              @keyframes wt-ken-burns { 0%{ transform:scale(1) translate(0,0) } 50%{ transform:scale(1.12) translate(-1.5%,-1%) } 100%{ transform:scale(1) translate(0,0) } }
+              @keyframes wt-logo-glow { 0%,100%{ filter:drop-shadow(0 0 20px ${accent}40) } 50%{ filter:drop-shadow(0 0 50px ${accent}70) drop-shadow(0 0 80px ${accent}30) } }
+              @keyframes wt-fade-in { from{ opacity:0; transform:scale(0.95) } to{ opacity:1; transform:scale(1) } }
+              .wt-backdrop { animation: wt-ken-burns ${config?.rotate_interval ?? 20}s ease-in-out infinite; transition: opacity 2s ease-in-out; }
+              .wt-logo { animation: wt-logo-glow 4s ease-in-out infinite, wt-fade-in 1.5s ease-out both; }
+              .wt-info { animation: wt-fade-in 1s ease-out both; }
+            `}</style>
+            {/* Full bleed rotating backdrops */}
+            {config?.rotate_backdrops && allBackdrops.length > 1 ? (
+              allBackdrops.map((url, i) => (
+                <div key={`wt-bd-${i}`} className="absolute inset-0 bg-cover bg-center wt-backdrop" style={{
+                  backgroundImage: `url(${url})`, opacity: i === rotatingIndex % allBackdrops.length ? 1 : 0,
+                }} />
+              ))
+            ) : effectiveBackdrop ? (
+              <div className="absolute inset-0 bg-cover bg-center wt-backdrop" style={{ backgroundImage: `url(${effectiveBackdrop})` }} />
+            ) : null}
+            {/* Dark vignette */}
+            <div className="absolute inset-0" style={{
+              background: `radial-gradient(ellipse at center, ${bg}40 0%, ${bg}dd 70%, ${bg} 100%)`,
+            }} />
+            {/* Center content */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+              {/* Logo or Title */}
+              {effectiveLogo ? (
+                <img src={effectiveLogo} alt={movie?.title || ''} className="wt-logo max-w-[450px] max-h-[160px] object-contain mb-8" />
+              ) : movie?.title ? (
+                <h1 className="wt-info text-7xl font-bold text-center tracking-tight mb-6" style={{
+                  color: txt, textShadow: `0 0 40px ${accent}40, 0 4px 30px rgba(0,0,0,0.8)`,
+                }}>
+                  {movie.title}
+                </h1>
+              ) : null}
+              {/* Genres */}
+              {hasComp('genres') && movie?.genres && movie.genres.length > 0 && (
+                <div className="wt-info flex gap-3" style={{ animationDelay: '0.5s' }}>
+                  {movie.genres.slice(0, 3).map((g, i) => (
+                    <span key={i} className="px-4 py-1.5 rounded-full text-sm font-medium backdrop-blur-sm" style={{
+                      backgroundColor: `${accent}20`, color: `${txt}cc`, border: `1px solid ${accent}30`,
+                    }}>{g}</span>
+                  ))}
+                </div>
+              )}
+              {/* Sequence countdown */}
+              {sequenceRemaining !== null && sequenceRemaining > 0 && (
+                <div className="wt-info mt-8 flex flex-col items-center" style={{ animationDelay: '0.7s' }}>
+                  <span className="text-5xl font-extralight tracking-widest" style={{
+                    color: `${txt}99`, textShadow: `0 0 30px ${accent}30`,
+                  }}>
+                    {formatSeqCountdown(sequenceRemaining)}
+                  </span>
+                </div>
+              )}
+            </div>
+            {/* Session name watermark at bottom */}
+            {session?.name && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 wt-info" style={{ animationDelay: '1s' }}>
+                <span className="text-sm uppercase tracking-[0.4em] opacity-30" style={{ color: txt }}>{session.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // --- DEFAULT WAITING: cinematic ambient (waiting-ambient, waiting-poster-centered, etc.) ---
+      return (
+        <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+          <style>{animationStyles}{`
+            @keyframes ws-ken-burns { 0%{ transform:scale(1) translate(0,0) } 50%{ transform:scale(1.08) translate(-1%,-0.5%) } 100%{ transform:scale(1) translate(0,0) } }
+            @keyframes ws-fade-in-up { from{ opacity:0; transform:translateY(20px) } to{ opacity:1; transform:translateY(0) } }
+            @keyframes ws-gradient-shift { 0%,100%{ background-position:0% 50% } 50%{ background-position:100% 50% } }
+            .ws-backdrop { animation: ws-ken-burns ${config?.rotate_backdrops ? (config.rotate_interval ?? 25) : 50}s ease-in-out infinite; transition: opacity 1.5s ease-in-out; }
+            .ws-info { animation: ws-fade-in-up 1s ease-out both; }
+            .ws-gradient-bar { background: linear-gradient(90deg, ${accent}40, ${palette?.vibrant || '#8b5cf6'}40, ${accent}40); background-size: 200% 100%; animation: ws-gradient-shift 8s ease-in-out infinite; }
+          `}</style>
+          {/* Full bleed backdrops with Ken Burns + crossfade */}
+          {config?.rotate_backdrops && allBackdrops.length > 1 ? (
+            allBackdrops.map((url, i) => (
+              <div key={`ws-bd-${i}`} className="absolute inset-0 bg-cover bg-center ws-backdrop" style={{
+                backgroundImage: `url(${url})`, opacity: i === rotatingIndex % allBackdrops.length ? 1 : 0,
+              }} />
+            ))
+          ) : effectiveBackdrop ? (
+            <div className="absolute inset-0 bg-cover bg-center ws-backdrop" style={{ backgroundImage: `url(${effectiveBackdrop})` }} />
+          ) : null}
+          {/* Cinematic gradient overlays */}
+          <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${bg} 0%, transparent 40%, transparent 70%, ${bg}90 100%)` }} />
+          <div className="absolute inset-0" style={{ background: `linear-gradient(to right, ${bg}cc 0%, transparent 30%, transparent 70%, ${bg}cc 100%)` }} />
+          {/* Accent gradient bar */}
+          <div className="absolute top-0 left-0 right-0 h-1 ws-gradient-bar z-20" />
+          {/* Content — bottom-left */}
+          <div className="relative z-10 w-full h-full flex flex-col justify-end p-12">
+            <div className="ws-info" style={{ animationDelay: '0.2s' }}>
+              {effectiveLogo ? (
+                <img src={effectiveLogo} alt={movie?.title || ''} className="max-w-[350px] max-h-[120px] object-contain mb-6 drop-shadow-2xl" />
+              ) : movie?.title ? (
+                <h1 className="text-6xl font-bold mb-2 tracking-tight" style={{ color: txt, textShadow: '0 4px 30px rgba(0,0,0,0.8)' }}>
+                  {movie.title}
+                  {movie.year && <span className="ml-4 text-3xl font-light opacity-60">({movie.year})</span>}
+                </h1>
+              ) : null}
+            </div>
+            {hasComp('tagline') && movie?.tagline && (
+              <div className="ws-info text-xl italic opacity-70 mb-6" style={{ animationDelay: '0.4s', color: txt }}>{movie.tagline}</div>
+            )}
+            <div className="ws-info flex items-center gap-6 mb-8" style={{ animationDelay: '0.6s' }}>
+              {hasComp('metadata') && movie?.runtime_minutes && (
+                <span className="text-lg opacity-80" style={{ color: txt }}>{Math.floor(movie.runtime_minutes / 60)}h{String(movie.runtime_minutes % 60).padStart(2, '0')}</span>
+              )}
+              {hasComp('metadata') && movie?.rating && (
+                <span className="flex items-center gap-1.5 text-lg"><span style={{ color: accent }}>★</span><span className="opacity-90" style={{ color: txt }}>{movie.rating.toFixed(1)}</span></span>
+              )}
+              {hasComp('genres') && movie?.genres?.slice(0, 3).map((g, i) => (
+                <span key={i} className="px-3 py-1 rounded-full text-sm border" style={{ borderColor: `${accent}40`, color: txt, backgroundColor: `${accent}15` }}>{g}</span>
+              ))}
+            </div>
+            {hasComp('session_info') && session?.name && (
+              <div className="ws-info mt-2 text-sm uppercase tracking-[0.3em] opacity-50" style={{ animationDelay: '0.8s', color: txt }}>{session.name}</div>
+            )}
+            {/* Sequence countdown */}
+            {sequenceRemaining !== null && sequenceRemaining > 0 && (
+              <div className="ws-info mt-4 flex items-center gap-3" style={{ animationDelay: '1s' }}>
+                <span className="text-3xl font-extralight tracking-wider opacity-60" style={{ color: txt }}>
+                  {formatSeqCountdown(sequenceRemaining)}
+                </span>
+                {sequenceProgress !== null && (
+                  <div className="w-32 h-0.5 rounded-full overflow-hidden" style={{ backgroundColor: `${accent}20` }}>
+                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${sequenceProgress * 100}%`, backgroundColor: `${accent}60` }} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          {/* Small poster in corner */}
+          {hasComp('poster') && effectivePoster && (
+            <div className="absolute top-8 right-8 z-20 ws-info" style={{ animationDelay: '1s' }}>
+              <img src={effectivePoster} alt={movie?.title || ''} className="w-32 rounded-lg shadow-2xl" style={{ boxShadow: `0 25px 50px -12px ${palette?.primary || '#000'}80` }} />
+            </div>
+          )}
+        </div>
+      );
+    }
+
     // DEFAULT layout (fallback)
     return (
       <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
@@ -4992,5 +5795,129 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
     <div className="w-full h-full flex items-center justify-center text-white/50">
       No content to display
     </div>
+  );
+}
+
+// ============================================================================
+// Custom HTML Template Renderer (iframe sandboxed)
+// ============================================================================
+
+interface CustomHtmlRendererProps {
+  content: string;
+  styles?: string;
+  script?: string;
+  data: Record<string, unknown>;
+  config?: TemplateConfig;
+  sequenceRemaining: number | null;
+  sequenceProgress: number | null;
+  templateName: string;
+}
+
+function CustomHtmlRenderer({
+  content,
+  styles,
+  script,
+  data,
+  config,
+  sequenceRemaining,
+  sequenceProgress,
+  templateName,
+}: CustomHtmlRendererProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [iframeReady, setIframeReady] = useState(false);
+
+  // Build the srcdoc HTML once (only changes if template code changes)
+  const srcdoc = useMemo(() => {
+    const bridgeScript = `<script>
+window.Theatarr = {
+  data: null,
+  _listeners: [],
+  onUpdate: function(cb) {
+    this._listeners.push(cb);
+    if (this.data) cb(this.data);
+  }
+};
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'theatarr-data') {
+    window.Theatarr.data = e.data.payload;
+    window.Theatarr._listeners.forEach(function(cb) {
+      try { cb(e.data.payload); } catch(err) { console.error('[Theatarr] onUpdate error:', err); }
+    });
+  }
+});
+window.parent.postMessage({ type: 'theatarr-ready' }, '*');
+</script>`;
+
+    return `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:transparent;color:#fff;font-family:system-ui,-apple-system,sans-serif}
+</style>
+${styles ? `<style>${styles}</style>` : ''}
+${bridgeScript}
+</head><body>
+${content}
+${script ? `<script>${script}<\/script>` : ''}
+</body></html>`;
+  }, [content, styles, script]);
+
+  // Listen for iframe ready signal
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'theatarr-ready') {
+        setIframeReady(true);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  // Reset ready state when srcdoc changes (template code changed)
+  useEffect(() => {
+    setIframeReady(false);
+  }, [srcdoc]);
+
+  // Build payload to send
+  const buildPayload = useCallback(() => {
+    return {
+      ...data,
+      config: config || {},
+      countdown:
+        sequenceRemaining !== null
+          ? {
+              remaining: sequenceRemaining,
+              progress: sequenceProgress,
+              formatted:
+                sequenceRemaining > 0
+                  ? Math.floor(sequenceRemaining / 60) > 0
+                    ? `${Math.floor(sequenceRemaining / 60)}:${String(sequenceRemaining % 60).padStart(2, '0')}`
+                    : `${sequenceRemaining}s`
+                  : '0s',
+            }
+          : null,
+      template: { name: templateName },
+    };
+  }, [data, config, sequenceRemaining, sequenceProgress, templateName]);
+
+  // Send data to iframe whenever data changes and iframe is ready
+  useEffect(() => {
+    if (!iframeReady) return;
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage({ type: 'theatarr-data', payload: buildPayload() }, '*');
+  }, [iframeReady, buildPayload]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={srcdoc}
+      sandbox="allow-scripts"
+      className="w-full h-full border-0"
+      style={{ background: 'transparent' }}
+      title={templateName}
+    />
   );
 }

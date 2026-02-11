@@ -349,7 +349,7 @@ class SequenceEngine:
                 if action.delay_ms > 0:
                     await asyncio.sleep(action.delay_ms / 1000)
 
-                result = await self._execute_action(action)
+                result = await self._execute_action(action, sequence_duration_ms=duration_ms)
                 logger.info(
                     "Action %s result: success=%s message=%s",
                     action.id, result.success, result.message,
@@ -392,7 +392,7 @@ class SequenceEngine:
 
                 remaining -= wait_ms
 
-    async def _execute_action(self, action: Action) -> ActionResult:
+    async def _execute_action(self, action: Action, *, sequence_duration_ms: int = 0) -> ActionResult:
         """Execute a single action via the appropriate adapter and/or display channel."""
         start_time = datetime.now(timezone.utc)
 
@@ -467,6 +467,11 @@ class SequenceEngine:
                             logger.info("Resolved playback URL for media_id %s", ws_params["media_id"])
                 except Exception as e:
                     logger.warning("Failed to resolve playback URL: %s", e)
+
+            # Inject sequence duration for frontend countdown support
+            if sequence_duration_ms > 0:
+                ws_params['sequence_duration_ms'] = sequence_duration_ms
+                ws_params['sequence_started_at'] = datetime.now(timezone.utc).isoformat()
 
             # 3) Always notify display clients via WebSocket
             logger.info(
