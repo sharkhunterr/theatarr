@@ -105,6 +105,34 @@ const animationStyles = `
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
+@keyframes scroll-left {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100%); }
+}
+@keyframes scroll-right {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100vw); }
+}
+@keyframes scroll-up {
+  0% { transform: translateY(100vh); }
+  100% { transform: translateY(-100%); }
+}
+@keyframes scroll-down {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+@keyframes fade-in-text {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes fade-out-text {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes rotate-text {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 `;
 
 // Helper to resolve dynamic text variables
@@ -248,7 +276,15 @@ interface BadgeConfig {
 interface CustomText {
   text: string;
   position: string;
+  position_x?: number;
+  position_y?: number;
   style?: string;
+  font_family?: string;
+  font_size?: number;
+  font_weight?: string;
+  text_color?: string;
+  animation?: string;
+  animation_speed?: number;
 }
 
 interface TemplateConfig {
@@ -859,35 +895,96 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
         );
 
       case 'custom_text': {
-        const textContent = (component as any).text || '';
+        const comp = component as any;
+        const textContent = comp.text || '';
         if (!textContent) return null;
-        const textPos = component.position || 'center';
-        const textStyle = (component as any).style || '';
-        const posClasses =
-          textPos === 'top' ? 'absolute top-8 left-0 right-0 text-center' :
-          textPos === 'bottom' ? 'absolute bottom-8 left-0 right-0 text-center' :
-          textPos === 'top-left' ? 'absolute top-8 left-8' :
-          textPos === 'top-right' ? 'absolute top-8 right-8' :
-          textPos === 'bottom-left' ? 'absolute bottom-8 left-8' :
-          textPos === 'bottom-right' ? 'absolute bottom-8 right-8' :
-          'flex items-center justify-center text-center';
-        const sizeClass =
+
+        const textPos = comp.position || 'center';
+        const textStyle = comp.style || '';
+        const fontFamily = comp.font_family as string | undefined;
+        const fontSize = comp.font_size as number | undefined;
+        const fontWeight = comp.font_weight as string | undefined;
+        const textColor = (comp.text_color as string) || palette?.text || '#ffffff';
+        const animationType = (comp.animation as string) || 'none';
+        const animSpeed = (comp.animation_speed as number) || 10;
+
+        // Position
+        let positionStyle: React.CSSProperties = {};
+        let posClasses = '';
+
+        if (textPos === 'custom' && comp.position_x !== undefined && comp.position_y !== undefined) {
+          positionStyle = {
+            position: 'absolute',
+            left: `${comp.position_x}%`,
+            top: `${comp.position_y}%`,
+            transform: 'translate(-50%, -50%)',
+          };
+        } else {
+          posClasses =
+            textPos === 'top' ? 'absolute top-8 left-0 right-0 text-center' :
+            textPos === 'bottom' ? 'absolute bottom-8 left-0 right-0 text-center' :
+            textPos === 'left' ? 'absolute top-0 bottom-0 left-8 flex items-center' :
+            textPos === 'right' ? 'absolute top-0 bottom-0 right-8 flex items-center justify-end' :
+            textPos === 'top-left' ? 'absolute top-8 left-8' :
+            textPos === 'top-right' ? 'absolute top-8 right-8' :
+            textPos === 'bottom-left' ? 'absolute bottom-8 left-8' :
+            textPos === 'bottom-right' ? 'absolute bottom-8 right-8' :
+            'flex items-center justify-center text-center';
+        }
+
+        // Typography — use explicit values or fall back to preset style classes
+        const typoStyle: React.CSSProperties = {
+          color: textColor,
+          textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+        };
+        if (fontFamily) typoStyle.fontFamily = fontFamily;
+        if (fontSize) typoStyle.fontSize = `${fontSize}px`;
+        if (fontWeight) typoStyle.fontWeight = fontWeight;
+
+        const sizeClass = fontSize ? '' : (
           textStyle === 'title' ? 'text-5xl font-bold' :
           textStyle === 'subtitle' ? 'text-2xl font-medium' :
           textStyle === 'cinema-label' ? 'text-lg uppercase tracking-[0.3em] font-light' :
           textStyle === 'small' ? 'text-sm' :
-          'text-xl';
+          'text-xl'
+        );
+
+        // Animation
+        const animMap: Record<string, string> = {
+          'scroll-left': `scroll-left ${animSpeed}s linear infinite`,
+          'scroll-right': `scroll-right ${animSpeed}s linear infinite`,
+          'scroll-up': `scroll-up ${animSpeed}s linear infinite`,
+          'scroll-down': `scroll-down ${animSpeed}s linear infinite`,
+          'blink': `blink ${animSpeed}s ease-in-out infinite`,
+          'pulse-glow': `pulse-glow ${animSpeed}s ease-in-out infinite`,
+          'fade-in': `fade-in-text ${animSpeed}s ease-in forwards`,
+          'fade-out': `fade-out-text ${animSpeed}s ease-out forwards`,
+          'rotate': `rotate-text ${animSpeed}s linear infinite`,
+          'float': `float ${animSpeed}s ease-in-out infinite`,
+          'neon-flicker': `neon-flicker ${animSpeed}s ease-in-out infinite`,
+          'shimmer': `shimmer ${animSpeed}s linear infinite`,
+        };
+        if (animationType !== 'none' && animMap[animationType]) {
+          typoStyle.animation = animMap[animationType];
+        }
+        if (animationType === 'shimmer') {
+          typoStyle.background = `linear-gradient(90deg, ${textColor} 0%, ${textColor}88 50%, ${textColor} 100%)`;
+          typoStyle.backgroundSize = '200% 100%';
+          typoStyle.WebkitBackgroundClip = 'text';
+          typoStyle.WebkitTextFillColor = 'transparent';
+        }
+
+        const needsOverflow = ['scroll-left', 'scroll-right', 'scroll-up', 'scroll-down'].includes(animationType);
+
         return (
           <div
             key={index}
-            className={`z-20 ${posClasses}`}
+            className={`z-20 ${posClasses} ${needsOverflow ? 'overflow-hidden' : ''}`}
+            style={positionStyle}
           >
             <p
               className={`${sizeClass} whitespace-pre-line`}
-              style={{
-                color: palette?.text || '#ffffff',
-                textShadow: '0 2px 8px rgba(0,0,0,0.6)',
-              }}
+              style={typoStyle}
             >
               {textContent}
             </p>

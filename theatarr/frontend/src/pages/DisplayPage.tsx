@@ -356,6 +356,42 @@ function SessionDisplay() {
           } else if (contentType === 'waiting_screen') {
             template = session?.template || null;
           } else if (contentType === 'text' && params.content) {
+            // Convert position_h + position_v into combined position for TemplateRenderer
+            const posH = (params.position_h as string) || 'center';
+            const posV = (params.position_v as string) || 'center';
+            let computedPosition = (params.position as string) || 'center';
+            let computedX = params.position_x as number | undefined;
+            let computedY = params.position_y as number | undefined;
+
+            if (params.position_h !== undefined || params.position_v !== undefined) {
+              // New format: derive combined position from H/V
+              if (posH === 'custom' || posV === 'custom') {
+                computedPosition = 'custom';
+                const hMap: Record<string, number> = { left: 5, center: 50, right: 95 };
+                const vMap: Record<string, number> = { top: 5, center: 50, bottom: 95 };
+                computedX = posH === 'custom' ? (params.position_x as number ?? 50) : hMap[posH] ?? 50;
+                computedY = posV === 'custom' ? (params.position_y as number ?? 50) : vMap[posV] ?? 50;
+              } else if (posH === 'center' && posV === 'center') {
+                computedPosition = 'center';
+              } else if (posH === 'center' && posV === 'top') {
+                computedPosition = 'top';
+              } else if (posH === 'center' && posV === 'bottom') {
+                computedPosition = 'bottom';
+              } else if (posH === 'left' && posV === 'center') {
+                computedPosition = 'left';
+              } else if (posH === 'right' && posV === 'center') {
+                computedPosition = 'right';
+              } else if (posH === 'left' && posV === 'top') {
+                computedPosition = 'top-left';
+              } else if (posH === 'right' && posV === 'top') {
+                computedPosition = 'top-right';
+              } else if (posH === 'left' && posV === 'bottom') {
+                computedPosition = 'bottom-left';
+              } else if (posH === 'right' && posV === 'bottom') {
+                computedPosition = 'bottom-right';
+              }
+            }
+
             // Text overlay — render as a waiting_screen with a single custom_text component
             template = {
               name: 'Text Overlay',
@@ -365,8 +401,16 @@ function SessionDisplay() {
                   {
                     type: 'custom_text',
                     text: params.content as string,
-                    position: (params.position as string) || 'center',
+                    position: computedPosition,
+                    position_x: computedX,
+                    position_y: computedY,
                     style: (params.style as string) || 'subtitle',
+                    font_family: params.font_family as string | undefined,
+                    font_size: params.font_size as number | undefined,
+                    font_weight: params.font_weight as string | undefined,
+                    text_color: params.text_color as string | undefined,
+                    animation: params.animation as string | undefined,
+                    animation_speed: params.animation_speed as number | undefined,
                   },
                 ],
               },
@@ -593,8 +637,11 @@ function SessionDisplay() {
           handleAction(payload);
         }
         // Receiving an action means session is running — remove idle overlay
+        // But don't override terminal statuses (completed/interrupted)
         setSession((prev) =>
           prev && prev.session_status !== 'running'
+            && prev.session_status !== 'completed'
+            && prev.session_status !== 'interrupted'
             ? { ...prev, session_status: 'running' }
             : prev
         );

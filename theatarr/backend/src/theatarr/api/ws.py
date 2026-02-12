@@ -330,6 +330,12 @@ class WebSocketManager:
             if not _engine:
                 return
 
+            # Check session status first — skip replay/resume for terminal sessions
+            session = await _engine._get_session(session_id)
+            from theatarr.models.session import SessionStatus
+            if session.status in (SessionStatus.COMPLETED, SessionStatus.INTERRUPTED):
+                return
+
             # Replay all actions from current block if session has them
             display_states = _engine.get_display_state(session_id)
             if display_states:
@@ -343,8 +349,6 @@ class WebSocketManager:
                     })
 
             # Auto-resume if session was paused and has pause_on_display_disconnect
-            session = await _engine._get_session(session_id)
-            from theatarr.models.session import SessionStatus
             if (
                 session.pause_on_display_disconnect
                 and session.status == SessionStatus.PAUSED

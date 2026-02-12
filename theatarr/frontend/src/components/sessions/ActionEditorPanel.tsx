@@ -938,6 +938,15 @@ function DisplayForm({
     imageUrl: language === 'fr' ? 'URL de l\'image' : 'Image URL',
     selectTemplate: language === 'fr' ? 'Template d\'attente' : 'Waiting Screen Template',
     noTemplates: language === 'fr' ? 'Aucun template disponible. Initialisez les templates intégrés.' : 'No templates available. Initialize built-in templates.',
+    position: language === 'fr' ? 'Position' : 'Position',
+    positionX: language === 'fr' ? 'Horizontal (%)' : 'Horizontal (%)',
+    positionY: language === 'fr' ? 'Vertical (%)' : 'Vertical (%)',
+    fontFamily: language === 'fr' ? 'Police' : 'Font',
+    fontSize: language === 'fr' ? 'Taille (px)' : 'Size (px)',
+    fontWeight: language === 'fr' ? 'Graisse' : 'Weight',
+    textColor: language === 'fr' ? 'Couleur' : 'Color',
+    animation: language === 'fr' ? 'Animation' : 'Animation',
+    animationSpeed: language === 'fr' ? 'Vitesse animation (s)' : 'Animation Speed (s)',
   };
 
   const commands = [
@@ -948,6 +957,48 @@ function DisplayForm({
     { value: 'show', label: language === 'fr' ? 'Afficher contenu' : 'Show Content' },
     { value: 'hide', label: language === 'fr' ? 'Masquer' : 'Hide' },
   ];
+
+  const positionsH = [
+    { value: 'center', label: language === 'fr' ? 'Centre' : 'Center' },
+    { value: 'left', label: language === 'fr' ? 'Gauche' : 'Left' },
+    { value: 'right', label: language === 'fr' ? 'Droite' : 'Right' },
+    { value: 'custom', label: language === 'fr' ? 'Personnalise' : 'Custom' },
+  ];
+  const positionsV = [
+    { value: 'center', label: language === 'fr' ? 'Centre' : 'Center' },
+    { value: 'top', label: language === 'fr' ? 'Haut' : 'Top' },
+    { value: 'bottom', label: language === 'fr' ? 'Bas' : 'Bottom' },
+    { value: 'custom', label: language === 'fr' ? 'Personnalise' : 'Custom' },
+  ];
+
+  const textFonts = [
+    { value: '', label: language === 'fr' ? 'Par defaut' : 'Default' },
+    { value: 'Georgia, serif', label: 'Georgia' },
+    { value: "'Courier New', monospace", label: 'Courier New' },
+    { value: 'Impact, sans-serif', label: 'Impact' },
+    { value: "'Arial Black', sans-serif", label: 'Arial Black' },
+    { value: "'Trebuchet MS', sans-serif", label: 'Trebuchet MS' },
+    { value: "'Palatino Linotype', serif", label: 'Palatino' },
+    { value: 'monospace', label: 'Monospace' },
+  ];
+
+  const textAnimations = [
+    { value: 'none', label: language === 'fr' ? 'Aucune' : 'None' },
+    { value: 'scroll-left', label: language === 'fr' ? 'Defilement gauche' : 'Scroll Left' },
+    { value: 'scroll-right', label: language === 'fr' ? 'Defilement droite' : 'Scroll Right' },
+    { value: 'scroll-up', label: language === 'fr' ? 'Defilement haut' : 'Scroll Up' },
+    { value: 'scroll-down', label: language === 'fr' ? 'Defilement bas' : 'Scroll Down' },
+    { value: 'blink', label: language === 'fr' ? 'Clignotement' : 'Blink' },
+    { value: 'pulse-glow', label: language === 'fr' ? 'Pulsation' : 'Pulse Glow' },
+    { value: 'fade-in', label: language === 'fr' ? 'Fondu entrant' : 'Fade In' },
+    { value: 'fade-out', label: language === 'fr' ? 'Fondu sortant' : 'Fade Out' },
+    { value: 'rotate', label: language === 'fr' ? 'Rotation' : 'Rotate' },
+    { value: 'float', label: language === 'fr' ? 'Flottement' : 'Float' },
+    { value: 'neon-flicker', label: language === 'fr' ? 'Neon clignotant' : 'Neon Flicker' },
+    { value: 'shimmer', label: language === 'fr' ? 'Chatoiement' : 'Shimmer' },
+  ];
+
+  const fontSizes = [16, 24, 32, 48, 64, 72, 96, 120, 150];
 
   const inputSources = ['HDMI 1', 'HDMI 2', 'HDMI 3', 'HDMI 4', 'Component', 'USB'];
   const displayModes = ['Movie', 'Game', 'Sport', 'Standard', 'Vivid'];
@@ -1087,13 +1138,158 @@ function DisplayForm({
           )}
 
           {(parameters.content_type as string) === 'text' && (
-            <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{t.textContent}</label>
-              <textarea
-                value={(parameters.content as string) || ''}
-                onChange={(e) => handleParametersChange({ content: e.target.value })}
-                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text min-h-[80px]"
-              />
+            <div className="space-y-3">
+              {/* Text content */}
+              <div>
+                <label className="block text-sm font-medium text-dark-text mb-1">{t.textContent}</label>
+                <textarea
+                  value={(parameters.content as string) || ''}
+                  onChange={(e) => handleParametersChange({ content: e.target.value })}
+                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text min-h-[80px]"
+                />
+              </div>
+
+              {/* Position: horizontal + vertical selects */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.positionX}</label>
+                  <select
+                    value={(parameters.position_h as string) || 'center'}
+                    onChange={(e) => handleParametersChange({ position_h: e.target.value })}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-1.5 text-dark-text text-sm"
+                  >
+                    {positionsH.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                  {(parameters.position_h as string) === 'custom' && (
+                    <div className="mt-1">
+                      <label className="block text-xs text-dark-muted">{(parameters.position_x as number) ?? 50}%</label>
+                      <input
+                        type="range" min={0} max={100}
+                        value={(parameters.position_x as number) ?? 50}
+                        onChange={(e) => handleParametersChange({ position_x: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.positionY}</label>
+                  <select
+                    value={(parameters.position_v as string) || 'center'}
+                    onChange={(e) => handleParametersChange({ position_v: e.target.value })}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-1.5 text-dark-text text-sm"
+                  >
+                    {positionsV.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                  {(parameters.position_v as string) === 'custom' && (
+                    <div className="mt-1">
+                      <label className="block text-xs text-dark-muted">{(parameters.position_y as number) ?? 50}%</label>
+                      <input
+                        type="range" min={0} max={100}
+                        value={(parameters.position_y as number) ?? 50}
+                        onChange={(e) => handleParametersChange({ position_y: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Color */}
+              <div>
+                <label className="block text-xs font-medium text-dark-muted mb-1">{t.textColor}</label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={(parameters.text_color as string) || '#ffffff'}
+                    onChange={(e) => handleParametersChange({ text_color: e.target.value })}
+                    className="w-10 h-8 bg-dark-bg border border-dark-border rounded cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={(parameters.text_color as string) || '#ffffff'}
+                    onChange={(e) => handleParametersChange({ text_color: e.target.value })}
+                    className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-2 py-1 text-dark-text text-sm font-mono"
+                    placeholder="#ffffff"
+                  />
+                </div>
+              </div>
+
+              {/* Font + Size + Weight row */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.fontFamily}</label>
+                  <select
+                    value={(parameters.font_family as string) || ''}
+                    onChange={(e) => handleParametersChange({ font_family: e.target.value || undefined })}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-dark-text text-sm"
+                  >
+                    {textFonts.map((f) => (
+                      <option key={f.value} value={f.value} style={{ fontFamily: f.value || undefined }}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.fontSize}</label>
+                  <select
+                    value={(parameters.font_size as number) || ''}
+                    onChange={(e) => handleParametersChange({ font_size: e.target.value ? Number(e.target.value) : undefined })}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-dark-text text-sm"
+                  >
+                    <option value="">{language === 'fr' ? 'Auto' : 'Auto'}</option>
+                    {fontSizes.map((s) => (
+                      <option key={s} value={s}>{s}px</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.fontWeight}</label>
+                  <select
+                    value={(parameters.font_weight as string) || ''}
+                    onChange={(e) => handleParametersChange({ font_weight: e.target.value || undefined })}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-dark-text text-sm"
+                  >
+                    <option value="">{language === 'fr' ? 'Normal' : 'Normal'}</option>
+                    <option value="300">{language === 'fr' ? 'Leger' : 'Light'}</option>
+                    <option value="700">{language === 'fr' ? 'Gras' : 'Bold'}</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Animation row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.animation}</label>
+                  <select
+                    value={(parameters.animation as string) || 'none'}
+                    onChange={(e) => handleParametersChange({ animation: e.target.value })}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-dark-text text-sm"
+                  >
+                    {textAnimations.map((a) => (
+                      <option key={a.value} value={a.value}>{a.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {(parameters.animation as string) && (parameters.animation as string) !== 'none' && (
+                  <div>
+                    <label className="block text-xs font-medium text-dark-muted mb-1">
+                      {t.animationSpeed}: {(parameters.animation_speed as number) || 10}s
+                    </label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={30}
+                      value={(parameters.animation_speed as number) || 10}
+                      onChange={(e) => handleParametersChange({ animation_speed: Number(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
