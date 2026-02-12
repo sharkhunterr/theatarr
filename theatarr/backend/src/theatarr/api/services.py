@@ -207,6 +207,57 @@ async def get_media_streams(
 
 
 @router.get(
+    "/{service_id}/media/{media_id}/chapters",
+    summary="Get Media Chapters",
+)
+async def get_media_chapters(
+    db: DbSession,
+    user: AdminUser,
+    service_id: str,
+    media_id: str,
+) -> dict:
+    """Get chapter markers for a media item."""
+    from theatarr.adapters.base import Command
+
+    result = await db.execute(select(Service).where(Service.id == service_id))
+    service = result.scalar_one_or_none()
+
+    if not service:
+        raise NotFoundError("Service", service_id)
+
+    if not service.is_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Service is disabled",
+        )
+
+    adapter = AdapterRegistry.get_instance(service_id)
+    if not adapter:
+        try:
+            adapter = AdapterRegistry.create_adapter(
+                service.adapter_type,
+                service.config,
+                instance_id=service_id,
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            )
+
+    cmd = Command(action="get_chapters", parameters={"media_id": media_id})
+    cmd_result = await adapter.execute(cmd)
+
+    if not cmd_result.success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=cmd_result.message or "Failed to get chapters",
+        )
+
+    return cmd_result.data or {"chapters": [], "duration_ms": 0}
+
+
+@router.get(
     "/{service_id}",
     response_model=ServiceResponse,
     summary="Get Service",

@@ -187,6 +187,11 @@ class PlexAdapter(ServiceAdapter):
                 description="List available audio and subtitle tracks for a media",
             ),
             Capability(
+                name="get_chapters",
+                parameters=["media_id"],
+                description="Get chapter markers for a media item",
+            ),
+            Capability(
                 name="list_clients",
                 parameters=[],
                 description="List connected Plex clients",
@@ -220,6 +225,8 @@ class PlexAdapter(ServiceAdapter):
                 return await self._get_playback_url(command.parameters)
             elif command.action == "get_media_streams":
                 return await self._get_media_streams(command.parameters)
+            elif command.action == "get_chapters":
+                return await self._get_chapters(command.parameters)
             elif command.action == "list_clients":
                 return await self._list_clients()
             elif command.action == "play_on_client":
@@ -565,6 +572,48 @@ class PlexAdapter(ServiceAdapter):
             data={
                 "audio_tracks": audio_tracks,
                 "subtitle_tracks": subtitle_tracks,
+            },
+        )
+
+    async def _get_chapters(self, parameters: dict[str, Any]) -> CommandResult:
+        """Get chapter markers for a media item."""
+        if not self._client:
+            return CommandResult(success=False, message="Not connected")
+
+        media_id = parameters.get("media_id")
+        if not media_id:
+            return CommandResult(success=False, message="media_id is required")
+
+        response = await self._client.get(
+            f"{self.server_url}/library/metadata/{media_id}",
+            params={"includeChapters": "1"},
+        )
+        data = response.json()
+
+        metadata = data.get("MediaContainer", {}).get("Metadata", [])
+        if not metadata:
+            return CommandResult(success=False, message="Media not found")
+
+        item = metadata[0]
+        duration_ms = item.get("duration", 0)
+
+        # Chapters require includeChapters=1 in the request
+        raw_chapters = item.get("Chapter", [])
+        chapters = []
+        for ch in raw_chapters:
+            chapters.append({
+                "index": ch.get("index", len(chapters)),
+                "title": ch.get("tag", f"Chapter {len(chapters) + 1}"),
+                "start_ms": ch.get("startTimeOffset", 0),
+                "end_ms": ch.get("endTimeOffset", 0),
+                "thumb": ch.get("thumb"),
+            })
+
+        return CommandResult(
+            success=True,
+            data={
+                "chapters": chapters,
+                "duration_ms": duration_ms,
             },
         )
 

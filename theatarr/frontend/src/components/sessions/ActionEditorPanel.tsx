@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Film, Lightbulb, Volume2, Monitor, Zap, X, RefreshCw } from 'lucide-react';
+import { Search, Film, Lightbulb, Volume2, Monitor, Zap, X, RefreshCw, Sparkles } from 'lucide-react';
 import { Spinner } from '../common';
 import { apiClient } from '../../api/client';
 import { useLayoutStore } from '../../stores/layoutStore';
@@ -628,6 +628,11 @@ function MediaForm({
   const { parameters, command, service_id } = action;
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isLoadingChapters, setIsLoadingChapters] = useState(false);
+  const [chaptersError, setChaptersError] = useState<string | null>(null);
+  const [chapters, setChapters] = useState<Array<{ index: number; title: string; start_ms: number; end_ms: number }>>([]);
+  const [chaptersDurationMs, setChaptersDurationMs] = useState(0);
+  const [chaptersLoaded, setChaptersLoaded] = useState(false);
 
   const t = {
     command: language === 'fr' ? 'Commande' : 'Command',
@@ -649,6 +654,11 @@ function MediaForm({
     pauseAtHint: language === 'fr' ? 'Le film se mettra en pause à ce moment (HH:MM:SS). Le moteur passera automatiquement à la séquence suivante.' : 'The movie will pause at this time (HH:MM:SS). The engine will automatically advance to the next sequence.',
     noPause: language === 'fr' ? 'Pas de pause' : 'No pause',
     resumeHint: language === 'fr' ? 'Reprend la lecture du film là où il a été mis en pause dans une séquence précédente.' : 'Resumes movie playback from where it was paused in a previous sequence.',
+    smartIntermission: language === 'fr' ? 'Entracte intelligente' : 'Smart Intermission',
+    smartIntermissionHint: language === 'fr' ? 'Positionne la pause au chapitre le plus proche du milieu du film.' : 'Sets the pause at the chapter boundary closest to the middle of the movie.',
+    noChapters: language === 'fr' ? 'Aucun chapitre trouvé pour ce film.' : 'No chapters found for this movie.',
+    chapterSet: language === 'fr' ? 'Pause positionnée au chapitre' : 'Pause set at chapter',
+    chapterSelect: language === 'fr' ? 'Pause après le chapitre...' : 'Pause after chapter...',
   };
 
   const commands = [
@@ -698,6 +708,50 @@ function MediaForm({
     });
     setSearchQuery('');
     setIsSearchOpen(false);
+  };
+
+  const fetchChapters = async (): Promise<Array<{ index: number; title: string; start_ms: number; end_ms: number }>> => {
+    if (chaptersLoaded) return chapters;
+    if (!service_id || !mediaId) return [];
+    setIsLoadingChapters(true);
+    setChaptersError(null);
+    try {
+      const data = await apiClient.get<{ chapters: Array<{ index: number; title: string; start_ms: number; end_ms: number }>; duration_ms: number }>(
+        `/services/${service_id}/media/${mediaId}/chapters`
+      );
+      const chs = data.chapters || [];
+      setChapters(chs);
+      setChaptersDurationMs(data.duration_ms || 0);
+      setChaptersLoaded(true);
+      if (chs.length < 2) {
+        setChaptersError(t.noChapters);
+      }
+      return chs;
+    } catch {
+      setChaptersError(t.noChapters);
+      setChaptersLoaded(true);
+      return [];
+    } finally {
+      setIsLoadingChapters(false);
+    }
+  };
+
+  const handleSmartIntermission = async () => {
+    const chs = await fetchChapters();
+    if (chs.length < 2) return;
+    const mid = chaptersDurationMs / 2 || chs[chs.length - 1].end_ms / 2;
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < chs.length - 1; i++) {
+      const dist = Math.abs(chs[i].end_ms - mid);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
+      }
+    }
+    const bestChapter = chs[bestIdx];
+    handleParametersChange({ pause_at_ms: bestChapter.end_ms });
+    setChaptersError(`${t.chapterSet} "${bestChapter.title}"`);
   };
 
   const handleRemoveMovie = () => {
@@ -966,6 +1020,92 @@ function MediaForm({
             })()}
             <p className="text-xs text-dark-muted mt-1">{t.pauseAtHint}</p>
           </div>
+
+          {/* Smart Intermission + Chapter selector */}
+          {service_id && mediaId && (() => {
+            const noChaptersAvailable = chaptersLoaded && chapters.length < 2;
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSmartIntermission}
+                    disabled={isLoadingChapters || noChaptersAvailable}
+                    className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition-colors flex-shrink-0 ${
+                      noChaptersAvailable
+                        ? 'bg-dark-bg border-dark-border text-dark-muted cursor-not-allowed opacity-50'
+                        : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 disabled:opacity-50'
+                    }`}
+                  >
+                    {isLoadingChapters ? <Spinner size="sm" /> : <Sparkles size={14} />}
+                    {t.smartIntermission}
+                  </button>
+                  {chapters.length >= 2 ? (
+                    <select
+                      value={(() => {
+                        const pauseMs = (parameters.pause_at_ms as number) || 0;
+                        if (!pauseMs) return '';
+                        const match = chapters.find(ch => ch.end_ms === pauseMs);
+                        return match ? String(match.index) : '';
+                      })()}
+                      onChange={(e) => {
+                        const idx = e.target.value;
+                        if (!idx) {
+                          const newParams = { ...parameters };
+                          delete newParams.pause_at_ms;
+                          onChange({ parameters: newParams });
+                          setChaptersError(null);
+                        } else {
+                          const ch = chapters.find(c => String(c.index) === idx);
+                          if (ch) {
+                            handleParametersChange({ pause_at_ms: ch.end_ms });
+                            setChaptersError(`${t.chapterSet} "${ch.title}"`);
+                          }
+                        }
+                      }}
+                      className="flex-1 min-w-0 bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text text-sm"
+                    >
+                      <option value="">{t.chapterSelect}</option>
+                      {chapters.slice(0, -1).map((ch) => {
+                        const sec = Math.floor(ch.end_ms / 1000);
+                        const hh = Math.floor(sec / 3600);
+                        const mm = Math.floor((sec % 3600) / 60);
+                        const ss = sec % 60;
+                        const ts = hh > 0
+                          ? `${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+                          : `${mm}:${String(ss).padStart(2, '0')}`;
+                        return (
+                          <option key={ch.index} value={ch.index}>
+                            {ch.title} ({ts})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  ) : noChaptersAvailable ? (
+                    <span className="text-xs text-dark-muted italic">
+                      {language === 'fr' ? 'Indisponible — aucun chapitre détecté' : 'Unavailable — no chapters detected'}
+                    </span>
+                  ) : !chaptersLoaded && !isLoadingChapters ? (
+                    <button
+                      type="button"
+                      onClick={fetchChapters}
+                      className="text-xs text-dark-muted hover:text-dark-text transition-colors"
+                    >
+                      {language === 'fr' ? 'Charger les chapitres' : 'Load chapters'}
+                    </button>
+                  ) : null}
+                </div>
+                {!noChaptersAvailable && (
+                  <p className="text-xs text-dark-muted">{t.smartIntermissionHint}</p>
+                )}
+                {chaptersError && (
+                  <p className={`text-xs ${chaptersError.startsWith(t.chapterSet) ? 'text-green-400' : 'text-amber-400'}`}>
+                    {chaptersError}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </>
       )}
 
