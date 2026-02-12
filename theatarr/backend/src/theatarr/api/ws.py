@@ -287,6 +287,13 @@ class WebSocketManager:
                     },
                 )
 
+        elif msg_type == "video_paused_at":
+            # Display client reports video paused at pause_at_ms
+            session_id = payload.get("session_id")
+            position_ms = payload.get("position_ms")
+            if session_id:
+                await self._handle_video_paused(session_id, position_ms)
+
         else:
             await self._send(
                 websocket,
@@ -390,6 +397,31 @@ class WebSocketManager:
                 await _engine.pause_session(session_id)
         except Exception as e:
             logger.warning("Failed to auto-pause session %s on display disconnect: %s", session_id, e)
+
+    async def _handle_video_paused(self, session_id: str, position_ms: int | None) -> None:
+        """Handle video paused at pause_at_ms — store position and auto-skip to next sequence."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            from theatarr.services.engine import _engine
+            if not _engine:
+                return
+
+            # Store the video position so resume can use it
+            if position_ms is not None:
+                _engine.store_media_pause(session_id, position_ms)
+
+            # Auto-skip to next sequence
+            logger.info(
+                "Video paused at %sms for session %s — auto-skipping to next sequence",
+                position_ms, session_id,
+            )
+            await _engine.skip_sequence(session_id)
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "Failed to handle video_paused_at for session %s: %s", session_id, e
+            )
 
     async def broadcast_wallmount_state(self, state: dict) -> int:
         """Broadcast wallmount state to all wallmount subscribers."""

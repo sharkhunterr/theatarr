@@ -645,6 +645,10 @@ function MediaForm({
     defaultTrack: language === 'fr' ? 'Par défaut' : 'Default',
     loadingStreams: language === 'fr' ? 'Chargement des pistes...' : 'Loading tracks...',
     noService: language === 'fr' ? 'Sélectionnez un service média pour rechercher des films' : 'Select a media service to search for movies',
+    pauseAt: language === 'fr' ? 'Pause automatique à' : 'Auto-pause at',
+    pauseAtHint: language === 'fr' ? 'Le film se mettra en pause à ce moment (HH:MM:SS). Le moteur passera automatiquement à la séquence suivante.' : 'The movie will pause at this time (HH:MM:SS). The engine will automatically advance to the next sequence.',
+    noPause: language === 'fr' ? 'Pas de pause' : 'No pause',
+    resumeHint: language === 'fr' ? 'Reprend la lecture du film là où il a été mis en pause dans une séquence précédente.' : 'Resumes movie playback from where it was paused in a previous sequence.',
   };
 
   const commands = [
@@ -888,7 +892,87 @@ function MediaForm({
               step="1000"
             />
           </div>
+
+          {/* Pause automatique — 3 inputs H / M / S pour mobile */}
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t.pauseAt}</label>
+            {(() => {
+              const ms = (parameters.pause_at_ms as number) || 0;
+              const totalSec = Math.floor(ms / 1000);
+              const h = Math.floor(totalSec / 3600);
+              const m = Math.floor((totalSec % 3600) / 60);
+              const s = totalSec % 60;
+
+              const updatePause = (newH: number, newM: number, newS: number) => {
+                const total = newH * 3600 + newM * 60 + newS;
+                if (total > 0) {
+                  handleParametersChange({ pause_at_ms: total * 1000 });
+                } else {
+                  const newParams = { ...parameters };
+                  delete newParams.pause_at_ms;
+                  onChange({ parameters: newParams });
+                }
+              };
+
+              return (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={23}
+                    value={ms > 0 ? h : ''}
+                    placeholder="H"
+                    onChange={(e) => updatePause(parseInt(e.target.value) || 0, m, s)}
+                    className="w-16 bg-dark-bg border border-dark-border rounded-lg px-2 py-2 text-dark-text text-center"
+                  />
+                  <span className="text-dark-muted font-bold">:</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={59}
+                    value={ms > 0 ? m : ''}
+                    placeholder="M"
+                    onChange={(e) => updatePause(h, parseInt(e.target.value) || 0, s)}
+                    className="w-16 bg-dark-bg border border-dark-border rounded-lg px-2 py-2 text-dark-text text-center"
+                  />
+                  <span className="text-dark-muted font-bold">:</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={59}
+                    value={ms > 0 ? s : ''}
+                    placeholder="S"
+                    onChange={(e) => updatePause(h, m, parseInt(e.target.value) || 0)}
+                    className="w-16 bg-dark-bg border border-dark-border rounded-lg px-2 py-2 text-dark-text text-center"
+                  />
+                  {ms > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newParams = { ...parameters };
+                        delete newParams.pause_at_ms;
+                        onChange({ parameters: newParams });
+                      }}
+                      className="ml-1 p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+            <p className="text-xs text-dark-muted mt-1">{t.pauseAtHint}</p>
+          </div>
         </>
+      )}
+
+      {command === 'resume' && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <p className="text-sm text-blue-300">{t.resumeHint}</p>
+        </div>
       )}
     </div>
   );

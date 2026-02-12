@@ -263,6 +263,9 @@ function SessionDisplay() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [showVideo, setShowVideo] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
+  const [videoPausedForResume, setVideoPausedForResume] = useState(false);
+  const videoPausedForResumeRef = useRef(false);
+  const pauseAtMsRef = useRef<number | null>(null);
   const [sequenceDurationMs, setSequenceDurationMs] = useState<number | null>(null);
   const [sequenceStartedAt, setSequenceStartedAt] = useState<number | null>(null);
 
@@ -381,7 +384,13 @@ function SessionDisplay() {
               config: params.config,
             };
           } else if (contentType === 'waiting_screen') {
-            template = session?.template || null;
+            // Fallback: use session template or a simple default
+            template = session?.template || {
+              name: 'Entracte',
+              template_type: 'waiting_screen',
+              layout: { style: 'waiting-intermission', components: [] },
+              config: {},
+            };
           } else if (contentType === 'quiz') {
             // Quiz display action — show quiz template and subscribe to quiz WS
             const quizSessionId = params.quiz_session_id as string;
@@ -563,12 +572,20 @@ function SessionDisplay() {
         case 'play': {
           const url = params.url as string;
           if (url) {
+            // Store pause_at_ms if provided
+            const pauseAt = params.pause_at_ms as number | undefined;
+            pauseAtMsRef.current = pauseAt ?? null;
+            setVideoPausedForResume(false);
+            videoPausedForResumeRef.current = false;
             setVideoUrl(url);
             setShowVideo(true);
-            enterFullscreen();
+            // Request fullscreen (use containerRef directly to avoid declaration order issue)
+            const el = containerRef.current || document.documentElement;
+            el.requestFullscreen?.().catch(() => {});
           } else {
             // No stream URL (e.g. Plex plays on its own device)
             // Hide template — external player handles the video
+            pauseAtMsRef.current = null;
             setDisplayLayers([]);
             currentBlockIdRef.current = null;
             setShowVideo(false);
@@ -576,17 +593,51 @@ function SessionDisplay() {
           break;
         }
         case 'stop':
+          pauseAtMsRef.current = null;
+          setVideoPausedForResume(false);
+          videoPausedForResumeRef.current = false;
           setShowVideo(false);
           setVideoUrl(null);
           break;
         case 'pause':
           videoRef.current?.pause();
           break;
-        case 'resume':
-          videoRef.current?.play();
+        case 'resume': {
+          // Resume from stored pause position
+          const resumeUrl = params.resume_url as string | undefined;
+          const video = videoRef.current;
+
+          if (video && videoPausedForResumeRef.current) {
+            // Video is still loaded — just play from current position
+            setShowVideo(true);
+            setVideoPausedForResume(false);
+            videoPausedForResumeRef.current = false;
+            setDisplayLayers([]);
+            currentBlockIdRef.current = null;
+            video.play().catch(() => {});
+          } else if (resumeUrl) {
+            // Video was unloaded — reload from resume URL + position
+            const resumePos = params.resume_position_ms as number | undefined;
+            pauseAtMsRef.current = null;
+            setVideoPausedForResume(false);
+            videoPausedForResumeRef.current = false;
+            setVideoUrl(resumeUrl);
+            setShowVideo(true);
+            setDisplayLayers([]);
+            currentBlockIdRef.current = null;
+            // Seek to position once video is ready
+            if (resumePos) {
+              setTimeout(() => {
+                const v = videoRef.current;
+                if (v) v.currentTime = resumePos / 1000;
+              }, 500);
+            }
+          }
           break;
+        }
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -846,10 +897,17 @@ function SessionDisplay() {
   // HLS instance ref for cleanup
   const hlsRef = useRef<Hls | null>(null);
 
-  // Attach video source (HLS or native) and start playback
+  // Attach video source (HLS or native) and start playback.
+  // Only re-runs when videoUrl changes (NOT when showVideo changes,
+  // so HLS stays alive during pause-for-resume).
+  const videoUrlForSetup = useRef<string | null>(null);
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !showVideo || !videoUrl) return;
+    if (!video || !videoUrl) return;
+
+    // Skip if same URL already loaded (avoid re-init on showVideo toggle)
+    if (videoUrlForSetup.current === videoUrl) return;
+    videoUrlForSetup.current = videoUrl;
 
     // Cleanup previous HLS instance
     if (hlsRef.current) {
@@ -903,8 +961,39 @@ function SessionDisplay() {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      videoUrlForSetup.current = null;
     };
-  }, [showVideo, videoUrl]);
+  }, [videoUrl]);
+
+  // Monitor video position for pause_at_ms — auto-pause and notify engine
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !showVideo) return;
+
+    const onTimeUpdate = () => {
+      const pauseAt = pauseAtMsRef.current;
+      if (pauseAt != null && video.currentTime * 1000 >= pauseAt && !video.paused) {
+        video.pause();
+        pauseAtMsRef.current = null;
+        setVideoPausedForResume(true);
+        videoPausedForResumeRef.current = true;
+        setShowVideo(false);
+        // Notify engine so it auto-advances to next sequence
+        if (session?.session_id) {
+          send({
+            type: 'video_paused_at',
+            payload: {
+              session_id: session.session_id,
+              position_ms: Math.round(video.currentTime * 1000),
+            },
+          });
+        }
+      }
+    };
+
+    video.addEventListener('timeupdate', onTimeUpdate);
+    return () => video.removeEventListener('timeupdate', onTimeUpdate);
+  }, [showVideo, session?.session_id, send]);
 
   // React to session status changes (pause/stop/resume from admin)
   const prevStatusRef = useRef<string | null>(null);
@@ -934,6 +1023,9 @@ function SessionDisplay() {
       setShowVideo(false);
       setVideoUrl(null);
       setVideoMuted(false);
+      setVideoPausedForResume(false);
+      videoPausedForResumeRef.current = false;
+      pauseAtMsRef.current = null;
       setDisplayLayers([]);
       currentBlockIdRef.current = null;
       audioEngine.stop(0);
@@ -1012,6 +1104,9 @@ function SessionDisplay() {
     setShowVideo(false);
     setVideoUrl(null);
     setVideoMuted(false);
+    setVideoPausedForResume(false);
+    videoPausedForResumeRef.current = false;
+    pauseAtMsRef.current = null;
     // Notify backend
     if (session?.session_id) {
       send({
@@ -1045,33 +1140,6 @@ function SessionDisplay() {
     );
   }
 
-  // Video playback mode
-  if (showVideo && videoUrl) {
-    return (
-      <div ref={containerRef} className="w-screen h-screen bg-black relative">
-        <video
-          ref={videoRef}
-          className="w-full h-full object-contain"
-          onEnded={handleVideoEnded}
-        />
-        {videoMuted && (
-          <button
-            onClick={() => {
-              if (videoRef.current) {
-                videoRef.current.muted = false;
-                setVideoMuted(false);
-              }
-            }}
-            className="absolute bottom-8 right-8 px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-full transition-all flex items-center gap-2 text-lg"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-            Activer le son
-          </button>
-        )}
-      </div>
-    );
-  }
-
   // Template data for TemplateRenderer
   const templateData = {
     movie: session.movie || undefined,
@@ -1087,15 +1155,46 @@ function SessionDisplay() {
 
   // Before session starts or after it ends: simple black screen with status text.
   // Active display layers only shown when the engine has broadcast actions.
-  const isIdle = session.session_status !== 'running' && displayLayers.length === 0;
+  const isIdle = session.session_status !== 'running' && displayLayers.length === 0 && !videoPausedForResume;
+
+  // Whether the video element should be visible (active playback, not paused-for-resume)
+  const videoVisible = showVideo && !!videoUrl;
+  // Whether the video element should stay in the DOM (playing OR paused-for-resume)
+  const videoAlive = !!videoUrl || videoPausedForResume;
 
   return (
     <div
       ref={containerRef}
       className="w-screen h-screen bg-black overflow-hidden relative"
     >
-      {/* Template layers (only when the engine has sent display actions) */}
-      {displayLayers.map((layer) => (
+      {/* Video element — stays in DOM when paused-for-resume (hidden behind overlays) */}
+      {videoAlive && (
+        <div className={`absolute inset-0 ${videoVisible ? 'z-30' : 'z-0'}`}
+             style={videoVisible ? undefined : { opacity: 0, pointerEvents: 'none' }}>
+          <video
+            ref={videoRef}
+            className="w-full h-full object-contain"
+            onEnded={handleVideoEnded}
+          />
+          {videoMuted && videoVisible && (
+            <button
+              onClick={() => {
+                if (videoRef.current) {
+                  videoRef.current.muted = false;
+                  setVideoMuted(false);
+                }
+              }}
+              className="absolute bottom-8 right-8 px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-full transition-all flex items-center gap-2 text-lg"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+              Activer le son
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Template layers (only when the engine has sent display actions and video is not in foreground) */}
+      {!videoVisible && displayLayers.map((layer) => (
         <div key={layer.id} className="absolute inset-0" style={{ zIndex: layer.zIndex }}>
           <TemplateRenderer
             template={layer.template}
@@ -1159,6 +1258,7 @@ function SessionDisplay() {
           <span className="text-blue-400/60 text-xs ml-1">&#9835;</span>
         )}
       </div>
+
     </div>
   );
 }

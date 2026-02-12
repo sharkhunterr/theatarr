@@ -70,16 +70,21 @@ class ActionResult:
 class SequenceEngine:
     """Engine for executing cinema session sequences.
 
-    Owns a single long-lived DB session (created lazily).
-    Background tasks and request-handler calls all share this session.
-    SQLite WAL mode + busy_timeout prevent "database is locked" errors.
+    Lifecycle methods (start/pause/resume/stop/skip) use self.db.
+    Background tasks (_run_session and its callees) use a dedicated
+    per-session DB session stored in _bg_db to avoid "prepared state"
+    conflicts when both run concurrently on the same event loop.
     """
 
     def __init__(self):
         self._db: AsyncSession | None = None
+        self._bg_db: dict[str, AsyncSession] = {}
         self._running_sessions: dict[str, asyncio.Task] = {}
         self._session_locks: dict[str, asyncio.Lock] = {}
         self._display_states: dict[str, list[dict]] = {}
+        # Stores last media play state per session for pause/resume
+        # {session_id: {url, media_id, position_ms, ...original play params}}
+        self._media_states: dict[str, dict[str, Any]] = {}
 
     @property
     def db(self) -> AsyncSession:
@@ -89,13 +94,37 @@ class SequenceEngine:
             self._db = async_session_maker()
         return self._db
 
+    def _session_db(self, session_id: str) -> AsyncSession:
+        """Get the DB session for a given cinema session.
+
+        Background tasks get a dedicated session; lifecycle methods
+        fall back to self.db.
+        """
+        return self._bg_db.get(session_id) or self.db
+
     def get_display_state(self, session_id: str) -> list[dict] | None:
         """Get all broadcast actions for the current block (for reconnection replay)."""
         return self._display_states.get(session_id) or None
 
+    def store_media_play(self, session_id: str, params: dict[str, Any]) -> None:
+        """Store media play parameters for later resume."""
+        self._media_states[session_id] = dict(params)
+        logger.info("Stored media state for session %s: media_id=%s", session_id, params.get("media_id"))
+
+    def store_media_pause(self, session_id: str, position_ms: int) -> None:
+        """Update stored media state with pause position."""
+        if session_id in self._media_states:
+            self._media_states[session_id]["pause_position_ms"] = position_ms
+            logger.info("Stored pause position %dms for session %s", position_ms, session_id)
+
+    def get_media_state(self, session_id: str) -> dict[str, Any] | None:
+        """Get stored media state for resume."""
+        return self._media_states.get(session_id)
+
     async def _get_session(self, session_id: str) -> Session:
         """Get a session by ID with sequences and actions loaded."""
-        result = await self.db.execute(
+        db = self._session_db(session_id)
+        result = await db.execute(
             select(Session).where(Session.id == session_id)
         )
         session = result.scalar_one_or_none()
@@ -229,6 +258,7 @@ class SequenceEngine:
             await self.db.commit()
 
             self._display_states.pop(session_id, None)
+            self._media_states.pop(session_id, None)
             logger.info("Stopped session %s", session_id)
             await self._emit_state_change(session)
 
@@ -264,7 +294,15 @@ class SequenceEngine:
     # ------------------------------------------------------------------
 
     async def _run_session(self, session_id: str, resuming: bool = False) -> None:
-        """Main session execution loop."""
+        """Main session execution loop.
+
+        Creates a dedicated DB session so it never conflicts with
+        lifecycle methods (skip/pause/stop) using self.db concurrently.
+        """
+        from theatarr.database import async_session_maker
+
+        bg_db = async_session_maker()
+        self._bg_db[session_id] = bg_db
         try:
             while True:
                 session = await self._get_session(session_id)
@@ -275,8 +313,9 @@ class SequenceEngine:
                 if session.current_sequence_index >= session.total_sequences:
                     session.status = SessionStatus.COMPLETED
                     session.completed_at = datetime.now(timezone.utc)
-                    await self.db.commit()
+                    await bg_db.commit()
                     self._display_states.pop(session_id, None)
+                    self._media_states.pop(session_id, None)
                     await self._emit_state_change(session)
                     break
 
@@ -285,6 +324,7 @@ class SequenceEngine:
                     logger.warning("Session %s: no current sequence at index %d", session_id, session.current_sequence_index)
                     break
 
+                seq_index_before = sequence.order_index
                 await self._execute_sequence(session, sequence, skip_actions=resuming)
                 resuming = False
 
@@ -292,6 +332,11 @@ class SequenceEngine:
                 if session.status != SessionStatus.RUNNING:
                     logger.info("Session %s: status changed to %s during sequence, stopping", session_id, _enum_val(session.status))
                     break
+
+                # If skip_sequence() already advanced the index, don't double-advance
+                if session.current_sequence_index != seq_index_before:
+                    logger.info("Session %s: sequence was skipped externally (index %d → %d), continuing", session_id, seq_index_before, session.current_sequence_index)
+                    continue
 
                 logger.info("Session %s: transitioning from sequence %d to next", session_id, session.current_sequence_index)
                 await self._transition_to_next_sequence(session)
@@ -303,12 +348,14 @@ class SequenceEngine:
             try:
                 session = await self._get_session(session_id)
                 session.status = SessionStatus.INTERRUPTED
-                await self.db.commit()
+                await bg_db.commit()
                 self._display_states.pop(session_id, None)
                 await self._emit_state_change(session)
             except Exception:
                 pass
         finally:
+            self._bg_db.pop(session_id, None)
+            await bg_db.close()
             self._running_sessions.pop(session_id, None)
 
     async def _execute_sequence(self, session: Session, sequence: Sequence, skip_actions: bool = False) -> None:
@@ -367,10 +414,21 @@ class SequenceEngine:
                 session = await self._get_session(session.id)
                 if session.status != SessionStatus.RUNNING:
                     return
+                if session.current_sequence_index != sequence.order_index:
+                    return
                 wait_ms = min(chunk_ms, remaining)
                 await asyncio.sleep(wait_ms / 1000)
+                # Re-check after sleep: skip_sequence() may have changed the
+                # index and reset elapsed_ms while we were sleeping.  We must
+                # re-fetch BEFORE touching elapsed_ms to avoid contaminating
+                # the next sequence and to prevent stale-attribute errors.
+                session = await self._get_session(session.id)
+                if session.status != SessionStatus.RUNNING:
+                    return
+                if session.current_sequence_index != sequence.order_index:
+                    return
                 session.current_sequence_elapsed_ms += wait_ms
-                await self.db.commit()
+                await self._session_db(session.id).commit()
                 remaining -= wait_ms
 
     async def _execute_action(self, action: Action, *, sequence_duration_ms: int = 0, block_id: str | None = None) -> ActionResult:
@@ -389,7 +447,7 @@ class SequenceEngine:
                 adapter = AdapterRegistry.get_instance(action.service_id)
                 if not adapter:
                     from theatarr.models.service import Service
-                    svc_result = await self.db.execute(
+                    svc_result = await self._session_db(session_id).execute(
                         select(Service).where(Service.id == action.service_id)
                     )
                     svc = svc_result.scalar_one_or_none()
@@ -448,6 +506,23 @@ class SequenceEngine:
                 except Exception as e:
                     logger.warning("Failed to resolve playback URL: %s", e)
 
+            # Store media play state for later resume
+            if action_type_val == "media" and action.command == "play":
+                self.store_media_play(session_id, ws_params)
+
+            # For resume command: inject stored media state
+            if action_type_val == "media" and action.command == "resume":
+                stored = self.get_media_state(session_id)
+                if stored:
+                    # Pass the stored URL and pause position to the display
+                    ws_params["resume_url"] = stored.get("url")
+                    ws_params["resume_position_ms"] = stored.get("pause_position_ms")
+                    ws_params["resume_media_id"] = stored.get("media_id")
+                    logger.info(
+                        "Resume action for session %s: url=%s position=%sms",
+                        session_id, bool(stored.get("url")), stored.get("pause_position_ms"),
+                    )
+
             if sequence_duration_ms > 0:
                 ws_params['sequence_duration_ms'] = sequence_duration_ms
                 ws_params['sequence_started_at'] = datetime.now(timezone.utc).isoformat()
@@ -501,8 +576,10 @@ class SequenceEngine:
         from theatarr.services.quiz import open_quiz, start_quiz, generate_quiz_token
 
         try:
+            db = self._session_db(session_id)
+
             # 1. Get accepted participants
-            result = await self.db.execute(
+            result = await db.execute(
                 select(SessionParticipant, User)
                 .join(User, SessionParticipant.user_id == User.id)
                 .where(
@@ -513,7 +590,7 @@ class SequenceEngine:
             participants = result.all()
 
             # 2. Get quiz session
-            quiz_result = await self.db.execute(
+            quiz_result = await db.execute(
                 select(QuizSession).where(QuizSession.id == quiz_session_id)
             )
             quiz = quiz_result.scalar_one_or_none()
@@ -524,7 +601,7 @@ class SequenceEngine:
             # 3. Create tokens for participants who don't have one
             participant_names: list[str] = []
             for participant, user in participants:
-                existing = await self.db.execute(
+                existing = await db.execute(
                     select(QuizToken).where(
                         QuizToken.quiz_session_id == quiz_session_id,
                         QuizToken.user_id == user.id,
@@ -540,22 +617,22 @@ class SequenceEngine:
                         is_active=True,
                         joined_at=datetime.now(),
                     )
-                    self.db.add(token)
+                    db.add(token)
                 participant_names.append(name)
 
-            await self.db.flush()
+            await db.flush()
 
             # 4. Open and start quiz if not already active
             questions = quiz.questions or []
             config = quiz.config or {}
             qs_status = quiz.status.value if isinstance(quiz.status, QuizSessionStatus) else quiz.status
             if qs_status == QuizSessionStatus.DRAFT.value:
-                quiz = await open_quiz(self.db, quiz)
+                quiz = await open_quiz(db, quiz)
                 qs_status = quiz.status.value if isinstance(quiz.status, QuizSessionStatus) else quiz.status
 
             started_now = False
             if qs_status == QuizSessionStatus.OPEN.value:
-                quiz = await start_quiz(self.db, quiz)
+                quiz = await start_quiz(db, quiz)
                 started_now = True
 
                 # Broadcast quiz_started + first question
@@ -591,7 +668,7 @@ class SequenceEngine:
                         },
                     )
 
-            await self.db.commit()
+            await db.commit()
             logger.info(
                 "Quiz %s auto-setup for session %s: %d participants enrolled",
                 quiz_session_id, session_id, len(participants),
@@ -655,12 +732,13 @@ class SequenceEngine:
         """Transition to the next sequence."""
         transition_start = time.perf_counter()
         monitor = get_performance_monitor()
+        db = self._session_db(session.id)
         next_index = session.current_sequence_index + 1
 
         if next_index >= session.total_sequences:
             session.status = SessionStatus.COMPLETED
             session.completed_at = datetime.now(timezone.utc)
-            await self.db.commit()
+            await db.commit()
             logger.info("Session %s completed (all sequences done)", session.id)
             await self._emit_state_change(session)
             return
@@ -674,7 +752,7 @@ class SequenceEngine:
         post_delay_start = time.perf_counter()
         session.current_sequence_index = next_index
         session.current_sequence_elapsed_ms = 0
-        await self.db.commit()
+        await db.commit()
         await self._emit_state_change(session)
         post_delay_ms = (time.perf_counter() - post_delay_start) * 1000
 
