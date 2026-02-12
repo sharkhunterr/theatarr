@@ -21,6 +21,7 @@ export interface ActionItem {
   duration_ms: number;
   on_failure: 'warn' | 'skip' | 'abort';
   service_id?: string;
+  block_index: number;
 }
 
 interface Service {

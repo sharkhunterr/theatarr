@@ -265,9 +265,12 @@ async def _sync_sequences_from_workflow(
 ) -> None:
     """Auto-generate Sequence + Action records from workflow action nodes.
 
-    Each action node becomes one Sequence with one Action.
-    The sequence duration_ms comes from the node's duration_ms field.
+    Actions with the same block_index are grouped into a single Sequence
+    and execute in parallel. Different block_indexes become separate
+    Sequences that execute sequentially.
     """
+    from collections import defaultdict
+
     action_datas = _extract_ordered_actions_from_workflow(workflow)
 
     if not action_datas:
@@ -283,17 +286,40 @@ async def _sync_sequences_from_workflow(
     if existing:
         await db.flush()
 
-    # Create one sequence per action
-    for order_index, data in enumerate(action_datas):
-        params = data.get("parameters", {})
-        duration_ms = data.get("duration_ms") or params.get("duration_ms") or 0
+    # Group actions by block_index (actions without block_index get auto-incremented)
+    blocks: dict[int, list[dict]] = defaultdict(list)
+    auto_block = 0
+    for data in action_datas:
+        bi = data.get("block_index")
+        if bi is None:
+            # No block_index = each action is its own block (backward compat)
+            bi = auto_block
+            auto_block += 1
+        else:
+            auto_block = max(auto_block, bi + 1)
+        blocks[bi].append(data)
 
-        action_type_str = data.get("actionType", "display")
-        command_str = data.get("command", "")
+    # Create one Sequence per block
+    for order_index, block_idx in enumerate(sorted(blocks.keys())):
+        block_actions = blocks[block_idx]
+
+        # Sequence name: derived from action types
+        name = " + ".join(
+            f'{a.get("actionType", "action")}:{a.get("command", "")}'
+            for a in block_actions[:3]
+        )
+        if len(block_actions) > 3:
+            name += f" +{len(block_actions) - 3}"
+
+        # Duration: max of individual action durations (parallel = longest wins)
+        duration_ms = max(
+            (a.get("duration_ms") or a.get("parameters", {}).get("duration_ms") or 0)
+            for a in block_actions
+        )
 
         sequence = Sequence(
             session_id=session.id,
-            name=f"{action_type_str}:{command_str}",
+            name=name,
             order_index=order_index,
             duration_type=DurationType.FIXED if duration_ms > 0 else DurationType.MANUAL,
             duration_ms=duration_ms if duration_ms > 0 else None,
@@ -303,16 +329,24 @@ async def _sync_sequences_from_workflow(
         db.add(sequence)
         await db.flush()
 
-        action = Action(
-            sequence_id=sequence.id,
-            action_type=action_type_str,
-            command=command_str,
-            parameters=params,
-            delay_ms=data.get("delay_ms", 0),
-            on_failure=data.get("on_failure", "warn"),
-            service_id=data.get("service_id"),
-        )
-        db.add(action)
+        for data in block_actions:
+            # Inject action_duration_ms into parameters so the display
+            # page can auto-remove individual layers before the block ends
+            params = dict(data.get("parameters", {}))
+            action_dur = data.get("duration_ms") or params.get("duration_ms") or 0
+            if action_dur > 0 and len(block_actions) > 1:
+                params["action_duration_ms"] = action_dur
+
+            action = Action(
+                sequence_id=sequence.id,
+                action_type=data.get("actionType", "display"),
+                command=data.get("command", ""),
+                parameters=params,
+                delay_ms=data.get("delay_ms", 0),
+                on_failure=data.get("on_failure", "warn"),
+                service_id=data.get("service_id"),
+            )
+            db.add(action)
 
 
 @router.get(
@@ -814,7 +848,7 @@ async def delete_session(
 
     # Auto-stop active sessions before deleting
     if session.is_active:
-        engine = get_engine(db)
+        engine = get_engine()
         try:
             await engine.stop_session(session_id)
             # Refresh session after stop
@@ -824,7 +858,7 @@ async def delete_session(
             logger.warning("Failed to stop session %s before delete, forcing cleanup", session_id)
     else:
         # Cancel any orphaned engine task even if session isn't "active"
-        engine = get_engine(db)
+        engine = get_engine()
         if session_id in engine._running_sessions:
             engine._running_sessions[session_id].cancel()
             del engine._running_sessions[session_id]
@@ -875,7 +909,7 @@ async def control_session(
     data: SessionControlRequest,
 ) -> SessionControlResponse:
     """Control session execution (play, pause, stop, skip, restart)."""
-    engine = get_engine(db)
+    engine = get_engine()
 
     try:
         if data.action == SessionControlAction.PLAY:
@@ -955,7 +989,7 @@ async def get_session_state(
     session_id: str,
 ) -> SessionState:
     """Get current execution state of a session."""
-    engine = get_engine(db)
+    engine = get_engine()
 
     try:
         state_dict = await engine.get_session_state(session_id)

@@ -61,6 +61,7 @@ export interface WorkflowNodeData {
   condition?: string;
   on_failure?: 'warn' | 'skip' | 'abort';
   service_id?: string;
+  block_index?: number;
 }
 
 export interface WorkflowData {

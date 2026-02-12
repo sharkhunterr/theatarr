@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import Depends
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -26,12 +26,23 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
-# Create async engine
+# Create async engine — SQLite busy_timeout avoids "database is locked"
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
     future=True,
+    connect_args={"timeout": 30},
 )
+
+
+# Enable WAL mode on every new SQLite connection for better concurrency
+@event.listens_for(engine.sync_engine, "connect")
+def _set_sqlite_pragmas(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=30000")
+    cursor.close()
+
 
 # Session factory
 async_session_maker = async_sessionmaker(

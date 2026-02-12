@@ -66,6 +66,15 @@ interface ActionPayload {
   parameters: Record<string, unknown>;
   is_replay?: boolean;
   broadcast_at?: string;
+  block_id?: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface DisplayLayer {
+  id: string;
+  template: any;
+  zIndex: number;
+  expiresAt?: number; // JS timestamp (ms) — layer auto-removed after this
 }
 
 // ============================================================================
@@ -249,7 +258,8 @@ function SessionDisplay() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [currentTemplate, setCurrentTemplate] = useState<any>(null);
+  const [displayLayers, setDisplayLayers] = useState<DisplayLayer[]>([]);
+  const currentBlockIdRef = useRef<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [showVideo, setShowVideo] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
@@ -282,28 +292,9 @@ function SessionDisplay() {
     fetchSession();
   }, [code]);
 
-  // Handle WebSocket action messages
-  const handleAction = useCallback(
-    (payload: ActionPayload) => {
-      const { action_type, command, parameters } = payload;
-
-      switch (action_type) {
-        case 'audio':
-          handleAudioAction(command, parameters);
-          break;
-        case 'display':
-          handleDisplayAction(command, parameters);
-          break;
-        case 'media':
-          handleMediaAction(command, parameters);
-          break;
-        default:
-          console.log('Unknown action type:', action_type, command, parameters);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  // -------------------------------------------------------
+  // Action handlers — stored in refs to avoid stale closures
+  // -------------------------------------------------------
 
   const handleAudioAction = useCallback(
     (command: string, params: Record<string, unknown>) => {
@@ -336,7 +327,7 @@ function SessionDisplay() {
   );
 
   const handleDisplayAction = useCallback(
-    (command: string, params: Record<string, unknown>) => {
+    (command: string, params: Record<string, unknown>, blockId?: string) => {
       // Capture sequence timing for countdown support (universal, all template types)
       if (params.sequence_duration_ms) {
         setSequenceDurationMs(params.sequence_duration_ms as number);
@@ -352,35 +343,94 @@ function SessionDisplay() {
 
       switch (command) {
         case 'show': {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let template: any = null;
           const contentType = params.content_type as string | undefined;
           if (contentType === 'waiting_screen' && params.layout) {
-            // Use the action's waiting screen template
-            setCurrentTemplate({
+            template = {
               name: (params.template_name as string) || 'Waiting Screen',
               template_type: 'waiting_screen',
               layout: params.layout,
               config: params.config,
-            });
-            setShowVideo(false);
+            };
           } else if (contentType === 'waiting_screen') {
-            // Fallback to session template
-            setCurrentTemplate(session?.template || null);
-            setShowVideo(false);
+            template = session?.template || null;
+          } else if (contentType === 'text' && params.content) {
+            // Text overlay — render as a waiting_screen with a single custom_text component
+            template = {
+              name: 'Text Overlay',
+              template_type: 'waiting_screen',
+              layout: {
+                components: [
+                  {
+                    type: 'custom_text',
+                    text: params.content as string,
+                    position: (params.position as string) || 'center',
+                    style: (params.style as string) || 'subtitle',
+                  },
+                ],
+              },
+              config: { transparent_bg: true },
+            };
+          } else if (contentType === 'image' && params.image_url) {
+            // Image overlay
+            template = {
+              name: 'Image Overlay',
+              template_type: 'waiting_screen',
+              layout: {
+                components: [
+                  {
+                    type: 'backdrop',
+                    url: params.image_url as string,
+                    opacity: (params.opacity as number) ?? 1,
+                  },
+                ],
+              },
+              config: {},
+            };
           } else if (params.template_id || params.layout) {
-            // Explicit template override from action parameters
-            setCurrentTemplate({
+            template = {
               name: (params.template_name as string) || 'Display Template',
               template_type: (params.template_type as string) || 'movie_info',
               layout: params.layout,
               config: params.config,
-            });
+            };
+          }
+
+          if (template) {
+            // Per-action duration: if action_duration_ms < sequence_duration_ms, layer auto-expires
+            const actionDurationMs = params.action_duration_ms as number | undefined;
+            const seqDurationMs = params.sequence_duration_ms as number | undefined;
+            const expiresAt = (actionDurationMs && seqDurationMs && actionDurationMs < seqDurationMs)
+              ? Date.now() + actionDurationMs
+              : undefined;
+
+            const newLayer: DisplayLayer = {
+              id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+              template,
+              zIndex: 0,
+              expiresAt,
+            };
+
+            if (blockId && blockId === currentBlockIdRef.current) {
+              // Same block: add as overlay layer
+              setDisplayLayers(prev => {
+                const layer = { ...newLayer, zIndex: prev.length };
+                return [...prev, layer];
+              });
+            } else {
+              // New block or no block: clear all, start fresh
+              currentBlockIdRef.current = blockId || null;
+              setDisplayLayers([newLayer]);
+            }
             setShowVideo(false);
           }
           break;
         }
         case 'blank':
         case 'black':
-          setCurrentTemplate(null);
+          setDisplayLayers([]);
+          currentBlockIdRef.current = null;
           setShowVideo(false);
           break;
       }
@@ -400,7 +450,8 @@ function SessionDisplay() {
           } else {
             // No stream URL (e.g. Plex plays on its own device)
             // Hide template — external player handles the video
-            setCurrentTemplate(null);
+            setDisplayLayers([]);
+            currentBlockIdRef.current = null;
             setShowVideo(false);
           }
           break;
@@ -415,6 +466,36 @@ function SessionDisplay() {
         case 'resume':
           videoRef.current?.play();
           break;
+      }
+    },
+    []
+  );
+
+  // Use refs so that onMessage always calls the latest handlers (no stale closures)
+  const handleDisplayActionRef = useRef(handleDisplayAction);
+  handleDisplayActionRef.current = handleDisplayAction;
+  const handleAudioActionRef = useRef(handleAudioAction);
+  handleAudioActionRef.current = handleAudioAction;
+  const handleMediaActionRef = useRef(handleMediaAction);
+  handleMediaActionRef.current = handleMediaAction;
+
+  // Handle WebSocket action messages (uses refs to always call latest handlers)
+  const handleAction = useCallback(
+    (payload: ActionPayload) => {
+      const { action_type, command, parameters, block_id } = payload;
+
+      switch (action_type) {
+        case 'audio':
+          handleAudioActionRef.current(command, parameters);
+          break;
+        case 'display':
+          handleDisplayActionRef.current(command, parameters, block_id);
+          break;
+        case 'media':
+          handleMediaActionRef.current(command, parameters);
+          break;
+        default:
+          console.log('Unknown action type:', action_type, command, parameters);
       }
     },
     []
@@ -445,7 +526,8 @@ function SessionDisplay() {
               // Wait for the next useEffect cycle to set up the video, then seek
               setTimeout(seekOnReady, 500);
             } else {
-              setCurrentTemplate(null);
+              setDisplayLayers([]);
+              currentBlockIdRef.current = null;
               setShowVideo(false);
             }
           } else if (command === 'pause') {
@@ -482,14 +564,13 @@ function SessionDisplay() {
           break;
         case 'display':
           // Display actions are stateless (images/text) — replay normally
-          handleDisplayAction(command, parameters);
+          handleDisplayActionRef.current(command, parameters, payload.block_id);
           break;
         default:
           console.log('Replay: unknown action type:', action_type, command);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [audioEngine, handleDisplayAction]
+    [audioEngine]
   );
 
   // WebSocket connection
@@ -644,6 +725,8 @@ function SessionDisplay() {
       setShowVideo(false);
       setVideoUrl(null);
       setVideoMuted(false);
+      setDisplayLayers([]);
+      currentBlockIdRef.current = null;
       audioEngine.stop(0);
     } else if (status === 'running' && prev === 'paused') {
       if (video && video.paused && showVideo) {
@@ -652,6 +735,20 @@ function SessionDisplay() {
       audioEngine.resume();
     }
   }, [session?.session_status, showVideo, audioEngine]);
+
+  // Auto-remove expired display layers (per-action duration)
+  useEffect(() => {
+    const hasExpiring = displayLayers.some(l => l.expiresAt);
+    if (!hasExpiring) return;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setDisplayLayers(prev => {
+        const filtered = prev.filter(l => !l.expiresAt || l.expiresAt > now);
+        return filtered.length !== prev.length ? filtered : prev;
+      });
+    }, 250);
+    return () => clearInterval(timer);
+  }, [displayLayers]);
 
   // Video ended handler
   const handleVideoEnded = useCallback(() => {
@@ -722,87 +819,75 @@ function SessionDisplay() {
     );
   }
 
-  // Template display mode (or idle waiting)
-  // Use session template if available, otherwise a basic fallback
-  const fallbackTemplate = {
-    name: 'Waiting Screen',
-    template_type: 'movie_info',
-    layout: {
-      components: [
-        ...(session.movie?.poster_url
-          ? [{ type: 'backdrop', opacity: 0.15, blur: 30 }]
-          : []),
-        { type: 'poster', position: 'center', size: 'large' },
-        { type: 'title' },
-      ],
+  // Template data for TemplateRenderer
+  const templateData = {
+    movie: session.movie || undefined,
+    session: {
+      name: session.session_name,
+      status: session.session_status,
+      current_sequence_duration_ms: sequenceDurationMs ?? undefined,
+      current_sequence_started_at: sequenceStartedAt ?? undefined,
     },
-    config: {},
+    palette: session.color_palette || undefined,
   };
 
-  const template = currentTemplate || session.template || fallbackTemplate;
+  // Before session starts or after it ends: simple black screen with status text.
+  // Active display layers only shown when the engine has broadcast actions.
+  const isIdle = session.session_status !== 'running' && displayLayers.length === 0;
 
   return (
     <div
       ref={containerRef}
       className="w-screen h-screen bg-black overflow-hidden relative"
     >
-      {/* Template content */}
-      <TemplateRenderer
-        template={template}
-        data={{
-          movie: session.movie || undefined,
-          session: {
-            name: session.session_name,
-            status: session.session_status,
-            current_sequence_duration_ms: sequenceDurationMs ?? undefined,
-            current_sequence_started_at: sequenceStartedAt ?? undefined,
-          },
-          palette: session.color_palette || undefined,
-        }}
-      />
+      {/* Template layers (only when the engine has sent display actions) */}
+      {displayLayers.map((layer) => (
+        <div key={layer.id} className="absolute inset-0" style={{ zIndex: layer.zIndex }}>
+          <TemplateRenderer
+            template={layer.template}
+            data={templateData}
+          />
+        </div>
+      ))}
 
-      {/* Idle overlay when not running */}
-      {session.session_status !== 'running' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10">
+      {/* Idle screen: simple black + session info */}
+      {isIdle && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-white mb-2">
-              {session.session_name}
-            </h2>
-            {session.movie && (
-              <p className="text-white/60 text-lg mb-8">{session.movie.title}</p>
-            )}
-            <p className="text-white/40 text-sm mb-6 uppercase tracking-widest">
+            <p className="text-white/30 text-sm uppercase tracking-widest mb-2">
               {session.session_status === 'draft'
-                ? 'En attente du lancement...'
+                ? 'En attente du lancement'
                 : session.session_status === 'scheduled'
-                  ? 'Session programmee...'
+                  ? 'Session programmee'
                   : session.session_status === 'paused'
                     ? 'Session en pause'
                     : session.session_status === 'completed'
                       ? 'Session terminee'
-                      : `Status: ${session.session_status}`}
+                      : ''}
             </p>
+            <h2 className="text-2xl font-semibold text-white/50">
+              {session.session_name}
+            </h2>
 
             {/* Fullscreen button */}
             {!isFullscreen && (
               <button
                 onClick={enterFullscreen}
-                className="px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl transition-all duration-300 hover:scale-105"
+                className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl transition-all duration-300 hover:scale-105"
               >
                 Passer en plein ecran
               </button>
             )}
           </div>
+        </div>
+      )}
 
-          {/* Code display */}
-          <div className="absolute bottom-8 flex flex-col items-center">
-            <span className="text-white/20 text-xs uppercase tracking-widest mb-1">
-              Code
-            </span>
-            <span className="text-white/40 font-mono text-lg tracking-[0.3em]">
-              {session.display_code}
-            </span>
-          </div>
+      {/* Paused overlay on top of display layers */}
+      {session.session_status === 'paused' && displayLayers.length > 0 && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+          <p className="text-white/60 text-lg uppercase tracking-widest">
+            Session en pause
+          </p>
         </div>
       )}
 

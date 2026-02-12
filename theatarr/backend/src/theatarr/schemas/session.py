@@ -134,6 +134,7 @@ class ActionInput(BaseSchema):
     delay_ms: int = 0
     on_failure: str = "warn"
     service_id: str | None = None
+    block_index: int | None = None  # Actions with same block_index execute in parallel
 
 
 class SequenceInput(BaseSchema):

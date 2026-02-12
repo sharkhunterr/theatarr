@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Node } from 'reactflow';
@@ -24,6 +24,9 @@ import {
   Info,
   Users,
   Sparkles,
+  Layers,
+  Plus,
+  GripVertical,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { Button, Spinner } from '../components/common';
@@ -173,7 +176,7 @@ function serializeWorkflow(workflow: WorkflowData): Record<string, unknown> {
 function workflowToActions(workflow: WorkflowData): ActionItem[] {
   return workflow.nodes
     .filter((n) => n.data.nodeType === 'action' && n.data.actionType)
-    .map((n) => ({
+    .map((n, i) => ({
       id: n.id,
       action_type: n.data.actionType!,
       command: n.data.command || '',
@@ -182,6 +185,7 @@ function workflowToActions(workflow: WorkflowData): ActionItem[] {
       duration_ms: n.data.duration_ms || 0,
       on_failure: n.data.on_failure || 'warn',
       service_id: n.data.service_id as string | undefined,
+      block_index: n.data.block_index ?? i,
     }));
 }
 
@@ -216,6 +220,7 @@ function actionsToWorkflow(actions: ActionItem[]): WorkflowData {
         duration_ms: action.duration_ms,
         on_failure: action.on_failure,
         service_id: action.service_id,
+        block_index: action.block_index,
       },
     });
     edges.push({
@@ -332,6 +337,12 @@ export function SessionEditor() {
     useGlobalTemplate: language === 'fr' ? 'Utiliser le template global actif' : 'Use global active template',
     selectTemplate: language === 'fr' ? 'Choisir un template' : 'Select template',
     customTemplate: language === 'fr' ? 'Template personnalisé' : 'Custom template',
+    // Blocks
+    block: language === 'fr' ? 'Bloc' : 'Block',
+    parallelActions: language === 'fr' ? 'Actions parallèles' : 'Parallel actions',
+    addToBlock: language === 'fr' ? 'Ajouter au bloc' : 'Add to block',
+    newBlock: language === 'fr' ? 'Nouveau bloc' : 'New block',
+    deleteBlock: language === 'fr' ? 'Supprimer le bloc' : 'Delete block',
   };
 
   const [session, setSession] = useState<Session | null>(
@@ -736,7 +747,13 @@ export function SessionEditor() {
   }, [selectedNode, session]);
 
   // Linear mode handlers
-  const addAction = (type: ActionType) => {
+  const nextBlockIndex = useMemo(() => {
+    if (actions.length === 0) return 0;
+    return Math.max(...actions.map(a => a.block_index)) + 1;
+  }, [actions]);
+
+  const addAction = (type: ActionType, targetBlockIndex?: number) => {
+    const bi = targetBlockIndex ?? nextBlockIndex;
     const newAction: ActionItem = {
       id: generateId(),
       action_type: type,
@@ -745,6 +762,7 @@ export function SessionEditor() {
       delay_ms: 0,
       duration_ms: 0,
       on_failure: 'warn',
+      block_index: bi,
     };
     const newActions = [...actions, newAction];
     setActions(newActions);
@@ -763,18 +781,48 @@ export function SessionEditor() {
     setSelectedActionIndex(null);
   };
 
-  const moveAction = (fromIndex: number, direction: 'up' | 'down') => {
-    const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
-    if (toIndex < 0 || toIndex >= actions.length) return;
-    const newActions = [...actions];
-    const [moved] = newActions.splice(fromIndex, 1);
-    newActions.splice(toIndex, 0, moved);
+  // Group actions into blocks by block_index
+  const actionBlocks = useMemo(() => {
+    const blocks = new Map<number, ActionItem[]>();
+    for (const action of actions) {
+      const bi = action.block_index ?? 0;
+      if (!blocks.has(bi)) blocks.set(bi, []);
+      blocks.get(bi)!.push(action);
+    }
+    return Array.from(blocks.entries()).sort((a, b) => a[0] - b[0]);
+  }, [actions]);
+
+  const moveBlock = (blockIndex: number, direction: 'up' | 'down') => {
+    const blockOrder = actionBlocks.map(([bi]) => bi);
+    const pos = blockOrder.indexOf(blockIndex);
+    const targetPos = direction === 'up' ? pos - 1 : pos + 1;
+    if (targetPos < 0 || targetPos >= blockOrder.length) return;
+    const targetBlockIndex = blockOrder[targetPos];
+    // Swap block_index values between the two blocks
+    const newActions = actions.map(a => {
+      if (a.block_index === blockIndex) return { ...a, block_index: targetBlockIndex };
+      if (a.block_index === targetBlockIndex) return { ...a, block_index: blockIndex };
+      return a;
+    });
     setActions(newActions);
-    setSelectedActionIndex(toIndex);
   };
 
-  // Smart preset: adds a complete sequence of 4 actions
+  const deleteBlock = (blockIndex: number) => {
+    const newActions = actions.filter(a => a.block_index !== blockIndex);
+    setActions(newActions);
+    setSelectedActionIndex(null);
+  };
+
+  const removeActionFromBlock = (actionIndex: number) => {
+    // Move action to its own new block
+    const newActions = [...actions];
+    newActions[actionIndex] = { ...newActions[actionIndex], block_index: nextBlockIndex };
+    setActions(newActions);
+  };
+
+  // Smart preset: adds a complete sequence of 4 blocks
   const addSmartActions = () => {
+    const base = nextBlockIndex;
     const smartActions: ActionItem[] = [
       {
         id: generateId(),
@@ -795,6 +843,7 @@ export function SessionEditor() {
         delay_ms: 0,
         duration_ms: 10000,
         on_failure: 'warn',
+        block_index: base,
       },
       {
         id: generateId(),
@@ -815,6 +864,7 @@ export function SessionEditor() {
         delay_ms: 0,
         duration_ms: 10000,
         on_failure: 'warn',
+        block_index: base + 1,
       },
       {
         id: generateId(),
@@ -843,6 +893,7 @@ export function SessionEditor() {
         delay_ms: 0,
         duration_ms: 10000,
         on_failure: 'warn',
+        block_index: base + 2,
       },
       {
         id: generateId(),
@@ -852,6 +903,7 @@ export function SessionEditor() {
         delay_ms: 0,
         duration_ms: 0,
         on_failure: 'warn',
+        block_index: base + 3,
       },
     ];
     const newActions = [...actions, ...smartActions];
@@ -1401,68 +1453,137 @@ export function SessionEditor() {
                         {t.noActions}
                       </div>
                     ) : (
-                      <div className="p-2 space-y-1">
-                        {actions.map((action, index) => {
-                          const config = actionTypeConfig[action.action_type];
-                          const Icon = config.icon;
-                          const isSelected = selectedActionIndex === index;
-
+                      <div className="p-2 space-y-2">
+                        {actionBlocks.map(([blockIndex, blockActions], blockPos) => {
+                          const isParallel = blockActions.length > 1;
                           return (
-                            <div
-                              key={action.id}
-                              onClick={() => { setSelectedActionIndex(index); setMobilePanel('properties'); }}
-                              className={clsx(
-                                'p-2 rounded-lg border cursor-pointer transition-all',
-                                isSelected
-                                  ? 'border-theatarr-500 bg-theatarr-500/10'
-                                  : 'border-transparent bg-dark-bg hover:bg-dark-bg/80'
-                              )}
-                            >
-                              <div className="flex items-center gap-2">
-                                {/* Move buttons */}
+                            <div key={blockIndex} className="border border-dark-border rounded-lg bg-dark-bg/40">
+                              {/* Block header */}
+                              <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-dark-border/50">
                                 <div className="flex flex-col">
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); moveAction(index, 'up'); }}
+                                    onClick={() => moveBlock(blockIndex, 'up')}
                                     className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-0.5"
-                                    disabled={index === 0}
+                                    disabled={blockPos === 0}
                                   >
-                                    <ChevronUp size={12} />
+                                    <ChevronUp size={10} />
                                   </button>
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); moveAction(index, 'down'); }}
+                                    onClick={() => moveBlock(blockIndex, 'down')}
                                     className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-0.5"
-                                    disabled={index === actions.length - 1}
+                                    disabled={blockPos === actionBlocks.length - 1}
                                   >
-                                    <ChevronDown size={12} />
+                                    <ChevronDown size={10} />
                                   </button>
                                 </div>
-
-                                {/* Icon */}
-                                <div className={`p-1.5 rounded ${config.bgColor}`}>
-                                  <Icon size={14} className={config.color} />
-                                </div>
-
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-medium text-dark-text truncate">
-                                    {action.command}
+                                <GripVertical size={12} className="text-dark-muted/50" />
+                                <span className="text-[10px] font-semibold text-dark-muted uppercase tracking-wider">
+                                  {t.block} {blockPos + 1}
+                                </span>
+                                {isParallel && (
+                                  <span className="flex items-center gap-0.5 text-[10px] text-theatarr-400 bg-theatarr-500/10 px-1.5 py-0.5 rounded">
+                                    <Layers size={9} />
+                                    {blockActions.length}x
+                                  </span>
+                                )}
+                                <div className="flex-1" />
+                                {/* Add action to this block - dropdown */}
+                                <div className="relative group">
+                                  <button
+                                    className="p-0.5 text-dark-muted hover:text-theatarr-400 transition-colors"
+                                    title={t.addToBlock}
+                                  >
+                                    <Plus size={12} />
+                                  </button>
+                                  <div className="hidden group-hover:block absolute right-0 top-full z-10 mt-1 bg-dark-surface border border-dark-border rounded-lg shadow-lg p-1 min-w-[120px]">
+                                    {(Object.keys(actionTypeConfig) as ActionType[]).map((type) => {
+                                      const cfg = actionTypeConfig[type];
+                                      const TypeIcon = cfg.icon;
+                                      return (
+                                        <button
+                                          key={type}
+                                          onClick={() => { addAction(type, blockIndex); setMobilePanel('properties'); }}
+                                          className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-dark-text hover:bg-dark-bg rounded transition-colors"
+                                        >
+                                          <TypeIcon size={11} className={cfg.color} />
+                                          {language === 'fr' ? cfg.label.fr : cfg.label.en}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
-                                  <div className="text-[10px] text-dark-muted truncate">
-                                    {language === 'fr' ? config.label.fr : config.label.en}
-                                  </div>
                                 </div>
-
-                                {/* Delete */}
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); deleteAction(index); }}
-                                  className="p-1 text-dark-muted hover:text-red-400 transition-colors"
+                                  onClick={() => deleteBlock(blockIndex)}
+                                  className="p-0.5 text-dark-muted hover:text-red-400 transition-colors"
+                                  title={t.deleteBlock}
                                 >
-                                  <Trash2 size={12} />
+                                  <Trash2 size={11} />
                                 </button>
+                              </div>
+
+                              {/* Block actions */}
+                              <div className="p-1 space-y-0.5">
+                                {blockActions.map((action) => {
+                                  const globalIndex = actions.indexOf(action);
+                                  const config = actionTypeConfig[action.action_type];
+                                  const Icon = config.icon;
+                                  const isSelected = selectedActionIndex === globalIndex;
+
+                                  return (
+                                    <div
+                                      key={action.id}
+                                      onClick={() => { setSelectedActionIndex(globalIndex); setMobilePanel('properties'); }}
+                                      className={clsx(
+                                        'p-1.5 rounded border cursor-pointer transition-all',
+                                        isSelected
+                                          ? 'border-theatarr-500 bg-theatarr-500/10'
+                                          : 'border-transparent hover:bg-dark-bg/60'
+                                      )}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div className={`p-1 rounded ${config.bgColor}`}>
+                                          <Icon size={12} className={config.color} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-xs font-medium text-dark-text truncate">
+                                            {action.command}
+                                          </div>
+                                          <div className="text-[10px] text-dark-muted truncate">
+                                            {language === 'fr' ? config.label.fr : config.label.en}
+                                          </div>
+                                        </div>
+                                        {isParallel && (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); removeActionFromBlock(globalIndex); }}
+                                            className="p-0.5 text-dark-muted hover:text-amber-400 transition-colors"
+                                            title={language === 'fr' ? 'Extraire du bloc' : 'Extract from block'}
+                                          >
+                                            <Layers size={11} />
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); deleteAction(globalIndex); }}
+                                          className="p-0.5 text-dark-muted hover:text-red-400 transition-colors"
+                                        >
+                                          <Trash2 size={11} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           );
                         })}
+
+                        {/* Add new block button */}
+                        <button
+                          onClick={() => addAction('display')}
+                          className="w-full p-2 border border-dashed border-dark-border rounded-lg text-dark-muted text-xs hover:border-theatarr-500/50 hover:text-theatarr-400 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <Plus size={12} />
+                          {t.newBlock}
+                        </button>
                       </div>
                     )}
                   </div>

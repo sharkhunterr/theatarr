@@ -300,6 +300,7 @@ interface TemplateConfig {
   show_original_title?: boolean;
   show_overview?: boolean;
   cast_scroll?: boolean;
+  transparent_bg?: boolean;
 }
 
 interface TemplateRendererProps {
@@ -857,6 +858,43 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
           </div>
         );
 
+      case 'custom_text': {
+        const textContent = (component as any).text || '';
+        if (!textContent) return null;
+        const textPos = component.position || 'center';
+        const textStyle = (component as any).style || '';
+        const posClasses =
+          textPos === 'top' ? 'absolute top-8 left-0 right-0 text-center' :
+          textPos === 'bottom' ? 'absolute bottom-8 left-0 right-0 text-center' :
+          textPos === 'top-left' ? 'absolute top-8 left-8' :
+          textPos === 'top-right' ? 'absolute top-8 right-8' :
+          textPos === 'bottom-left' ? 'absolute bottom-8 left-8' :
+          textPos === 'bottom-right' ? 'absolute bottom-8 right-8' :
+          'flex items-center justify-center text-center';
+        const sizeClass =
+          textStyle === 'title' ? 'text-5xl font-bold' :
+          textStyle === 'subtitle' ? 'text-2xl font-medium' :
+          textStyle === 'cinema-label' ? 'text-lg uppercase tracking-[0.3em] font-light' :
+          textStyle === 'small' ? 'text-sm' :
+          'text-xl';
+        return (
+          <div
+            key={index}
+            className={`z-20 ${posClasses}`}
+          >
+            <p
+              className={`${sizeClass} whitespace-pre-line`}
+              style={{
+                color: palette?.text || '#ffffff',
+                textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+              }}
+            >
+              {textContent}
+            </p>
+          </div>
+        );
+      }
+
       default:
         return null;
     }
@@ -887,7 +925,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
 
     const baseStyles = {
       ...cssVars as React.CSSProperties,
-      backgroundColor: palette?.background || '#0a0a0f',
+      backgroundColor: config?.transparent_bg ? 'transparent' : (palette?.background || '#0a0a0f'),
       color: palette?.text || '#ffffff',
     };
 

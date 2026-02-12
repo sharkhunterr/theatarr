@@ -89,7 +89,7 @@ class SessionScheduler:
             if not sessions:
                 return
 
-            engine = get_engine(db)
+            engine = get_engine()
 
             for session in sessions:
                 try:
@@ -315,7 +315,7 @@ class SessionScheduler:
                 return
 
             logger.info(f"Found {len(sessions)} interrupted sessions to auto-resume")
-            engine = get_engine(db)
+            engine = get_engine()
 
             for session in sessions:
                 try:

@@ -330,16 +330,17 @@ class WebSocketManager:
             if not _engine:
                 return
 
-            # Replay last display action if session has one
-            display_state = _engine.get_display_state(session_id)
-            if display_state:
-                await self._send(websocket, {
-                    "type": "action_execute",
-                    "payload": {
-                        **display_state,
-                        "is_replay": True,
-                    },
-                })
+            # Replay all actions from current block if session has them
+            display_states = _engine.get_display_state(session_id)
+            if display_states:
+                for state in display_states:
+                    await self._send(websocket, {
+                        "type": "action_execute",
+                        "payload": {
+                            **state,
+                            "is_replay": True,
+                        },
+                    })
 
             # Auto-resume if session was paused and has pause_on_display_disconnect
             session = await _engine._get_session(session_id)
@@ -444,21 +445,25 @@ class WebSocketManager:
         action_type: str,
         command: str,
         parameters: dict,
+        block_id: str | None = None,
     ) -> int:
         """Broadcast an action to the display channel for a session.
 
         Used by the engine when an action has no service_id,
         meaning it should be executed by the connected browser/kiosk.
         """
+        payload: dict = {
+            "action_type": action_type,
+            "command": command,
+            "parameters": parameters,
+        }
+        if block_id is not None:
+            payload["block_id"] = block_id
         return await self.broadcast(
             f"{Channel.DISPLAY.value}:{session_id}",
             {
                 "type": "action_execute",
-                "payload": {
-                    "action_type": action_type,
-                    "command": command,
-                    "parameters": parameters,
-                },
+                "payload": payload,
             },
         )
 

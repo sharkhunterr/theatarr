@@ -1,6 +1,7 @@
 """FastAPI application entry point for Theatarr."""
 
 import json
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -31,6 +32,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     from theatarr.api.logs import setup_log_capture
     setup_log_capture()
+    # Also log to console for dev
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    console.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    logging.getLogger().addHandler(console)
 
     discover_adapters()
     await init_db()
