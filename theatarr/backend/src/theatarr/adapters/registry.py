@@ -147,6 +147,16 @@ def discover_adapters() -> None:
     except ImportError:
         pass
 
+    try:
+        from theatarr.adapters.lighting import wled  # noqa: F401
+    except ImportError:
+        pass
+
+    try:
+        from theatarr.adapters.lighting import zigbee2mqtt  # noqa: F401
+    except ImportError:
+        pass
+
     # Media source adapters
     try:
         from theatarr.adapters.media import plex  # noqa: F401

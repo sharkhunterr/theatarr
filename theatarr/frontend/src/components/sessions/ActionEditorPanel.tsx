@@ -272,6 +272,9 @@ function LightingForm({
     refresh: language === 'fr' ? 'Actualiser' : 'Refresh',
     moviePalette: language === 'fr' ? 'Palette du film' : 'Movie Palette',
     noPalette: language === 'fr' ? 'Sélectionnez un film pour voir sa palette' : 'Select a movie to see its palette',
+    effect: language === 'fr' ? 'Effet' : 'Effect',
+    effectSpeed: language === 'fr' ? 'Vitesse' : 'Speed',
+    effectIntensity: language === 'fr' ? 'Intensité' : 'Intensity',
   };
 
   const commands = [
@@ -281,6 +284,7 @@ function LightingForm({
     { value: 'set_color', label: language === 'fr' ? 'Définir couleur' : 'Set Color' },
     { value: 'set_brightness', label: language === 'fr' ? 'Définir luminosité' : 'Set Brightness' },
     { value: 'set_scene', label: language === 'fr' ? 'Activer scène' : 'Activate Scene' },
+    { value: 'set_effect', label: language === 'fr' ? 'Effet LED' : 'LED Effect' },
   ];
 
   const lights = resources?.items || [];
@@ -467,6 +471,63 @@ function LightingForm({
               placeholder="scene_name"
             />
           )}
+        </div>
+      )}
+
+      {/* Effect (WLED effects come as scenes via get_scenes) */}
+      {command === 'set_effect' && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t.effect}</label>
+            {service_id && scenes.length > 0 ? (
+              <select
+                value={(parameters.effect as string) || ''}
+                onChange={(e) => handleParametersChange({ effect: e.target.value })}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+              >
+                <option value="">--</option>
+                {scenes.map((scene) => (
+                  <option key={scene.id} value={scene.id}>{scene.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={(parameters.effect as string) || ''}
+                onChange={(e) => handleParametersChange({ effect: e.target.value })}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+                placeholder={language === 'fr' ? 'Nom ou ID de l\'effet' : 'Effect name or ID'}
+              />
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-1">
+              {t.effectSpeed} ({(parameters.speed as number) ?? 128})
+            </label>
+            <input
+              type="range"
+              value={(parameters.speed as number) ?? 128}
+              onChange={(e) => handleParametersChange({ speed: parseInt(e.target.value) })}
+              className="w-full accent-theatarr-500"
+              min="0"
+              max="255"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-1">
+              {t.effectIntensity} ({(parameters.intensity as number) ?? 128})
+            </label>
+            <input
+              type="range"
+              value={(parameters.intensity as number) ?? 128}
+              onChange={(e) => handleParametersChange({ intensity: parseInt(e.target.value) })}
+              className="w-full accent-theatarr-500"
+              min="0"
+              max="255"
+            />
+          </div>
         </div>
       )}
     </div>
