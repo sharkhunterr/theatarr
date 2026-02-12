@@ -87,6 +87,8 @@ const LAYOUT_STYLES = [
   { value: 'waiting-annonce', label: 'Annonces', group: 'Waiting (generique)' },
   { value: 'waiting-trailers', label: 'Bandes-Annonces', group: 'Waiting (generique)' },
   { value: 'waiting-trailers-retro', label: 'Bandes-Annonces Retro', group: 'Waiting (generique)' },
+  // Waiting Screen - Session info
+  { value: 'waiting-session-info', label: 'Infos Seance', group: 'Waiting (film)' },
   // Waiting Screen - Film
   { value: 'waiting-ambient', label: 'Ambiance', group: 'Waiting (film)' },
   { value: 'waiting-poster-centered', label: 'Affiche Centree', group: 'Waiting (film)' },

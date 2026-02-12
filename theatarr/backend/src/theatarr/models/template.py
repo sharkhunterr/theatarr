@@ -1021,6 +1021,29 @@ BUILTIN_TEMPLATES = {
             "rotate_interval": 20,
         },
     },
+    "waiting_session_info": {
+        "name": "Infos Seance",
+        "description": "Vue complete de la seance : film, programme des actions, participants, duree totale et heure de fin estimee",
+        "template_type": TemplateType.WAITING_SCREEN,
+        "is_builtin": True,
+        "layout": {
+            "style": "waiting-session-info",
+            "components": [
+                {"type": "backdrop", "opacity": 0.2, "blur": 40},
+                {"type": "poster", "position": "left", "size": "large"},
+                {"type": "title", "size": "xlarge"},
+                {"type": "tagline", "style": "italic"},
+                {"type": "genres", "style": "pills"},
+                {"type": "metadata", "fields": ["year", "runtime", "rating"]},
+                {"type": "session_info", "position": "bottom", "fields": ["name"]},
+            ]
+        },
+        "config": {
+            "theme": "dark",
+            "use_palette_colors": True,
+            "use_logo_image": True,
+        },
+    },
     # ============================================================
     # TRAILER ANNOUNCEMENT TEMPLATES (generiques, sans contenu film)
     # ============================================================

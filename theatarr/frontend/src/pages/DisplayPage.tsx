@@ -295,6 +295,8 @@ function SessionDisplay() {
   const [quizState, setQuizState] = useState<QuizDisplayInfo | null>(null);
   const quizTimerRef = useRef<NodeJS.Timeout | null>(null);
   const quizSubscribedRef = useRef<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [sessionOverview, setSessionOverview] = useState<any>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -383,6 +385,10 @@ function SessionDisplay() {
               layout: params.layout,
               config: params.config,
             };
+            // Capture session overview for session-info template
+            if (params.session_overview) {
+              setSessionOverview(params.session_overview);
+            }
           } else if (contentType === 'waiting_screen') {
             // Fallback: use session template or a simple default
             template = session?.template || {
@@ -1151,6 +1157,7 @@ function SessionDisplay() {
     },
     palette: session.color_palette || undefined,
     quiz_info: quizState || undefined,
+    session_overview: sessionOverview || undefined,
   };
 
   // Before session starts or after it ends: simple black screen with status text.

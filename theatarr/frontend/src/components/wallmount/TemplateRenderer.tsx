@@ -431,12 +431,32 @@ interface TemplateRendererProps {
       join_url?: string;
       join_code?: string;
     };
+    session_overview?: {
+      participants_accepted: number;
+      participants_total: number;
+      sequences: Array<{
+        name: string;
+        order_index: number;
+        duration_ms: number;
+        duration_type: string;
+        actions: Array<{
+          action_type: string;
+          command: string;
+          label: string;
+          icon: string;
+          details: Record<string, unknown>;
+        }>;
+      }>;
+      total_duration_ms: number;
+      estimated_end_time: string;
+      current_sequence_index: number;
+    };
   };
 }
 
 export function TemplateRenderer({ template, data }: TemplateRendererProps) {
   const { layout, config } = template;
-  const { movie, session, countdown_to, palette, vote_info, mystery_info, quiz_info } = data;
+  const { movie, session, countdown_to, palette, vote_info, mystery_info, quiz_info, session_overview } = data;
 
   // Apply CSS variables from palette
   const cssVars = useMemo(() => {
@@ -5161,6 +5181,234 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
       const bg = palette?.background || '#0a0a0f';
       const accent = palette?.accent || palette?.vibrant || '#6366f1';
       const txt = palette?.text || '#ffffff';
+
+      // --- WAITING-SESSION-INFO: full session overview with movie info + programme ---
+      if (layoutStyle === 'waiting-session-info') {
+        const overview = session_overview;
+        const iconMap: Record<string, string> = {
+          film: '\uD83C\uDFAC', coffee: '\u2615', quiz: '\uD83C\uDFAF', audio: '\uD83D\uDD0A',
+          lighting: '\uD83D\uDCA1', monitor: '\uD83D\uDCFA', text: '\uD83D\uDCDD', image: '\uD83D\uDDBC\uFE0F',
+          default: '\u25B6',
+        };
+        const fmtDur = (ms: number) => {
+          const totalMin = Math.round(ms / 60000);
+          if (totalMin >= 60) {
+            const h = Math.floor(totalMin / 60);
+            const m = totalMin % 60;
+            return m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
+          }
+          return `${totalMin} min`;
+        };
+        const fmtTime = (iso: string) => {
+          try {
+            const d = new Date(iso);
+            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+          } catch { return ''; }
+        };
+        // Primary label per sequence = first action label (most meaningful)
+        const seqLabel = (seq: NonNullable<typeof overview>['sequences'][number]) => {
+          if (seq.actions.length > 0) return seq.actions[0].label;
+          return seq.name;
+        };
+        const seqIcon = (seq: NonNullable<typeof overview>['sequences'][number]) => {
+          if (seq.actions.length > 0) return iconMap[seq.actions[0].icon] || iconMap.default;
+          return iconMap.default;
+        };
+        const currentIdx = overview?.current_sequence_index ?? 0;
+
+        return (
+          <div className="relative w-full h-full overflow-hidden" style={baseStyles}>
+            <style>{`
+              @keyframes wsi-fade-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+              @keyframes wsi-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+              @keyframes wsi-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+              .wsi-anim { animation: wsi-fade-in 0.8s ease-out both; }
+              .wsi-current { animation: wsi-pulse 2s ease-in-out infinite; }
+            `}</style>
+
+            {/* Blurred backdrop */}
+            {effectiveBackdrop && (
+              <div className="absolute inset-0">
+                <div className="absolute inset-0 bg-cover bg-center" style={{
+                  backgroundImage: `url(${effectiveBackdrop})`,
+                  filter: 'blur(40px) brightness(0.18) saturate(1.2)',
+                  transform: 'scale(1.1)',
+                }} />
+              </div>
+            )}
+            {/* Dark overlay with subtle gradient */}
+            <div className="absolute inset-0" style={{
+              background: `linear-gradient(160deg, ${bg}e6 0%, ${bg}cc 40%, ${accent}10 100%)`,
+            }} />
+
+            {/* Content */}
+            <div className="relative z-10 w-full h-full flex flex-col p-10 overflow-hidden">
+
+              {/* ---- TOP: Movie info row ---- */}
+              {movie && (
+                <div className="wsi-anim flex gap-8 mb-8" style={{ animationDelay: '0.1s' }}>
+                  {/* Poster */}
+                  {effectivePoster && (
+                    <div className="flex-shrink-0">
+                      <img
+                        src={effectivePoster}
+                        alt={movie.title}
+                        className="h-[38vh] rounded-xl object-cover"
+                        style={{ boxShadow: `0 20px 60px -15px ${accent}50, 0 8px 30px -8px rgba(0,0,0,0.7)` }}
+                      />
+                    </div>
+                  )}
+                  {/* Movie details */}
+                  <div className="flex flex-col justify-center min-w-0 flex-1">
+                    {/* Logo or title */}
+                    {config?.use_logo_image && effectiveLogo ? (
+                      <img src={effectiveLogo} alt="" className="max-w-[360px] max-h-[80px] object-contain mb-3 drop-shadow-2xl wsi-anim" style={{ animationDelay: '0.2s' }} />
+                    ) : (
+                      <h1 className="wsi-anim text-4xl font-bold tracking-tight mb-2" style={{ animationDelay: '0.2s', color: txt, textShadow: '0 2px 16px rgba(0,0,0,0.5)' }}>
+                        {movie.title}
+                        {movie.year && <span className="ml-3 text-xl font-light opacity-50">({movie.year})</span>}
+                      </h1>
+                    )}
+                    {/* Rating + Runtime + Genres row */}
+                    <div className="wsi-anim flex flex-wrap items-center gap-3 mb-3" style={{ animationDelay: '0.3s' }}>
+                      {movie.rating && (
+                        <span className="flex items-center gap-1 text-sm">
+                          <span style={{ color: accent }}>&#9733;</span>
+                          <span style={{ color: `${txt}cc` }}>{movie.rating.toFixed(1)}</span>
+                        </span>
+                      )}
+                      {movie.runtime_minutes && (
+                        <span className="text-sm opacity-60" style={{ color: txt }}>
+                          {Math.floor(movie.runtime_minutes / 60)}h{String(movie.runtime_minutes % 60).padStart(2, '0')}
+                        </span>
+                      )}
+                      {movie.genres?.slice(0, 4).map((g, i) => (
+                        <span key={i} className="px-2.5 py-0.5 rounded-full text-xs border" style={{
+                          borderColor: `${accent}30`, color: `${txt}bb`, backgroundColor: `${accent}0d`,
+                        }}>{g}</span>
+                      ))}
+                    </div>
+                    {/* Tagline */}
+                    {movie.tagline && (
+                      <p className="wsi-anim text-base italic opacity-50 mb-3" style={{ animationDelay: '0.4s', color: txt }}>
+                        &laquo; {movie.tagline} &raquo;
+                      </p>
+                    )}
+                    {/* Director */}
+                    {movie.directors && movie.directors.length > 0 && (
+                      <p className="wsi-anim text-sm opacity-50 mb-2" style={{ animationDelay: '0.45s', color: txt }}>
+                        {movie.directors.length === 1 ? 'Realise par' : 'Realise par'} {movie.directors.join(', ')}
+                      </p>
+                    )}
+                    {/* Cast */}
+                    {movie.cast && movie.cast.length > 0 && (
+                      <p className="wsi-anim text-sm opacity-40 mb-3" style={{ animationDelay: '0.5s', color: txt }}>
+                        Avec {movie.cast.slice(0, 4).join(', ')}
+                      </p>
+                    )}
+                    {/* Participants badge */}
+                    {overview && overview.participants_total > 0 && (
+                      <div className="wsi-anim flex items-center gap-2 mt-1" style={{ animationDelay: '0.55s' }}>
+                        <span className="text-lg">&#128101;</span>
+                        <span className="text-sm font-medium" style={{ color: `${txt}cc` }}>
+                          {overview.participants_accepted}/{overview.participants_total} participants
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ---- PROGRAMME ---- */}
+              {overview && overview.sequences.length > 0 && (
+                <div className="wsi-anim flex-1 flex flex-col min-h-0" style={{ animationDelay: '0.6s' }}>
+                  {/* Section title */}
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="h-px flex-1" style={{ backgroundColor: `${accent}25` }} />
+                    <span className="text-xs uppercase tracking-[0.25em] font-semibold" style={{ color: `${accent}90` }}>
+                      Programme de la seance
+                    </span>
+                    <div className="h-px flex-1" style={{ backgroundColor: `${accent}25` }} />
+                  </div>
+
+                  {/* Sequence list */}
+                  <div className="flex flex-col gap-1.5 overflow-y-auto flex-1" style={{ scrollbarWidth: 'none' }}>
+                    {overview.sequences.map((seq, idx) => {
+                      const isPast = idx < currentIdx;
+                      const isCurrent = idx === currentIdx;
+                      const label = seqLabel(seq);
+                      const icon = seqIcon(seq);
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${isCurrent ? 'wsi-current' : ''}`}
+                          style={{
+                            opacity: isPast ? 0.35 : isCurrent ? 1 : 0.75,
+                            backgroundColor: isCurrent ? `${accent}15` : 'transparent',
+                            borderLeft: isCurrent ? `3px solid ${accent}` : '3px solid transparent',
+                          }}
+                        >
+                          {/* Icon */}
+                          <span className="text-lg w-7 text-center flex-shrink-0">{icon}</span>
+                          {/* Current indicator */}
+                          {isCurrent && (
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 8px ${accent}` }} />
+                          )}
+                          {/* Label */}
+                          <span className="flex-1 text-sm font-medium truncate" style={{ color: isCurrent ? txt : `${txt}cc` }}>
+                            {label}
+                          </span>
+                          {/* Duration */}
+                          {seq.duration_ms > 0 && (
+                            <span className="text-xs font-mono opacity-50 flex-shrink-0" style={{ color: txt }}>
+                              {fmtDur(seq.duration_ms)}
+                            </span>
+                          )}
+                          {seq.duration_type === 'manual' && (
+                            <span className="text-xs opacity-40 flex-shrink-0" style={{ color: txt }}>manuel</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ---- BOTTOM: Total duration + End time + Countdown ---- */}
+              <div className="wsi-anim mt-4 pt-4" style={{ animationDelay: '0.8s', borderTop: `1px solid ${accent}20` }}>
+                <div className="flex items-center justify-between mb-3">
+                  {overview && overview.total_duration_ms > 0 && (
+                    <span className="text-sm opacity-50" style={{ color: txt }}>
+                      Duree totale : <span className="font-semibold opacity-80">{fmtDur(overview.total_duration_ms)}</span>
+                    </span>
+                  )}
+                  {overview?.estimated_end_time && (
+                    <span className="text-sm opacity-50" style={{ color: txt }}>
+                      Fin estimee : <span className="font-semibold opacity-80">{fmtTime(overview.estimated_end_time)}</span>
+                    </span>
+                  )}
+                </div>
+                {/* Sequence countdown */}
+                {sequenceRemaining !== null && sequenceRemaining > 0 && (
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="h-px flex-1" style={{ backgroundColor: `${accent}20` }} />
+                    <span className="text-2xl font-mono font-bold tracking-wider" style={{ color: accent, textShadow: `0 0 20px ${accent}40` }}>
+                      {formatSeqCountdown(sequenceRemaining)}
+                    </span>
+                    <div className="h-px flex-1" style={{ backgroundColor: `${accent}20` }} />
+                  </div>
+                )}
+                {/* Session name */}
+                {session?.name && (
+                  <div className="text-center mt-3">
+                    <span className="text-xs uppercase tracking-[0.2em] opacity-30" style={{ color: txt }}>{session.name}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
 
       // --- WAITING-CINEMA: generic cinema ambiance, no movie data ---
       if (layoutStyle === 'waiting-cinema') {

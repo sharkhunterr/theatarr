@@ -34,6 +34,72 @@ def _enum_val(v: Any) -> str:
     return v.value if hasattr(v, 'value') else v
 
 
+def _format_ms(ms: int) -> str:
+    """Format milliseconds as HH:MM:SS or M:SS."""
+    total_s = ms // 1000
+    h, rem = divmod(total_s, 3600)
+    m, s = divmod(rem, 60)
+    if h > 0:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
+async def _describe_action(action: "Action", db: "AsyncSession | None" = None) -> tuple[str, str, dict]:
+    """Return (label, icon_hint, details) for a session action."""
+    params = action.parameters or {}
+    at = _enum_val(action.action_type)
+    cmd = action.command
+
+    if at == "media" and cmd == "play":
+        pause_at = params.get("pause_at_ms")
+        details: dict[str, Any] = {}
+        if pause_at:
+            details["pause_at_ms"] = pause_at
+            return f"Lecture du film (entracte a {_format_ms(int(pause_at))})", "film", details
+        return "Lecture du film", "film", details
+
+    if at == "media" and cmd == "resume":
+        return "Reprise du film", "film", {}
+
+    if at == "display" and params.get("content_type") == "waiting_screen":
+        style = (params.get("layout") or {}).get("style", "")
+        if "intermission" in style:
+            return "Entracte", "coffee", {}
+        if style == "waiting-session-info":
+            return "Accueil", "monitor", {}
+        return "Ecran d'attente", "monitor", {}
+
+    if at == "display" and params.get("content_type") == "quiz":
+        quiz_id = params.get("quiz_session_id")
+        total_q = 0
+        if quiz_id and db:
+            try:
+                from theatarr.models.quiz import QuizSession
+                q_result = await db.execute(
+                    select(QuizSession.questions).where(QuizSession.id == quiz_id)
+                )
+                questions = q_result.scalar_one_or_none()
+                total_q = len(questions) if questions else 0
+            except Exception:
+                pass
+        label = f"Quiz ({total_q} questions)" if total_q else "Quiz"
+        return label, "quiz", {"quiz_session_id": quiz_id, "total_questions": total_q}
+
+    if at == "display" and params.get("content_type") == "text":
+        return "Affichage texte", "text", {}
+
+    if at == "display" and params.get("content_type") == "image":
+        return "Affichage image", "image", {}
+
+    if at == "audio":
+        return "Audio", "audio", {}
+
+    if at == "lighting":
+        return "Eclairage", "lighting", {}
+
+    return f"{at}:{cmd}", "default", {}
+
+
 class EngineError(Exception):
     """Base exception for engine errors."""
     pass
@@ -484,6 +550,20 @@ class SequenceEngine:
                 if quiz_state:
                     ws_params["quiz_display_state"] = quiz_state
 
+            # Inject session overview for session-info waiting screens
+            if (
+                action_type_val == "display"
+                and action.command == "show"
+                and ws_params.get("content_type") == "waiting_screen"
+            ):
+                layout = ws_params.get("layout") or {}
+                if isinstance(layout, dict) and layout.get("style") == "waiting-session-info":
+                    try:
+                        overview = await self._build_session_overview(session_id)
+                        ws_params["session_overview"] = overview
+                    except Exception as e:
+                        logger.warning("Failed to build session overview: %s", e)
+
             if (
                 action_type_val == "media"
                 and action.command == "play"
@@ -768,6 +848,73 @@ class SequenceEngine:
                 "Transition overhead (%.2fms) exceeded target (%dms) for session %s",
                 overhead_ms, TRANSITION_OVERHEAD_TARGET_MS, session.id,
             )
+
+    async def _build_session_overview(self, session_id: str) -> dict[str, Any]:
+        """Build a session overview for the session-info waiting screen."""
+        from datetime import timedelta
+
+        from theatarr.models.session_participant import SessionParticipant, InvitationStatus
+        from sqlalchemy import func
+
+        db = self._session_db(session_id)
+        session = await self._get_session(session_id)
+
+        # Participant counts
+        part_result = await db.execute(
+            select(
+                func.count().label("total"),
+                func.count().filter(
+                    SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value
+                ).label("accepted"),
+            ).where(SessionParticipant.session_id == session_id)
+        )
+        part_row = part_result.first()
+        participants_total = part_row.total if part_row else 0
+        participants_accepted = int(part_row.accepted or 0) if part_row else 0
+
+        # Build sequences summary
+        sequences_summary = []
+        total_duration_ms = 0
+        for seq in sorted(session.sequences, key=lambda s: s.order_index):
+            eff_dur = seq.effective_duration_ms
+            total_duration_ms += eff_dur
+
+            actions_summary = []
+            for act in (seq.actions or []):
+                label, icon, details = await _describe_action(act, db)
+                actions_summary.append({
+                    "action_type": _enum_val(act.action_type),
+                    "command": act.command,
+                    "label": label,
+                    "icon": icon,
+                    "details": details,
+                })
+
+            sequences_summary.append({
+                "name": seq.name,
+                "order_index": seq.order_index,
+                "duration_ms": eff_dur,
+                "duration_type": _enum_val(seq.duration_type),
+                "actions": actions_summary,
+            })
+
+        # Estimated end time
+        now = datetime.now(timezone.utc)
+        elapsed_ms = session.current_sequence_elapsed_ms or 0
+        elapsed_sequences_ms = sum(
+            s["duration_ms"] for s in sequences_summary[:session.current_sequence_index]
+        )
+        remaining_ms = total_duration_ms - elapsed_sequences_ms - elapsed_ms
+        estimated_end = (now + timedelta(milliseconds=max(0, remaining_ms))).isoformat()
+
+        return {
+            "participants_accepted": participants_accepted,
+            "participants_total": participants_total,
+            "sequences": sequences_summary,
+            "total_duration_ms": total_duration_ms,
+            "estimated_end_time": estimated_end,
+            "current_sequence_index": session.current_sequence_index,
+        }
 
     async def get_session_state(self, session_id: str) -> dict[str, Any]:
         """Get current state of a session."""
