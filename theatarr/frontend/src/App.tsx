@@ -13,6 +13,8 @@ import { WallmountPage } from './pages/WallmountPage';
 import { TemplateManager } from './pages/TemplateManager';
 import { VotePage } from './pages/VotePage';
 import { VoteSessionManager } from './pages/VoteSessionManager';
+import { QuizSessionManager } from './pages/QuizSessionManager';
+import { QuizPage } from './pages/QuizPage';
 import { DisplayCodeInput, SessionDisplay } from './pages/DisplayPage';
 import { TrailersManager } from './pages/TrailersManager';
 import { ConfigPage } from './pages/ConfigPage';
@@ -25,7 +27,9 @@ import {
   PortalHome,
   MySessions,
   MyVotes,
+  MyQuiz,
   VoteDetail,
+  QuizDetail,
   SessionDetail,
   History,
   Profile,
@@ -136,6 +140,7 @@ function AppRoutes() {
       <Route path="/wallmount" element={<WallmountPage />} />
       <Route path="/wallmount/:sessionId" element={<WallmountPage />} />
       <Route path="/vote/:token" element={<VotePage />} />
+      <Route path="/quiz/:token" element={<QuizPage />} />
       <Route path="/display" element={<DisplayCodeInput />} />
       <Route path="/display/:code" element={<SessionDisplay />} />
       <Route path="/login" element={<Login />} />
@@ -214,6 +219,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/quiz"
+        element={
+          <RequireAuth>
+            <QuizSessionManager />
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/settings"
         element={
           <RequireAuth>
@@ -284,6 +297,22 @@ function AppRoutes() {
         element={
           <RequireUser>
             <VoteDetail />
+          </RequireUser>
+        }
+      />
+      <Route
+        path="/portal/quiz"
+        element={
+          <RequireUser>
+            <MyQuiz />
+          </RequireUser>
+        }
+      />
+      <Route
+        path="/portal/quiz/:id"
+        element={
+          <RequireUser>
+            <QuizDetail />
           </RequireUser>
         }
       />

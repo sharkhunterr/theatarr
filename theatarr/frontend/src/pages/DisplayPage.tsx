@@ -266,6 +266,33 @@ function SessionDisplay() {
   const [sequenceDurationMs, setSequenceDurationMs] = useState<number | null>(null);
   const [sequenceStartedAt, setSequenceStartedAt] = useState<number | null>(null);
 
+  // Quiz display state
+  interface QuizDisplayInfo {
+    quiz_session_id: string;
+    name: string;
+    status: string;
+    phase: string;
+    current_question_index: number;
+    total_questions: number;
+    current_question?: {
+      text: string;
+      choices: string[];
+      time_limit_seconds?: number;
+      hint?: string;
+      allow_multiple?: boolean;
+    };
+    correct_indices?: number[];
+    time_remaining_seconds?: number;
+    participants: Array<{ name: string; score: number; has_answered_current: boolean }>;
+    scoreboard: Array<{ name: string; score: number; avg_response_time_ms: number }>;
+    answer_distribution?: Record<number, number>;
+    join_url?: string;
+    join_code?: string;
+  }
+  const [quizState, setQuizState] = useState<QuizDisplayInfo | null>(null);
+  const quizTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const quizSubscribedRef = useRef<string | null>(null);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -355,6 +382,54 @@ function SessionDisplay() {
             };
           } else if (contentType === 'waiting_screen') {
             template = session?.template || null;
+          } else if (contentType === 'quiz') {
+            // Quiz display action — show quiz template and subscribe to quiz WS
+            const quizSessionId = params.quiz_session_id as string;
+            template = {
+              name: (params.template_name as string) || 'Quiz',
+              template_type: 'quiz',
+              layout: params.layout || { style: 'quiz-classic', components: [] },
+              config: params.config || {},
+            };
+            if (quizSessionId) {
+              // Use full quiz state from engine broadcast if available
+              const qds = params.quiz_display_state as Record<string, unknown> | undefined;
+              if (qds) {
+                setQuizState({
+                  quiz_session_id: (qds.quiz_session_id as string) || quizSessionId,
+                  name: (qds.name as string) || 'Quiz',
+                  status: (qds.status as string) || 'active',
+                  phase: (qds.phase as string) || 'waiting',
+                  current_question_index: (qds.current_question_index as number) ?? -1,
+                  total_questions: (qds.total_questions as number) || 0,
+                  current_question: qds.current_question as QuizDisplayInfo['current_question'],
+                  time_remaining_seconds: qds.time_remaining_seconds as number | undefined,
+                  participants: (qds.participants as QuizDisplayInfo['participants']) || [],
+                  scoreboard: (qds.scoreboard as QuizDisplayInfo['scoreboard']) || [],
+                  answer_distribution: qds.answer_distribution as Record<number, number> | undefined,
+                  join_url: qds.join_url as string | undefined,
+                  join_code: qds.join_code as string | undefined,
+                });
+              } else {
+                // Fallback: initialize with partial data from action parameters
+                setQuizState({
+                  quiz_session_id: quizSessionId,
+                  name: (params.quiz_name as string) || 'Quiz',
+                  status: 'open',
+                  phase: 'waiting',
+                  current_question_index: -1,
+                  total_questions: (params.total_questions as number) || 0,
+                  participants: [],
+                  scoreboard: [],
+                  join_url: params.join_url as string | undefined,
+                });
+              }
+              // Subscribe to quiz WS channel
+              if (quizSubscribedRef.current !== quizSessionId) {
+                send({ type: 'subscribe_quiz', payload: { quiz_session_id: quizSessionId } });
+                quizSubscribedRef.current = quizSessionId;
+              }
+            }
           } else if (contentType === 'text' && params.content) {
             // Convert position_h + position_v into combined position for TemplateRenderer
             const posH = (params.position_h as string) || 'center';
@@ -654,16 +729,103 @@ function SessionDisplay() {
           );
         }
       }
+
+      // Quiz WS events
+      else if (message.type === 'quiz_started' && message.payload) {
+        const p = message.payload as Record<string, unknown>;
+        setQuizState(prev => prev ? {
+          ...prev,
+          status: 'active',
+          phase: 'question',
+          total_questions: (p.total_questions as number) || prev.total_questions,
+        } : prev);
+      }
+      else if (message.type === 'quiz_question' && message.payload) {
+        const p = message.payload as Record<string, unknown>;
+        const q = p.question as Record<string, unknown> | undefined;
+        setQuizState(prev => prev ? {
+          ...prev,
+          phase: 'question',
+          current_question_index: (p.question_index as number) ?? prev.current_question_index,
+          current_question: q ? {
+            text: (q.text as string) || '',
+            choices: (q.choices as string[]) || [],
+            time_limit_seconds: q.time_limit_seconds as number | undefined,
+            hint: q.hint as string | undefined,
+            allow_multiple: q.allow_multiple as boolean | undefined,
+          } : undefined,
+          correct_indices: undefined,
+          answer_distribution: undefined,
+          time_remaining_seconds: q?.time_limit_seconds as number | undefined,
+          total_questions: (p.total_questions as number) || prev.total_questions,
+          participants: prev.participants.map(pp => ({ ...pp, has_answered_current: false })),
+        } : prev);
+      }
+      else if (message.type === 'quiz_answer_submitted' && message.payload) {
+        const p = message.payload as Record<string, unknown>;
+        const stats = p.stats as Record<string, unknown> | undefined;
+        setQuizState(prev => {
+          if (!prev) return prev;
+          // Update answer distribution if provided
+          const newDist = stats?.answer_distribution as Record<number, number> | undefined;
+          return {
+            ...prev,
+            answer_distribution: newDist || prev.answer_distribution,
+          };
+        });
+      }
+      else if (message.type === 'quiz_question_results' && message.payload) {
+        const p = message.payload as Record<string, unknown>;
+        setQuizState(prev => prev ? {
+          ...prev,
+          phase: 'feedback',
+          correct_indices: (p.correct_indices as number[]) || undefined,
+        } : prev);
+      }
+      else if (message.type === 'quiz_ended' && message.payload) {
+        const p = message.payload as Record<string, unknown>;
+        // Map scoreboard entries: backend sends participant_name, frontend expects name
+        const rawScoreboard = p.scoreboard as Array<Record<string, unknown>> | undefined;
+        const mappedScoreboard = rawScoreboard?.map(entry => ({
+          name: (entry.name as string) || (entry.participant_name as string) || 'Anonymous',
+          score: (entry.score as number) || 0,
+          avg_response_time_ms: (entry.avg_response_time_ms as number) || 0,
+        }));
+        setQuizState(prev => prev ? {
+          ...prev,
+          status: 'completed',
+          phase: 'podium',
+          scoreboard: mappedScoreboard || prev.scoreboard,
+        } : prev);
+      }
+      else if (message.type === 'quiz_participant_joined' && message.payload) {
+        const p = message.payload as Record<string, unknown>;
+        setQuizState(prev => {
+          if (!prev) return prev;
+          const name = (p.participant_name as string) || 'Anonyme';
+          return {
+            ...prev,
+            participants: [...prev.participants, { name, score: 0, has_answered_current: false }],
+          };
+        });
+      }
     },
   });
 
-  // Re-subscribe on reconnect
+  // Re-subscribe on reconnect (display + quiz channels)
   useEffect(() => {
     if (isConnected && session?.session_id) {
       send({
         type: 'subscribe_display',
         payload: { session_id: session.session_id },
       });
+      // Re-subscribe quiz channel if active
+      if (quizSubscribedRef.current) {
+        send({
+          type: 'subscribe_quiz',
+          payload: { quiz_session_id: quizSubscribedRef.current },
+        });
+      }
     }
   }, [isConnected, session?.session_id, send]);
 
@@ -797,6 +959,50 @@ function SessionDisplay() {
     return () => clearInterval(timer);
   }, [displayLayers]);
 
+  // Quiz timer countdown — decrement time_remaining_seconds every second during "question" phase
+  useEffect(() => {
+    if (quizTimerRef.current) {
+      clearInterval(quizTimerRef.current);
+      quizTimerRef.current = null;
+    }
+
+    if (quizState?.phase === 'question' && quizState.time_remaining_seconds && quizState.time_remaining_seconds > 0) {
+      quizTimerRef.current = setInterval(() => {
+        setQuizState(prev => {
+          if (!prev || prev.phase !== 'question' || !prev.time_remaining_seconds) return prev;
+          const next = Math.max(0, prev.time_remaining_seconds - 1);
+          if (next <= 0) {
+            // Timer expired — clear interval
+            if (quizTimerRef.current) {
+              clearInterval(quizTimerRef.current);
+              quizTimerRef.current = null;
+            }
+          }
+          return { ...prev, time_remaining_seconds: next };
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (quizTimerRef.current) {
+        clearInterval(quizTimerRef.current);
+        quizTimerRef.current = null;
+      }
+    };
+  }, [quizState?.phase, quizState?.current_question_index]);
+
+  // Clean up quiz state when session ends
+  useEffect(() => {
+    if (session?.session_status === 'completed' || session?.session_status === 'interrupted') {
+      setQuizState(null);
+      quizSubscribedRef.current = null;
+      if (quizTimerRef.current) {
+        clearInterval(quizTimerRef.current);
+        quizTimerRef.current = null;
+      }
+    }
+  }, [session?.session_status]);
+
   // Video ended handler
   const handleVideoEnded = useCallback(() => {
     if (hlsRef.current) {
@@ -876,6 +1082,7 @@ function SessionDisplay() {
       current_sequence_started_at: sequenceStartedAt ?? undefined,
     },
     palette: session.color_palette || undefined,
+    quiz_info: quizState || undefined,
   };
 
   // Before session starts or after it ends: simple black screen with status text.

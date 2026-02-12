@@ -17,6 +17,7 @@ class TemplateType(str, Enum):
     MOVIE_INFO = "movie_info"
     SESSION_STATUS = "session_status"
     WAITING_SCREEN = "waiting_screen"
+    QUIZ = "quiz"
     CUSTOM = "custom"
 
 
@@ -1107,6 +1108,100 @@ BUILTIN_TEMPLATES = {
         "config": {
             "theme": "minimal",
             "show_countdown": True,
+        },
+    },
+    # ============================================================
+    # QUIZ TEMPLATES (interactive quiz display)
+    # ============================================================
+    "quiz_classic": {
+        "name": "Quiz Classique",
+        "description": "Affichage quiz structure avec question, choix, timer, classement et QR code pour rejoindre",
+        "template_type": TemplateType.QUIZ,
+        "is_builtin": True,
+        "layout": {
+            "style": "quiz-classic",
+            "components": [
+                {"type": "quiz_header"},
+                {"type": "quiz_question"},
+                {"type": "quiz_choices"},
+                {"type": "quiz_timer"},
+                {"type": "quiz_scoreboard", "position": "right", "limit": 10},
+                {"type": "quiz_qrcode", "position": "bottom-right"},
+                {"type": "quiz_feedback"},
+                {"type": "quiz_podium"},
+                {"type": "quiz_participant_count", "position": "top-right"},
+                {"type": "quiz_join_message"},
+            ],
+        },
+        "config": {
+            "theme": "dark",
+            "accent_color": "#6366f1",
+            "show_scoreboard_during_question": True,
+            "show_qr_during_waiting": True,
+            "show_answer_distribution": True,
+            "feedback_duration_seconds": 5,
+            "podium_animation": True,
+        },
+    },
+    "quiz_gameshow": {
+        "name": "Quiz Gameshow",
+        "description": "Style emission TV avec effets visuels spectaculaires, couleurs vives et animations",
+        "template_type": TemplateType.QUIZ,
+        "is_builtin": True,
+        "layout": {
+            "style": "quiz-gameshow",
+            "components": [
+                {"type": "quiz_header"},
+                {"type": "quiz_question"},
+                {"type": "quiz_choices"},
+                {"type": "quiz_timer", "style": "circular"},
+                {"type": "quiz_scoreboard", "position": "right", "limit": 5},
+                {"type": "quiz_qrcode", "position": "bottom-right"},
+                {"type": "quiz_feedback"},
+                {"type": "quiz_podium"},
+                {"type": "quiz_participant_count"},
+                {"type": "quiz_join_message"},
+            ],
+        },
+        "config": {
+            "theme": "gameshow",
+            "accent_color": "#f59e0b",
+            "secondary_color": "#8b5cf6",
+            "show_scoreboard_during_question": True,
+            "show_qr_during_waiting": True,
+            "show_answer_distribution": True,
+            "feedback_duration_seconds": 5,
+            "podium_animation": True,
+            "choice_colors": ["#ef4444", "#3b82f6", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899"],
+        },
+    },
+    "quiz_minimal": {
+        "name": "Quiz Minimal",
+        "description": "Design minimaliste centre sur la question et les choix, ideal pour un affichage propre",
+        "template_type": TemplateType.QUIZ,
+        "is_builtin": True,
+        "layout": {
+            "style": "quiz-minimal",
+            "components": [
+                {"type": "quiz_header"},
+                {"type": "quiz_question"},
+                {"type": "quiz_choices"},
+                {"type": "quiz_timer", "style": "bar"},
+                {"type": "quiz_feedback"},
+                {"type": "quiz_podium"},
+                {"type": "quiz_join_message"},
+            ],
+        },
+        "config": {
+            "theme": "minimal",
+            "background_color": "#000000",
+            "text_color": "#ffffff",
+            "accent_color": "#ffffff",
+            "show_scoreboard_during_question": False,
+            "show_qr_during_waiting": True,
+            "show_answer_distribution": False,
+            "feedback_duration_seconds": 3,
+            "podium_animation": True,
         },
     },
 }

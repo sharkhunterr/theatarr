@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from theatarr import __version__
 from theatarr.adapters.registry import discover_adapters
-from theatarr.api import auth, config, display, logs, movies, portal, services, sessions, sequences, templates, trailers, users, vote, wallmount
+from theatarr.api import auth, config, display, logs, movies, portal, quiz, services, sessions, sequences, templates, trailers, users, vote, wallmount
 from theatarr.api.errors import (
     AppException,
     app_exception_handler,
@@ -101,6 +101,7 @@ Query parameters:
         {"name": "templates", "description": "Wallmount display templates"},
         {"name": "wallmount", "description": "Public wallmount display"},
         {"name": "vote", "description": "Movie voting system"},
+        {"name": "quiz", "description": "Interactive quiz system"},
         {"name": "trailers", "description": "Trailer library management"},
         {"name": "configuration", "description": "Settings and config import/export"},
         {"name": "logs", "description": "Session history and activity logs"},
@@ -141,6 +142,7 @@ app.include_router(sequences.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")
 app.include_router(wallmount.router, prefix="/api/v1")
 app.include_router(vote.router, prefix="/api/v1")
+app.include_router(quiz.router, prefix="/api/v1")
 app.include_router(trailers.router, prefix="/api/v1")
 app.include_router(config.router, prefix="/api/v1")
 app.include_router(logs.router, prefix="/api/v1")

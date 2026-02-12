@@ -11,6 +11,7 @@ from theatarr.models.movie import Movie
 from theatarr.models.palette import ColorPalette
 from theatarr.models.template import Template
 from theatarr.models.vote import VoteSession, Vote, VoteToken
+from theatarr.models.quiz import QuizSession, QuizToken, QuizAnswer
 from theatarr.models.trailer import Trailer, TrailerRule
 from theatarr.models.session_participant import SessionParticipant, InvitationStatus
 from theatarr.models.vote_session_participant import VoteSessionParticipant
@@ -30,6 +31,9 @@ __all__ = [
     "VoteSession",
     "Vote",
     "VoteToken",
+    "QuizSession",
+    "QuizToken",
+    "QuizAnswer",
     "Trailer",
     "TrailerRule",
     "SessionParticipant",

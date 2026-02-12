@@ -14,10 +14,14 @@ from theatarr.models.session_participant import InvitationStatus, SessionPartici
 from theatarr.models.user import User
 from theatarr.models.vote import Vote, VoteSession, VoteSessionStatus
 from theatarr.models.vote_session_participant import VoteSessionParticipant
+from theatarr.models.quiz import QuizAnswer, QuizSession, QuizSessionStatus, QuizToken
 from theatarr.schemas.portal import (
     PortalHistorySessionItem,
     PortalHistoryVoteItem,
     PortalProfileResponse,
+    PortalQuizAnswer,
+    PortalQuizListResponse,
+    PortalQuizSessionSummary,
     PortalSessionDetail,
     PortalSessionListResponse,
     PortalSessionSummary,
@@ -236,8 +240,21 @@ async def get_my_stats(
     total_votes_result = await db.execute(total_votes_query)
     total_votes_cast = total_votes_result.scalar() or 0
 
+    # Count pending quiz (OPEN or ACTIVE where user has a token and hasn't completed)
+    pending_quiz_query = (
+        select(func.count(QuizToken.id))
+        .join(QuizSession)
+        .where(
+            QuizToken.user_id == user.id,
+            QuizSession.status.in_([QuizSessionStatus.OPEN.value, QuizSessionStatus.ACTIVE.value]),
+        )
+    )
+    pending_quiz_result = await db.execute(pending_quiz_query)
+    pending_quiz = pending_quiz_result.scalar() or 0
+
     return PortalStatsResponse(
         pending_votes=pending_votes,
+        pending_quiz=pending_quiz,
         pending_invitations=pending_invitations,
         upcoming_sessions=upcoming_sessions,
         total_sessions_attended=total_sessions_attended,
@@ -953,6 +970,309 @@ async def cast_vote(
         movie_index=data.movie_index,
         vote_session_id=vote_session_id,
     )
+
+
+# ============================================================================
+# Quiz endpoints
+# ============================================================================
+
+
+@router.get(
+    "/quiz",
+    response_model=PortalQuizListResponse,
+    summary="Get My Quizzes",
+)
+async def get_my_quizzes(
+    db: DbSession,
+    user: CurrentUser,
+    skip: int = 0,
+    limit: int = 20,
+) -> PortalQuizListResponse:
+    """Get quiz sessions where the user has a token."""
+    query = (
+        select(QuizToken)
+        .options(selectinload(QuizToken.quiz_session))
+        .where(QuizToken.user_id == user.id)
+        .order_by(QuizToken.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    tokens = result.scalars().all()
+
+    items = []
+    seen_ids: set[str] = set()
+    for token in tokens:
+        qs = token.quiz_session
+        if qs.id in seen_ids:
+            continue
+        seen_ids.add(qs.id)
+
+        # Get user's score
+        score_result = await db.execute(
+            select(func.count(QuizAnswer.id)).where(
+                QuizAnswer.quiz_session_id == qs.id,
+                QuizAnswer.token_id == token.id,
+                QuizAnswer.is_correct == True,
+            )
+        )
+        my_score = score_result.scalar() or 0
+
+        items.append(
+            PortalQuizSessionSummary(
+                id=qs.id,
+                name=qs.name,
+                description=qs.description,
+                status=qs.status.value if isinstance(qs.status, QuizSessionStatus) else qs.status,
+                question_count=len(qs.questions or []),
+                has_joined=token.joined_at is not None,
+                my_score=my_score,
+            )
+        )
+
+    return PortalQuizListResponse(items=items, total=len(items))
+
+
+@router.get(
+    "/quiz/pending",
+    response_model=PortalQuizListResponse,
+    summary="Get Pending Quizzes",
+)
+async def get_pending_quizzes(
+    db: DbSession,
+    user: CurrentUser,
+) -> PortalQuizListResponse:
+    """Get quiz sessions that are OPEN or ACTIVE where user has a token."""
+    query = (
+        select(QuizToken)
+        .options(selectinload(QuizToken.quiz_session))
+        .join(QuizSession)
+        .where(
+            QuizToken.user_id == user.id,
+            QuizSession.status.in_([QuizSessionStatus.OPEN.value, QuizSessionStatus.ACTIVE.value]),
+        )
+    )
+    result = await db.execute(query)
+    tokens = result.scalars().all()
+
+    items = []
+    seen_ids: set[str] = set()
+    for token in tokens:
+        qs = token.quiz_session
+        if qs.id in seen_ids:
+            continue
+        seen_ids.add(qs.id)
+
+        score_result = await db.execute(
+            select(func.count(QuizAnswer.id)).where(
+                QuizAnswer.quiz_session_id == qs.id,
+                QuizAnswer.token_id == token.id,
+                QuizAnswer.is_correct == True,
+            )
+        )
+        my_score = score_result.scalar() or 0
+
+        items.append(
+            PortalQuizSessionSummary(
+                id=qs.id,
+                name=qs.name,
+                description=qs.description,
+                status=qs.status.value if isinstance(qs.status, QuizSessionStatus) else qs.status,
+                question_count=len(qs.questions or []),
+                has_joined=token.joined_at is not None,
+                my_score=my_score,
+            )
+        )
+
+    return PortalQuizListResponse(items=items, total=len(items))
+
+
+@router.get(
+    "/quiz/{quiz_session_id}",
+    summary="Get Quiz Detail",
+)
+async def get_quiz_detail(
+    db: DbSession,
+    user: CurrentUser,
+    quiz_session_id: str,
+) -> dict:
+    """Get quiz detail for a portal user."""
+    # Find user's token for this quiz
+    result = await db.execute(
+        select(QuizToken)
+        .options(selectinload(QuizToken.quiz_session))
+        .where(
+            QuizToken.quiz_session_id == quiz_session_id,
+            QuizToken.user_id == user.id,
+        )
+    )
+    token = result.scalar_one_or_none()
+
+    if not token:
+        raise NotFoundError("Quiz session", quiz_session_id)
+
+    qs = token.quiz_session
+    questions = qs.questions or []
+    config = qs.config or {}
+
+    # Get score
+    from theatarr.services.quiz import get_participant_score, get_scoreboard
+    my_score = await get_participant_score(db, qs.id, token.id)
+
+    # Build current question (without correct_indices)
+    current_question = None
+    current_idx = qs.current_question_index
+    if 0 <= current_idx < len(questions):
+        q = questions[current_idx]
+        current_question = {
+            "text": q.get("text", ""),
+            "choices": q.get("choices", []),
+            "allow_multiple": q.get("allow_multiple", False),
+            "time_limit_seconds": q.get("time_limit_seconds") or config.get("default_time_limit_seconds", 30),
+            "hint": q.get("hint"),
+            "image_url": q.get("image_url"),
+        }
+
+    # Check if user already answered the current question
+    my_answer = None
+    if 0 <= current_idx < len(questions):
+        answer_result = await db.execute(
+            select(QuizAnswer).where(
+                QuizAnswer.quiz_session_id == qs.id,
+                QuizAnswer.token_id == token.id,
+                QuizAnswer.question_index == current_idx,
+            )
+        )
+        existing_answer = answer_result.scalar_one_or_none()
+        if existing_answer:
+            my_answer = {
+                "selected_indices": existing_answer.selected_indices,
+                "is_correct": existing_answer.is_correct,
+                "correct_indices": questions[current_idx].get("correct_indices", []),
+            }
+
+    # Scoreboard if completed or show_scores_live
+    scoreboard = None
+    if qs.status in (QuizSessionStatus.COMPLETED, QuizSessionStatus.COMPLETED.value) or config.get("show_scores_live"):
+        scoreboard = await get_scoreboard(db, qs.id)
+
+    return {
+        "id": qs.id,
+        "name": qs.name,
+        "description": qs.description,
+        "status": qs.status.value if isinstance(qs.status, QuizSessionStatus) else qs.status,
+        "question_count": len(questions),
+        "current_question_index": current_idx,
+        "current_question": current_question,
+        "my_score": my_score,
+        "my_answer": my_answer,
+        "has_joined": token.joined_at is not None,
+        "participant_name": token.participant_name,
+        "token": token.token,
+        "scoreboard": scoreboard,
+        "config": {
+            "show_live_results": config.get("show_live_results", "anonymous"),
+            "show_scores_live": config.get("show_scores_live", False),
+        },
+    }
+
+
+@router.post(
+    "/quiz/{quiz_session_id}/join",
+    summary="Join Quiz",
+)
+async def join_portal_quiz(
+    db: DbSession,
+    user: CurrentUser,
+    quiz_session_id: str,
+) -> dict:
+    """Join a quiz as a portal user."""
+    # Find or create token for user
+    result = await db.execute(
+        select(QuizToken).where(
+            QuizToken.quiz_session_id == quiz_session_id,
+            QuizToken.user_id == user.id,
+        )
+    )
+    token = result.scalar_one_or_none()
+
+    if not token:
+        raise NotFoundError("Quiz session", quiz_session_id)
+
+    if token.joined_at:
+        return {"success": True, "already_joined": True, "token": token.token}
+
+    # Use display name
+    name = user.first_name or user.username
+    from theatarr.services.quiz import join_quiz
+    token = await join_quiz(db, token, name)
+
+    return {"success": True, "already_joined": False, "token": token.token}
+
+
+@router.post(
+    "/quiz/{quiz_session_id}/answer",
+    summary="Submit Quiz Answer",
+)
+async def submit_portal_quiz_answer(
+    db: DbSession,
+    user: CurrentUser,
+    quiz_session_id: str,
+    data: PortalQuizAnswer,
+) -> dict:
+    """Submit a quiz answer as a portal user."""
+    # Find user's token
+    result = await db.execute(
+        select(QuizToken)
+        .options(selectinload(QuizToken.quiz_session))
+        .where(
+            QuizToken.quiz_session_id == quiz_session_id,
+            QuizToken.user_id == user.id,
+        )
+    )
+    token = result.scalar_one_or_none()
+
+    if not token:
+        raise NotFoundError("Quiz session", quiz_session_id)
+
+    if not token.joined_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must join the quiz before answering",
+        )
+
+    qs = token.quiz_session
+
+    from theatarr.services.quiz import submit_answer, get_participant_score
+    try:
+        answer = await submit_answer(
+            db, qs, token,
+            question_index=data.question_index,
+            selected_indices=data.selected_indices,
+            response_time_ms=data.response_time_ms,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+    score = await get_participant_score(db, qs.id, token.id)
+
+    # Check auto-advance
+    from theatarr.api.quiz import _check_auto_advance
+    await _check_auto_advance(db, qs)
+
+    questions = qs.questions or []
+    correct_indices = []
+    if data.question_index < len(questions):
+        correct_indices = questions[data.question_index].get("correct_indices", [])
+
+    return {
+        "is_correct": answer.is_correct,
+        "correct_indices": correct_indices,
+        "score": score,
+    }
 
 
 # ============================================================================

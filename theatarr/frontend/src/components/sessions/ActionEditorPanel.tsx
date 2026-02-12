@@ -907,6 +907,15 @@ interface TemplateListItem {
   is_builtin: boolean;
 }
 
+interface QuizSessionListItem {
+  id: string;
+  name: string;
+  status: string;
+  question_count: number;
+  template_id?: string | null;
+  template_name?: string | null;
+}
+
 function DisplayForm({
   action,
   onChange,
@@ -929,6 +938,19 @@ function DisplayForm({
     (t) => t.template_type === 'waiting_screen'
   );
 
+  const quizTemplates = (templatesData?.items || []).filter(
+    (t) => t.template_type === 'quiz'
+  );
+
+  // Fetch quiz sessions for quiz content type
+  const { data: quizSessionsData } = useQuery<{ items: QuizSessionListItem[] }>({
+    queryKey: ['quiz-sessions-for-action'],
+    queryFn: () => apiClient.get('/quiz-sessions'),
+    enabled: command === 'show' && (parameters.content_type as string) === 'quiz',
+  });
+
+  const quizSessions = quizSessionsData?.items || [];
+
   const t = {
     command: language === 'fr' ? 'Commande' : 'Command',
     inputSource: language === 'fr' ? 'Source d\'entrée' : 'Input Source',
@@ -938,6 +960,12 @@ function DisplayForm({
     imageUrl: language === 'fr' ? 'URL de l\'image' : 'Image URL',
     selectTemplate: language === 'fr' ? 'Template d\'attente' : 'Waiting Screen Template',
     noTemplates: language === 'fr' ? 'Aucun template disponible. Initialisez les templates intégrés.' : 'No templates available. Initialize built-in templates.',
+    quizSession: language === 'fr' ? 'Session de quiz' : 'Quiz Session',
+    selectQuiz: language === 'fr' ? 'Sélectionnez un quiz' : 'Select a quiz',
+    noQuizSessions: language === 'fr' ? 'Aucun quiz disponible. Créez un quiz dans la section Quiz.' : 'No quizzes available. Create one in the Quiz section.',
+    quizTemplate: language === 'fr' ? 'Template d\'affichage' : 'Display Template',
+    noQuizTemplate: language === 'fr' ? 'Aucun (classique par défaut)' : 'None (classic default)',
+    quizInfo: language === 'fr' ? 'Le quiz sera automatiquement lancé et les participants de la session seront inscrits.' : 'The quiz will auto-start and session participants will be auto-enrolled.',
     position: language === 'fr' ? 'Position' : 'Position',
     positionX: language === 'fr' ? 'Horizontal (%)' : 'Horizontal (%)',
     positionY: language === 'fr' ? 'Vertical (%)' : 'Vertical (%)',
@@ -1081,17 +1109,21 @@ function DisplayForm({
               value={(parameters.content_type as string) || 'text'}
               onChange={(e) => {
                 const newType = e.target.value;
-                // Clear template-specific params when switching away from waiting_screen
-                if (newType !== 'waiting_screen') {
-                  const { template_id, template_name, mode, layout, config, ...rest } = parameters;
+                // Clear type-specific params when switching content type
+                const { template_id, template_name, mode, layout, config,
+                  quiz_session_id, quiz_template_id, quiz_name, total_questions,
+                  ...rest } = parameters;
+                if (newType === 'waiting_screen' || newType === 'quiz') {
+                  // These types use layout/config, keep content_type only
                   onChange({ parameters: { ...rest, content_type: newType } });
                 } else {
-                  handleParametersChange({ content_type: newType });
+                  onChange({ parameters: { ...rest, content_type: newType } });
                 }
               }}
               className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
             >
               <option value="waiting_screen">{language === 'fr' ? 'Waiting Screen' : 'Waiting Screen'}</option>
+              <option value="quiz">Quiz</option>
               <option value="text">{language === 'fr' ? 'Texte' : 'Text'}</option>
               <option value="image">Image</option>
               <option value="template">Template</option>
@@ -1134,6 +1166,102 @@ function DisplayForm({
               ) : (
                 <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">{t.noTemplates}</div>
               )}
+            </div>
+          )}
+
+          {/* Quiz Session + Template Selectors */}
+          {(parameters.content_type as string) === 'quiz' && (
+            <div className="space-y-4">
+              {/* Info banner */}
+              <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-xs text-indigo-300">
+                {t.quizInfo}
+              </div>
+
+              {/* Quiz Session Selector */}
+              <div>
+                <label className="block text-sm font-medium text-dark-text mb-1">{t.quizSession}</label>
+                {quizSessions.length > 0 ? (
+                  <select
+                    value={(parameters.quiz_session_id as string) || ''}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      const selected = quizSessions.find(q => q.id === selectedId);
+                      const updates: Record<string, unknown> = {
+                        quiz_session_id: selectedId || undefined,
+                        quiz_name: selected?.name || undefined,
+                        total_questions: selected?.question_count || 0,
+                      };
+                      // Auto-fill template from quiz if it has one and no template is set yet
+                      if (selected?.template_id && !parameters.quiz_template_id) {
+                        const tmpl = quizTemplates.find(t => t.id === selected.template_id);
+                        if (tmpl) {
+                          updates.quiz_template_id = tmpl.id;
+                          updates.template_name = tmpl.name;
+                          updates.layout = tmpl.layout || { style: 'quiz-classic', components: [] };
+                          updates.config = tmpl.config || {};
+                        }
+                      }
+                      handleParametersChange(updates);
+                    }}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+                  >
+                    <option value="">{t.selectQuiz}</option>
+                    {quizSessions.map((qs) => (
+                      <option key={qs.id} value={qs.id}>
+                        {qs.name} ({qs.question_count}Q) — {qs.status}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">{t.noQuizSessions}</div>
+                )}
+              </div>
+
+              {/* Quiz Template Selector */}
+              <div>
+                <label className="block text-sm font-medium text-dark-text mb-1">{t.quizTemplate}</label>
+                {quizTemplates.length > 0 ? (
+                  <div className="space-y-2">
+                    {quizTemplates.map((tmpl) => {
+                      const isSelected = (parameters.quiz_template_id as string) === tmpl.id ||
+                        (!parameters.quiz_template_id && (parameters.layout as Record<string, unknown>)?.style === (tmpl.layout as Record<string, unknown>)?.style);
+                      return (
+                        <button
+                          key={tmpl.id}
+                          type="button"
+                          onClick={() => {
+                            handleParametersChange({
+                              quiz_template_id: tmpl.id,
+                              template_name: tmpl.name,
+                              layout: tmpl.layout || { style: 'quiz-classic', components: [] },
+                              config: tmpl.config || {},
+                            });
+                          }}
+                          className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                            isSelected
+                              ? 'border-indigo-500 bg-indigo-500/10'
+                              : 'border-dark-border bg-dark-bg hover:border-dark-muted'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Monitor size={16} className={isSelected ? 'text-indigo-400' : 'text-dark-muted'} />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-dark-text text-sm">{tmpl.name}</div>
+                              {tmpl.description && (
+                                <div className="text-xs text-dark-muted truncate">{tmpl.description}</div>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">
+                    {t.noQuizTemplate}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

@@ -20,6 +20,7 @@ class Channel(str, Enum):
     SESSION = "session"
     WALLMOUNT = "wallmount"
     VOTE = "vote"
+    QUIZ = "quiz"  # Per-session: quiz:{quiz_session_id}
     SERVICES = "services"
     DISPLAY = "display"  # Per-session: display:{session_id}
 
@@ -241,6 +242,15 @@ class WebSocketManager:
                 await self.subscribe(websocket, channel)
             else:
                 await self.subscribe(websocket, Channel.VOTE.value)
+
+        elif msg_type == "subscribe_quiz":
+            # Subscribe to quiz channel for real-time quiz events
+            quiz_session_id = payload.get("quiz_session_id")
+            if quiz_session_id:
+                channel = f"{Channel.QUIZ.value}:{quiz_session_id}"
+                await self.subscribe(websocket, channel)
+            else:
+                await self.subscribe(websocket, Channel.QUIZ.value)
 
         elif msg_type == "subscribe_display":
             # Subscribe to display channel for a specific session

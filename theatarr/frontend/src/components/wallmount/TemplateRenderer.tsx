@@ -409,12 +409,34 @@ interface TemplateRendererProps {
       is_revealed: boolean;
       selection_mode: string;
     };
+    quiz_info?: {
+      quiz_session_id: string;
+      name: string;
+      status: string;
+      phase: string; // waiting | question | feedback | results | podium
+      current_question_index: number;
+      total_questions: number;
+      current_question?: {
+        text: string;
+        choices: string[];
+        time_limit_seconds?: number;
+        hint?: string;
+        allow_multiple?: boolean;
+      };
+      correct_indices?: number[];
+      time_remaining_seconds?: number;
+      participants: Array<{ name: string; score: number; has_answered_current: boolean }>;
+      scoreboard: Array<{ name: string; score: number; avg_response_time_ms: number }>;
+      answer_distribution?: Record<number, number>;
+      join_url?: string;
+      join_code?: string;
+    };
   };
 }
 
 export function TemplateRenderer({ template, data }: TemplateRendererProps) {
   const { layout, config } = template;
-  const { movie, session, countdown_to, palette, vote_info, mystery_info } = data;
+  const { movie, session, countdown_to, palette, vote_info, mystery_info, quiz_info } = data;
 
   // Apply CSS variables from palette
   const cssVars = useMemo(() => {
@@ -1019,7 +1041,6 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
       c.type === 'marquee' || c.type === 'blink' || c.animation
     );
     const layoutStyle = (layout as any).style || 'default';
-
     const baseStyles = {
       ...cssVars as React.CSSProperties,
       backgroundColor: config?.transparent_bg ? 'transparent' : (palette?.background || '#0a0a0f'),
@@ -5135,7 +5156,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
     // ====================================================================
     // WAITING SCREEN layouts — dispatcher
     // ====================================================================
-    if (layoutStyle.startsWith('waiting-')) {
+    if (layoutStyle.startsWith('waiting-') || layoutStyle.startsWith('quiz-')) {
       const hasComp = (type: string) => layout.components.some((c) => c.type === type);
       const bg = palette?.background || '#0a0a0f';
       const accent = palette?.accent || palette?.vibrant || '#6366f1';
@@ -5805,6 +5826,364 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
             {session?.name && (
               <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 wt-info" style={{ animationDelay: '1s' }}>
                 <span className="text-sm uppercase tracking-[0.4em] opacity-30" style={{ color: txt }}>{session.name}</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // ============================================================
+      // QUIZ LAYOUTS
+      // ============================================================
+      if (layoutStyle === 'quiz-classic' || layoutStyle === 'quiz-gameshow' || layoutStyle === 'quiz-minimal') {
+        const qi = quiz_info;
+        const isGameshow = layoutStyle === 'quiz-gameshow';
+        const isMinimal = layoutStyle === 'quiz-minimal';
+        const phase = qi?.phase || 'waiting';
+        const choiceColors = (config as any)?.choice_colors || ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+        // Timer progress (0→1)
+        const timerProgress = qi?.current_question?.time_limit_seconds && qi?.time_remaining_seconds != null
+          ? qi.time_remaining_seconds / qi.current_question.time_limit_seconds
+          : 1;
+        const timerSec = Math.ceil(qi?.time_remaining_seconds ?? 0);
+
+        // Background style
+        const quizBg = (config as any)?.background_color || '#0a0a1a';
+        const quizAccent = (config as any)?.accent_color || accent;
+        const quizSecondary = (config as any)?.secondary_color || '#8b5cf6';
+
+        return (
+          <div className="relative w-full h-full overflow-hidden flex flex-col" style={{
+            backgroundColor: quizBg,
+            color: '#ffffff',
+            fontFamily: isGameshow ? '"Poppins", "Segoe UI", sans-serif' : undefined,
+          }}>
+            <style>{`
+              @keyframes quiz-fade-in { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+              @keyframes quiz-scale-in { from { opacity:0; transform:scale(0.8) } to { opacity:1; transform:scale(1) } }
+              @keyframes quiz-pulse { 0%,100% { transform:scale(1) } 50% { transform:scale(1.05) } }
+              @keyframes quiz-shake { 0%,100% { transform:translateX(0) } 25% { transform:translateX(-5px) } 75% { transform:translateX(5px) } }
+              @keyframes quiz-confetti { 0% { transform:translateY(0) rotate(0deg); opacity:1 } 100% { transform:translateY(100vh) rotate(720deg); opacity:0 } }
+              @keyframes quiz-slide-up { from { opacity:0; transform:translateY(40px) } to { opacity:1; transform:translateY(0) } }
+              @keyframes quiz-timer-pulse { 0%,100% { box-shadow:0 0 0 0 ${quizAccent}40 } 50% { box-shadow:0 0 0 15px ${quizAccent}00 } }
+              .quiz-ani { animation: quiz-fade-in 0.5s ease-out both; }
+              .quiz-scale { animation: quiz-scale-in 0.4s ease-out both; }
+              .quiz-choice-enter { animation: quiz-slide-up 0.4s ease-out both; }
+              ${isGameshow ? `
+                @keyframes gs-glow { 0%,100% { text-shadow:0 0 20px ${quizAccent}60 } 50% { text-shadow:0 0 40px ${quizAccent}aa, 0 0 80px ${quizSecondary}40 } }
+                .gs-title { animation: gs-glow 3s ease-in-out infinite; }
+              ` : ''}
+            `}</style>
+
+            {/* Sequence remaining badge (global action timer) */}
+            {sequenceRemaining !== null && sequenceRemaining > 0 && (
+              <div className="absolute top-4 right-4 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full text-sm"
+                style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', color: 'rgba(255,255,255,0.7)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5,4 15,12 5,20" /><line x1="19" y1="5" x2="19" y2="19" />
+                </svg>
+                <span>Suite {formatSeqCountdown(sequenceRemaining)}</span>
+              </div>
+            )}
+
+            {/* === PHASE: WAITING === */}
+            {phase === 'waiting' && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-8 p-12">
+                {/* Quiz name */}
+                <h1 className={`text-6xl font-bold text-center tracking-tight quiz-ani ${isGameshow ? 'gs-title' : ''}`}
+                  style={{ color: quizAccent }}>
+                  {qi?.name || 'Quiz'}
+                </h1>
+                {/* Join message */}
+                <div className="quiz-ani text-2xl text-white/70 text-center" style={{ animationDelay: '0.2s' }}>
+                  Ouvrez votre telephone et connectez-vous !
+                </div>
+                {/* QR code placeholder + URL */}
+                {qi?.join_url && (config as any)?.show_qr_during_waiting !== false && (
+                  <div className="quiz-ani flex flex-col items-center gap-4 mt-4" style={{ animationDelay: '0.4s' }}>
+                    <div className="w-48 h-48 bg-white rounded-2xl flex items-center justify-center p-3">
+                      {/* QR code rendered as simple URL display — real QR would need a library */}
+                      <div className="w-full h-full bg-black/5 rounded-xl flex items-center justify-center">
+                        <span className="text-black text-xs text-center break-all px-2 font-mono">{qi.join_url}</span>
+                      </div>
+                    </div>
+                    <span className="text-lg text-white/50">Scannez pour rejoindre</span>
+                  </div>
+                )}
+                {/* Participant count */}
+                <div className="quiz-ani flex items-center gap-3 mt-6" style={{ animationDelay: '0.6s' }}>
+                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-xl text-white/80">
+                    {qi?.participants?.length || 0} participant{(qi?.participants?.length || 0) !== 1 ? 's' : ''} connecte{(qi?.participants?.length || 0) !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* === PHASE: QUESTION === */}
+            {phase === 'question' && qi?.current_question && (
+              <div className="flex-1 flex flex-col p-8">
+                {/* Header: progression + timer */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="quiz-ani flex items-center gap-4">
+                    <span className="text-lg font-semibold" style={{ color: quizAccent }}>
+                      Question {(qi.current_question_index || 0) + 1}/{qi.total_questions}
+                    </span>
+                    {!isMinimal && (
+                      <span className="text-sm text-white/40">{qi.name}</span>
+                    )}
+                  </div>
+                  {/* Timer */}
+                  <div className="quiz-ani flex items-center gap-3" style={{ animationDelay: '0.1s' }}>
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold border-4 ${timerSec <= 5 ? 'animate-pulse' : ''}`}
+                      style={{
+                        borderColor: timerSec <= 5 ? '#ef4444' : quizAccent,
+                        color: timerSec <= 5 ? '#ef4444' : '#ffffff',
+                        animation: timerSec <= 5 ? 'quiz-timer-pulse 1s ease-in-out infinite' : undefined,
+                      }}>
+                      {timerSec}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timer bar */}
+                <div className="w-full h-2 rounded-full overflow-hidden mb-8" style={{ backgroundColor: `${quizAccent}20` }}>
+                  <div className="h-full rounded-full transition-all duration-1000 ease-linear" style={{
+                    width: `${timerProgress * 100}%`,
+                    backgroundColor: timerSec <= 5 ? '#ef4444' : quizAccent,
+                  }} />
+                </div>
+
+                {/* Question text */}
+                <div className="flex-shrink-0 mb-8">
+                  <h2 className="quiz-scale text-4xl font-bold text-center leading-tight" style={{ animationDelay: '0.15s' }}>
+                    {qi.current_question.text}
+                  </h2>
+                  {/* Hint */}
+                  {qi.current_question.hint && (
+                    <p className="quiz-ani text-lg text-white/50 text-center mt-4 italic" style={{ animationDelay: '0.3s' }}>
+                      Indice : {qi.current_question.hint}
+                    </p>
+                  )}
+                </div>
+
+                {/* Choices grid */}
+                <div className={`flex-1 grid gap-4 ${qi.current_question.choices.length <= 2 ? 'grid-cols-2' : qi.current_question.choices.length <= 4 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {qi.current_question.choices.map((choice, i) => (
+                    <div key={i}
+                      className="quiz-choice-enter rounded-2xl flex items-center justify-center p-6 text-center cursor-default"
+                      style={{
+                        animationDelay: `${0.2 + i * 0.1}s`,
+                        backgroundColor: isGameshow ? `${choiceColors[i % choiceColors.length]}dd` : `${quizAccent}20`,
+                        border: isGameshow ? 'none' : `2px solid ${quizAccent}40`,
+                        fontSize: choice.length > 60 ? '1.25rem' : choice.length > 30 ? '1.5rem' : '1.75rem',
+                        fontWeight: 600,
+                      }}>
+                      {isGameshow && (
+                        <span className="mr-3 w-10 h-10 rounded-full bg-black/30 flex items-center justify-center text-lg font-bold flex-shrink-0">
+                          {String.fromCharCode(65 + i)}
+                        </span>
+                      )}
+                      <span>{choice}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Scoreboard sidebar (non-minimal) */}
+                {!isMinimal && (config as any)?.show_scoreboard_during_question && qi.scoreboard && qi.scoreboard.length > 0 && (
+                  <div className="absolute top-24 right-8 w-64 quiz-ani" style={{ animationDelay: '0.5s' }}>
+                    <div className="rounded-xl p-4 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                      <h3 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: quizAccent }}>Classement</h3>
+                      {qi.scoreboard.slice(0, (config as any)?.show_scoreboard_limit || 5).map((entry, i) => (
+                        <div key={i} className="flex items-center justify-between py-1.5 text-sm">
+                          <span className="flex items-center gap-2">
+                            <span className="w-5 text-white/40">{i + 1}.</span>
+                            <span className="text-white/90 truncate max-w-[140px]">{entry.name}</span>
+                          </span>
+                          <span className="font-bold" style={{ color: quizAccent }}>{entry.score}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* === PHASE: FEEDBACK === */}
+            {phase === 'feedback' && qi?.current_question && (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 gap-8">
+                {/* Question recap */}
+                <h2 className="quiz-ani text-3xl font-bold text-center text-white/80 mb-4">
+                  {qi.current_question.text}
+                </h2>
+
+                {/* Choices with correct/incorrect highlighting */}
+                <div className={`w-full max-w-4xl grid gap-4 ${qi.current_question.choices.length <= 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                  {qi.current_question.choices.map((choice, i) => {
+                    const isCorrect = qi.correct_indices?.includes(i);
+                    return (
+                      <div key={i}
+                        className="quiz-choice-enter rounded-2xl flex items-center justify-center p-5 text-center relative overflow-hidden"
+                        style={{
+                          animationDelay: `${i * 0.1}s`,
+                          backgroundColor: isCorrect ? '#22c55e30' : '#ef444430',
+                          border: `3px solid ${isCorrect ? '#22c55e' : '#ef4444'}`,
+                          fontSize: '1.5rem',
+                          fontWeight: 600,
+                        }}>
+                        <span className="mr-3 text-2xl">{isCorrect ? '✓' : '✗'}</span>
+                        <span style={{ color: isCorrect ? '#22c55e' : '#ef4444cc' }}>{choice}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Answer distribution */}
+                {(config as any)?.show_answer_distribution && qi.answer_distribution && (
+                  <div className="quiz-ani w-full max-w-2xl mt-4" style={{ animationDelay: '0.4s' }}>
+                    <h3 className="text-sm uppercase tracking-wider text-white/50 mb-3 text-center">Distribution des reponses</h3>
+                    <div className="flex gap-3 justify-center">
+                      {qi.current_question.choices.map((choice, i) => {
+                        const count = qi.answer_distribution?.[i] || 0;
+                        const total = Object.values(qi.answer_distribution || {}).reduce((a, b) => a + b, 0);
+                        const pct = total > 0 ? (count / total) * 100 : 0;
+                        const isCorrect = qi.correct_indices?.includes(i);
+                        return (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                            <div className="w-full h-32 rounded-lg relative overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
+                              <div className="absolute bottom-0 left-0 right-0 rounded-lg transition-all duration-1000" style={{
+                                height: `${pct}%`,
+                                backgroundColor: isCorrect ? '#22c55e80' : isGameshow ? `${choiceColors[i % choiceColors.length]}80` : `${quizAccent}60`,
+                              }} />
+                            </div>
+                            <span className="text-xs text-white/60 truncate max-w-full">{choice.substring(0, 15)}</span>
+                            <span className="text-sm font-bold">{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* === PHASE: RESULTS (between questions) === */}
+            {phase === 'results' && qi?.scoreboard && (
+              <div className="flex-1 flex flex-col items-center justify-center p-12">
+                <h2 className="quiz-ani text-4xl font-bold mb-8" style={{ color: quizAccent }}>Classement</h2>
+                <div className="w-full max-w-xl">
+                  {qi.scoreboard.slice(0, 10).map((entry, i) => (
+                    <div key={i} className="quiz-ani flex items-center gap-4 py-3 px-6 rounded-xl mb-2"
+                      style={{
+                        animationDelay: `${i * 0.1}s`,
+                        backgroundColor: i === 0 ? `${quizAccent}30` : i < 3 ? `${quizAccent}15` : 'rgba(255,255,255,0.05)',
+                      }}>
+                      <span className="text-2xl font-bold w-10 text-center" style={{ color: i < 3 ? quizAccent : 'rgba(255,255,255,0.5)' }}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                      </span>
+                      <span className="flex-1 text-xl font-semibold truncate">{entry.name}</span>
+                      <span className="text-2xl font-bold" style={{ color: quizAccent }}>{entry.score}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* === PHASE: PODIUM (final) === */}
+            {phase === 'podium' && qi?.scoreboard && (
+              <div className="flex-1 flex flex-col items-center justify-center p-8">
+                {(config as any)?.podium_animation && (
+                  <style>{`
+                    @keyframes podium-rise-1 { from { height:0; opacity:0 } to { height:220px; opacity:1 } }
+                    @keyframes podium-rise-2 { from { height:0; opacity:0 } to { height:160px; opacity:1 } }
+                    @keyframes podium-rise-3 { from { height:0; opacity:0 } to { height:110px; opacity:1 } }
+                  `}</style>
+                )}
+                <h2 className="quiz-ani text-5xl font-bold mb-12" style={{ color: quizAccent }}>
+                  {isGameshow ? '🏆 Resultats Finaux 🏆' : 'Resultats'}
+                </h2>
+
+                {/* Podium visualization */}
+                <div className="flex items-end justify-center gap-6 mb-12">
+                  {/* 2nd place */}
+                  {qi.scoreboard.length > 1 && (
+                    <div className="quiz-ani flex flex-col items-center" style={{ animationDelay: '0.3s' }}>
+                      <span className="text-4xl mb-2">🥈</span>
+                      <span className="text-lg font-semibold mb-2 truncate max-w-[150px]">{qi.scoreboard[1].name}</span>
+                      <span className="text-xl font-bold mb-3" style={{ color: quizAccent }}>{qi.scoreboard[1].score} pts</span>
+                      <div className="w-32 rounded-t-xl flex items-end justify-center"
+                        style={{
+                          height: '160px',
+                          backgroundColor: `${quizSecondary}40`,
+                          border: `2px solid ${quizSecondary}60`,
+                          animation: (config as any)?.podium_animation ? 'podium-rise-2 1s ease-out 0.3s both' : undefined,
+                        }}>
+                        <span className="text-5xl font-bold opacity-30 mb-4">2</span>
+                      </div>
+                    </div>
+                  )}
+                  {/* 1st place */}
+                  {qi.scoreboard.length > 0 && (
+                    <div className="quiz-ani flex flex-col items-center" style={{ animationDelay: '0.1s' }}>
+                      <span className="text-5xl mb-2">🥇</span>
+                      <span className="text-xl font-bold mb-2 truncate max-w-[180px]">{qi.scoreboard[0].name}</span>
+                      <span className="text-2xl font-bold mb-3" style={{ color: quizAccent }}>{qi.scoreboard[0].score} pts</span>
+                      <div className="w-36 rounded-t-xl flex items-end justify-center"
+                        style={{
+                          height: '220px',
+                          backgroundColor: `${quizAccent}40`,
+                          border: `2px solid ${quizAccent}60`,
+                          animation: (config as any)?.podium_animation ? 'podium-rise-1 1s ease-out 0.1s both' : undefined,
+                        }}>
+                        <span className="text-6xl font-bold opacity-30 mb-4">1</span>
+                      </div>
+                    </div>
+                  )}
+                  {/* 3rd place */}
+                  {qi.scoreboard.length > 2 && (
+                    <div className="quiz-ani flex flex-col items-center" style={{ animationDelay: '0.5s' }}>
+                      <span className="text-4xl mb-2">🥉</span>
+                      <span className="text-lg font-semibold mb-2 truncate max-w-[150px]">{qi.scoreboard[2].name}</span>
+                      <span className="text-xl font-bold mb-3" style={{ color: quizAccent }}>{qi.scoreboard[2].score} pts</span>
+                      <div className="w-32 rounded-t-xl flex items-end justify-center"
+                        style={{
+                          height: '110px',
+                          backgroundColor: `${quizSecondary}30`,
+                          border: `2px solid ${quizSecondary}40`,
+                          animation: (config as any)?.podium_animation ? 'podium-rise-3 1s ease-out 0.5s both' : undefined,
+                        }}>
+                        <span className="text-5xl font-bold opacity-30 mb-4">3</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Rest of scoreboard */}
+                {qi.scoreboard.length > 3 && (
+                  <div className="w-full max-w-md">
+                    {qi.scoreboard.slice(3, 10).map((entry, i) => (
+                      <div key={i} className="quiz-ani flex items-center gap-3 py-2 px-4 text-white/70"
+                        style={{ animationDelay: `${0.7 + i * 0.1}s` }}>
+                        <span className="w-8 text-right text-white/40">{i + 4}.</span>
+                        <span className="flex-1 truncate">{entry.name}</span>
+                        <span className="font-semibold" style={{ color: `${quizAccent}aa` }}>{entry.score}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Participant count bar at bottom (question/feedback phases) */}
+            {(phase === 'question' || phase === 'feedback') && qi?.participants && (
+              <div className="flex-shrink-0 px-8 py-3 flex items-center justify-between border-t" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                <span className="text-sm text-white/50">
+                  {qi.participants.filter(p => p.has_answered_current).length}/{qi.participants.length} ont repondu
+                </span>
+                <span className="text-sm text-white/50">
+                  Question {(qi.current_question_index || 0) + 1}/{qi.total_questions}
+                </span>
               </div>
             )}
           </div>

@@ -27,6 +27,7 @@ import {
   Layers,
   Plus,
   GripVertical,
+  HelpCircle,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { Button, Spinner } from '../components/common';
@@ -911,6 +912,30 @@ export function SessionEditor() {
     setSelectedActionIndex(newActions.length - smartActions.length);
   };
 
+  // Quiz preset: adds a quiz display action block
+  const addQuizAction = () => {
+    const base = nextBlockIndex;
+    const quizAction: ActionItem = {
+      id: generateId(),
+      action_type: 'display',
+      command: 'show',
+      parameters: {
+        content_type: 'quiz',
+        quiz_session_id: '', // To be filled by user
+        template_name: 'Quiz',
+        layout: { style: 'quiz-classic', components: [] },
+        config: {},
+      },
+      delay_ms: 0,
+      duration_ms: 0,
+      on_failure: 'warn',
+      block_index: base,
+    };
+    const newActions = [...actions, quizAction];
+    setActions(newActions);
+    setSelectedActionIndex(newActions.length - 1);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1443,6 +1468,14 @@ export function SessionEditor() {
                       >
                         <Sparkles size={12} />
                         <span className="hidden sm:inline">Smart</span>
+                      </button>
+                      <button
+                        onClick={() => { addQuizAction(); setMobilePanel('properties'); }}
+                        className="px-2 py-1.5 rounded text-xs font-medium flex items-center gap-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-400 hover:opacity-80 transition-opacity border border-indigo-500/30"
+                        title={language === 'fr' ? 'Preset Quiz : action quiz' : 'Quiz preset: quiz action'}
+                      >
+                        <HelpCircle size={12} />
+                        <span className="hidden sm:inline">Quiz</span>
                       </button>
                     </div>
                   </div>

@@ -133,10 +133,38 @@ class PortalStatsResponse(BaseSchema):
     """User statistics for portal home."""
 
     pending_votes: int
+    pending_quiz: int = 0
     pending_invitations: int
     upcoming_sessions: int
     total_sessions_attended: int
     total_votes_cast: int
+
+
+class PortalQuizSessionSummary(BaseSchema):
+    """Quiz session summary for portal view."""
+
+    id: str
+    name: str
+    description: str | None
+    status: str
+    question_count: int
+    has_joined: bool
+    my_score: int = 0
+
+
+class PortalQuizListResponse(BaseSchema):
+    """List of portal quiz sessions."""
+
+    items: list[PortalQuizSessionSummary]
+    total: int
+
+
+class PortalQuizAnswer(BaseSchema):
+    """Request to submit a quiz answer from portal."""
+
+    question_index: int = Field(..., ge=0)
+    selected_indices: list[int] = Field(..., min_length=1)
+    response_time_ms: int | None = None
 
 
 class PortalHistorySessionItem(BaseSchema):

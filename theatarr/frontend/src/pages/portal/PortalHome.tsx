@@ -3,7 +3,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { Calendar, Vote, CheckCircle, Film, Mail } from 'lucide-react';
+import { Calendar, Vote, CheckCircle, Film, HelpCircle, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
@@ -13,10 +13,21 @@ import { useCountdown } from '../../hooks/useCountdown';
 
 interface PortalStats {
   pending_votes: number;
+  pending_quiz: number;
   pending_invitations: number;
   upcoming_sessions: number;
   total_sessions_attended: number;
   total_votes_cast: number;
+}
+
+interface PortalQuiz {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  question_count: number;
+  has_joined: boolean;
+  my_score: number;
 }
 
 interface PortalSession {
@@ -64,6 +75,11 @@ export function PortalHome() {
   const { data: pendingInvitations } = useQuery({
     queryKey: ['portal', 'sessions', 'pending'],
     queryFn: () => apiClient.get<{ items: PortalSession[]; total: number }>('/portal/sessions/pending'),
+  });
+
+  const { data: pendingQuiz } = useQuery({
+    queryKey: ['portal', 'quiz', 'pending'],
+    queryFn: () => apiClient.get<{ items: PortalQuiz[]; total: number }>('/portal/quiz/pending'),
   });
 
   const { data: sessions } = useQuery({
@@ -176,6 +192,51 @@ export function PortalHome() {
         </section>
       )}
 
+      {/* Pending quiz */}
+      {pendingQuiz && pendingQuiz.items.length > 0 && (
+        <section className="animate-pulse-subtle">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <HelpCircle size={18} className="text-yellow-400" />
+              <h2 className="text-lg font-semibold text-dark-text">Quiz en cours</h2>
+              <span className="px-2 py-0.5 text-xs font-bold bg-yellow-500 text-white rounded-full animate-blink">
+                {pendingQuiz.items.length}
+              </span>
+            </div>
+            <Link to="/portal/quiz" className="text-sm text-theatarr-500 hover:underline">
+              Voir tout
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {pendingQuiz.items.slice(0, 2).map((quiz) => (
+              <Link
+                key={quiz.id}
+                to={`/portal/quiz/${quiz.id}`}
+                className="block bg-dark-surface rounded-xl border border-dark-border p-4 hover:border-theatarr-500/50 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                    <HelpCircle size={20} className="text-yellow-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-dark-text truncate">{quiz.name}</h3>
+                    {quiz.description && (
+                      <p className="text-sm text-dark-muted line-clamp-1 mt-0.5">{quiz.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-2 text-xs text-dark-muted">
+                      <span>{quiz.question_count} questions</span>
+                      {!quiz.has_joined && (
+                        <span className="text-blue-400">Pas encore rejoint</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Upcoming sessions */}
       {sessions && sessions.items.length > 0 && (
         <section>
@@ -211,7 +272,8 @@ export function PortalHome() {
 
       {/* Empty state */}
       {(!sessions || sessions.items.length === 0) &&
-        (!pendingVotes || pendingVotes.items.length === 0) && (
+        (!pendingVotes || pendingVotes.items.length === 0) &&
+        (!pendingQuiz || pendingQuiz.items.length === 0) && (
           <div className="text-center py-12">
             <Film size={48} className="mx-auto text-dark-muted mb-4" />
             <h3 className="text-lg font-medium text-dark-text mb-2">

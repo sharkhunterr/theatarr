@@ -53,6 +53,7 @@ const TEMPLATE_TYPES = [
   { value: 'countdown', label: 'Countdown' },
   { value: 'session_status', label: 'Session Status' },
   { value: 'waiting_screen', label: 'Waiting Screen' },
+  { value: 'quiz', label: 'Quiz' },
   { value: 'custom', label: 'Custom' },
 ];
 
@@ -97,6 +98,10 @@ const LAYOUT_STYLES = [
   { value: 'waiting-intermission', label: 'Entracte', group: 'Waiting (entracte)' },
   { value: 'waiting-intermission-fun', label: 'Pause Detente', group: 'Waiting (entracte)' },
   { value: 'waiting-intermission-minimal', label: 'Pause Minimale', group: 'Waiting (entracte)' },
+  // Quiz
+  { value: 'quiz-classic', label: 'Quiz Classique', group: 'Quiz' },
+  { value: 'quiz-gameshow', label: 'Quiz Game Show', group: 'Quiz' },
+  { value: 'quiz-minimal', label: 'Quiz Minimal', group: 'Quiz' },
   // Custom HTML
   { value: 'custom-html', label: 'HTML/CSS/JS Personnalise', group: 'Custom' },
 ];

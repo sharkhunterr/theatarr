@@ -412,6 +412,20 @@ class SequenceEngine:
 
             ws_params = dict(action.parameters or {})
             action_type_val = _enum_val(action.action_type)
+
+            # Auto-setup quiz if this is a quiz display action
+            if (
+                action_type_val == "display"
+                and action.command == "show"
+                and ws_params.get("content_type") == "quiz"
+                and ws_params.get("quiz_session_id")
+            ):
+                quiz_state = await self._setup_quiz_for_session(
+                    session_id, ws_params["quiz_session_id"]
+                )
+                if quiz_state:
+                    ws_params["quiz_display_state"] = quiz_state
+
             if (
                 action_type_val == "media"
                 and action.command == "play"
@@ -471,6 +485,171 @@ class SequenceEngine:
         except Exception as e:
             logger.exception("Error executing action %s: %s", action.id, e)
             return ActionResult(action_id=action.id, success=False, error=str(e))
+
+    async def _setup_quiz_for_session(
+        self, session_id: str, quiz_session_id: str
+    ) -> dict | None:
+        """Auto-enroll accepted session participants into quiz and start it.
+
+        Returns a dict with quiz display state to include in the broadcast,
+        or None on failure.
+        """
+        from theatarr.api.ws import ws_manager, Channel
+        from theatarr.models.session_participant import SessionParticipant, InvitationStatus
+        from theatarr.models.quiz import QuizSession, QuizToken, QuizSessionStatus
+        from theatarr.models.user import User
+        from theatarr.services.quiz import open_quiz, start_quiz, generate_quiz_token
+
+        try:
+            # 1. Get accepted participants
+            result = await self.db.execute(
+                select(SessionParticipant, User)
+                .join(User, SessionParticipant.user_id == User.id)
+                .where(
+                    SessionParticipant.session_id == session_id,
+                    SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value,
+                )
+            )
+            participants = result.all()
+
+            # 2. Get quiz session
+            quiz_result = await self.db.execute(
+                select(QuizSession).where(QuizSession.id == quiz_session_id)
+            )
+            quiz = quiz_result.scalar_one_or_none()
+            if not quiz:
+                logger.warning("Quiz session %s not found for auto-setup", quiz_session_id)
+                return None
+
+            # 3. Create tokens for participants who don't have one
+            participant_names: list[str] = []
+            for participant, user in participants:
+                existing = await self.db.execute(
+                    select(QuizToken).where(
+                        QuizToken.quiz_session_id == quiz_session_id,
+                        QuizToken.user_id == user.id,
+                    )
+                )
+                name = getattr(user, 'display_name', None) or user.username
+                if not existing.scalar_one_or_none():
+                    token = QuizToken(
+                        quiz_session_id=quiz_session_id,
+                        token=generate_quiz_token(),
+                        user_id=user.id,
+                        participant_name=name,
+                        is_active=True,
+                        joined_at=datetime.now(),
+                    )
+                    self.db.add(token)
+                participant_names.append(name)
+
+            await self.db.flush()
+
+            # 4. Open and start quiz if not already active
+            questions = quiz.questions or []
+            config = quiz.config or {}
+            qs_status = quiz.status.value if isinstance(quiz.status, QuizSessionStatus) else quiz.status
+            if qs_status == QuizSessionStatus.DRAFT.value:
+                quiz = await open_quiz(self.db, quiz)
+                qs_status = quiz.status.value if isinstance(quiz.status, QuizSessionStatus) else quiz.status
+
+            started_now = False
+            if qs_status == QuizSessionStatus.OPEN.value:
+                quiz = await start_quiz(self.db, quiz)
+                started_now = True
+
+                # Broadcast quiz_started + first question
+                if questions:
+                    first_q = questions[0]
+                    await ws_manager.broadcast(
+                        f"{Channel.QUIZ.value}:{quiz_session_id}",
+                        {
+                            "type": "quiz_started",
+                            "payload": {
+                                "quiz_session_id": quiz_session_id,
+                                "total_questions": len(questions),
+                            },
+                        },
+                    )
+                    await ws_manager.broadcast(
+                        f"{Channel.QUIZ.value}:{quiz_session_id}",
+                        {
+                            "type": "quiz_question",
+                            "payload": {
+                                "quiz_session_id": quiz_session_id,
+                                "question_index": 0,
+                                "question": {
+                                    "text": first_q.get("text", ""),
+                                    "choices": first_q.get("choices", []),
+                                    "allow_multiple": first_q.get("allow_multiple", False),
+                                    "time_limit_seconds": first_q.get("time_limit_seconds")
+                                    or config.get("default_time_limit_seconds", 30),
+                                    "hint": first_q.get("hint"),
+                                },
+                                "total_questions": len(questions),
+                            },
+                        },
+                    )
+
+            await self.db.commit()
+            logger.info(
+                "Quiz %s auto-setup for session %s: %d participants enrolled",
+                quiz_session_id, session_id, len(participants),
+            )
+
+            # 5. Build display state for the broadcast
+            qs_status = quiz.status.value if isinstance(quiz.status, QuizSessionStatus) else quiz.status
+            current_idx = quiz.current_question_index
+            phase = "waiting"
+            current_question = None
+            time_limit = None
+
+            if started_now and questions:
+                phase = "question"
+                first_q = questions[0]
+                time_limit = first_q.get("time_limit_seconds") or config.get("default_time_limit_seconds", 30)
+                current_question = {
+                    "text": first_q.get("text", ""),
+                    "choices": first_q.get("choices", []),
+                    "allow_multiple": first_q.get("allow_multiple", False),
+                    "time_limit_seconds": time_limit,
+                    "hint": first_q.get("hint"),
+                }
+            elif qs_status == QuizSessionStatus.ACTIVE.value and 0 <= current_idx < len(questions):
+                phase = "question"
+                q = questions[current_idx]
+                time_limit = q.get("time_limit_seconds") or config.get("default_time_limit_seconds", 30)
+                current_question = {
+                    "text": q.get("text", ""),
+                    "choices": q.get("choices", []),
+                    "allow_multiple": q.get("allow_multiple", False),
+                    "time_limit_seconds": time_limit,
+                    "hint": q.get("hint"),
+                }
+
+            # Build join URL (best-effort — uses localhost fallback)
+            join_url = f"http://localhost:2173/portal/quiz/{quiz_session_id}"
+
+            return {
+                "quiz_session_id": quiz_session_id,
+                "name": quiz.name,
+                "status": qs_status,
+                "phase": phase,
+                "current_question_index": current_idx,
+                "total_questions": len(questions),
+                "current_question": current_question,
+                "time_remaining_seconds": time_limit,
+                "participants": [
+                    {"name": n, "score": 0, "has_answered_current": False}
+                    for n in participant_names
+                ],
+                "scoreboard": [],
+                "join_url": join_url,
+            }
+
+        except Exception as e:
+            logger.exception("Failed to auto-setup quiz %s for session %s: %s", quiz_session_id, session_id, e)
+            return None
 
     async def _transition_to_next_sequence(self, session: Session) -> None:
         """Transition to the next sequence."""

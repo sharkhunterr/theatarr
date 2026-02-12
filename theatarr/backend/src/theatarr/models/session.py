@@ -134,6 +134,11 @@ class Session(UUIDMixin, TimestampMixin, Base):
         ForeignKey("vote_sessions.id", ondelete="SET NULL"),
         nullable=True,
     )
+    linked_quiz_session_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("quiz_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     mystery_reveal_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
