@@ -123,6 +123,9 @@ class SequenceSummary(BaseSchema):
     transition_ms: int
     actions_count: int = 0
     action_types: list[str] = []
+    # For manual sequences: expected duration inferred from action parameters
+    # (e.g. pause_at_ms for media:play). None if truly open-ended.
+    expected_duration_ms: int | None = None
 
 
 class ActionInput(BaseSchema):

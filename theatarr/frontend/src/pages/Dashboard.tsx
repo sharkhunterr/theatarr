@@ -98,70 +98,42 @@ const MIN_BLOCK_PERCENT = 3; // minimum % width for any timeline block
 
 function getEffectiveDuration(seq: Sequence): number {
   if (seq.duration_type === 'fixed' && seq.duration_ms && seq.duration_ms > 0) return seq.duration_ms;
-  // dynamic: prefer explicit duration_ms, fall back to duration_fallback_ms
   if (seq.duration_ms && seq.duration_ms > 0) return seq.duration_ms;
   if (seq.duration_fallback_ms && seq.duration_fallback_ms > 0) return seq.duration_fallback_ms;
   return 60000;
 }
 
 /**
- * Compute proportional widths with a guaranteed minimum.
- * Uses the movie runtime to distribute duration across manual (media) sequences,
- * which gives correct proportions: a 5-min test cut vs a 2h film resume.
+ * Get the expected duration of a sequence for timeline display.
+ * Uses expected_duration_ms from backend (based on pause_at_ms for manual),
+ * movie runtime for open-ended manual sequences, or fixed duration.
+ */
+function getBlockDuration(seq: Sequence, movieRuntimeMs: number, knownManualMs: number): number {
+  // Backend-computed expected duration (pause_at_ms for media:play, duration_ms for fixed)
+  if (seq.expected_duration_ms && seq.expected_duration_ms > 0) return seq.expected_duration_ms;
+  // Manual without expected_duration (media:resume): rest of movie
+  if (seq.duration_type === 'manual') {
+    return Math.max(movieRuntimeMs - knownManualMs, 60000);
+  }
+  return getEffectiveDuration(seq);
+}
+
+/**
+ * Compute stable proportional widths. Computed once from sequence definitions
+ * and movie runtime — does NOT depend on elapsed time, so blocks never shift.
  */
 function computeProportionalWidths(
   sequences: Sequence[],
-  currentIndex: number,
-  elapsedMs: number,
   movieRuntimeMs: number,
 ): number[] {
   if (sequences.length === 0) return [];
 
-  // Identify manual sequences and count how many need runtime estimation
-  const manualIndices = sequences
-    .map((s, i) => (s.duration_type === 'manual' ? i : -1))
-    .filter((i) => i >= 0);
+  // Sum of known manual durations (from expected_duration_ms / pause_at_ms)
+  const knownManualMs = sequences
+    .filter((s) => s.duration_type === 'manual' && s.expected_duration_ms && s.expected_duration_ms > 0)
+    .reduce((sum, s) => sum + s.expected_duration_ms!, 0);
 
-  // Sum elapsed time already consumed by past + current manual sequences
-  let manualElapsedTotal = 0;
-  for (const idx of manualIndices) {
-    if (idx < currentIndex) {
-      // Past manual: we don't have exact elapsed, but the current sequence
-      // elapsed accumulates from the START of that sequence. Use a proportion
-      // of the movie runtime as estimate (short test cut = ~5 min).
-      manualElapsedTotal += sequences[idx].duration_ms && sequences[idx].duration_ms! > 0
-        ? sequences[idx].duration_ms!
-        : 300000; // default 5 min for past unknown manual
-    } else if (idx === currentIndex) {
-      manualElapsedTotal += elapsedMs;
-    }
-  }
-
-  // Remaining movie time for future manual sequences
-  const remainingMovieMs = Math.max(movieRuntimeMs - manualElapsedTotal, 60000);
-  const futureManualCount = manualIndices.filter((i) => i > currentIndex).length;
-
-  const durations = sequences.map((seq, idx) => {
-    if (seq.duration_type === 'manual') {
-      // Explicit duration_ms hint: use it directly
-      if (seq.duration_ms && seq.duration_ms > 0) return seq.duration_ms;
-
-      if (idx === currentIndex) {
-        // Current: use actual elapsed + buffer so cursor doesn't hit 100%
-        return Math.max(elapsedMs + 60000, 120000);
-      }
-      if (idx < currentIndex) {
-        // Past: estimate 5 min (typical test cut)
-        return 300000;
-      }
-      // Future: distribute remaining movie time across future manual sequences
-      if (movieRuntimeMs > 0 && futureManualCount > 0) {
-        return remainingMovieMs / futureManualCount;
-      }
-      return 300000; // fallback
-    }
-    return getEffectiveDuration(seq);
-  });
+  const durations = sequences.map((seq) => getBlockDuration(seq, movieRuntimeMs, knownManualMs));
 
   const total = durations.reduce((s, d) => s + d, 0);
   if (total === 0) return sequences.map(() => 100 / sequences.length);
@@ -238,11 +210,18 @@ function DashboardTimeline({
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Quantize elapsed to 30s chunks for width computation to avoid per-second layout shifts
-  const quantizedElapsed = Math.floor(elapsedMs / 30000) * 30000;
+  // Stable widths — computed from sequence definitions + movie runtime, NOT elapsed time
   const widths = useMemo(
-    () => computeProportionalWidths(sequences, currentIndex, quantizedElapsed, movieRuntimeMs),
-    [sequences, currentIndex, quantizedElapsed, movieRuntimeMs],
+    () => computeProportionalWidths(sequences, movieRuntimeMs),
+    [sequences, movieRuntimeMs],
+  );
+
+  // Sum of known manual durations for getBlockDuration
+  const knownManualMs = useMemo(
+    () => sequences
+      .filter((s) => s.duration_type === 'manual' && s.expected_duration_ms && s.expected_duration_ms > 0)
+      .reduce((sum, s) => sum + s.expected_duration_ms!, 0),
+    [sequences],
   );
 
   if (sequences.length === 0) {
@@ -256,11 +235,10 @@ function DashboardTimeline({
   const isActive = status === 'running' || status === 'paused';
   const isComplete = status === 'completed';
   const currentSeq = sequences[currentIndex];
-  const isManual = currentSeq?.duration_type === 'manual';
-  // For manual sequences, the "total" grows with elapsed so cursor stays ~proportional
-  const currentDuration = isManual
-    ? elapsedMs + 60000 // always 60s "ahead" — cursor smoothly fills
-    : currentSeq ? getEffectiveDuration(currentSeq) : 0;
+  // Current block's expected duration for cursor progress
+  const currentDuration = currentSeq
+    ? getBlockDuration(currentSeq, movieRuntimeMs, knownManualMs)
+    : 0;
   const progress = currentDuration > 0 ? Math.min(elapsedMs / currentDuration, 1) : 0;
 
   return (
@@ -339,9 +317,7 @@ function DashboardTimeline({
                   <div className="bg-dark-surface border border-dark-border rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
                     <div className="text-xs font-medium text-dark-text">{seq.name}</div>
                     <div className="text-[10px] text-dark-muted mt-0.5">
-                      {seq.duration_type === 'manual'
-                        ? (language === 'fr' ? 'Manuel' : 'Manual')
-                        : formatDuration(getEffectiveDuration(seq))}
+                      {formatDuration(getBlockDuration(seq, movieRuntimeMs, knownManualMs))}
                       {(seq.actions_count ?? 0) > 0 && (
                         <span className="ml-2">
                           {seq.actions_count} action{(seq.actions_count ?? 0) > 1 ? 's' : ''}
@@ -383,13 +359,9 @@ function DashboardTimeline({
                 {' — '}
                 <span className="text-dark-text">{currentSeq.name}</span>
               </span>
-              {isManual ? (
-                <span className="italic ml-2">{formatDuration(elapsedMs)}</span>
-              ) : (
-                <span className="ml-2">
-                  {formatDuration(elapsedMs)} / {formatDuration(currentDuration)}
-                </span>
-              )}
+              <span className="ml-2">
+                {formatDuration(elapsedMs)} / {formatDuration(currentDuration)}
+              </span>
             </>
           )}
         </div>

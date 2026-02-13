@@ -197,16 +197,32 @@ def _sequence_to_summary(sequence: Sequence) -> SequenceSummary:
         a.action_type.value if hasattr(a.action_type, 'value') else a.action_type
         for a in sequence.actions
     })
+
+    # Infer expected_duration_ms for manual sequences from pause_at_ms
+    expected_duration_ms = None
+    dur_type = sequence.duration_type.value if hasattr(sequence.duration_type, 'value') else sequence.duration_type
+    if dur_type == "manual":
+        for action in sequence.actions:
+            params = action.parameters or {}
+            pat = params.get("pause_at_ms")
+            if pat is not None:
+                pat_int = int(pat)
+                if expected_duration_ms is None or pat_int > expected_duration_ms:
+                    expected_duration_ms = pat_int
+    elif dur_type == "fixed" and sequence.duration_ms:
+        expected_duration_ms = sequence.duration_ms
+
     return SequenceSummary(
         id=sequence.id,
         name=sequence.name,
         order_index=sequence.order_index,
-        duration_type=sequence.duration_type.value if hasattr(sequence.duration_type, 'value') else sequence.duration_type,
+        duration_type=dur_type,
         duration_ms=sequence.duration_ms,
         duration_fallback_ms=sequence.duration_fallback_ms,
         transition_ms=sequence.transition_ms,
         actions_count=len(sequence.actions),
         action_types=action_types,
+        expected_duration_ms=expected_duration_ms,
     )
 
 

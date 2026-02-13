@@ -27,6 +27,7 @@ export interface Sequence {
   remaining_ms?: number;
   actions_count?: number;
   action_types?: string[];
+  expected_duration_ms?: number | null;
 }
 
 export interface ColorPalette {
