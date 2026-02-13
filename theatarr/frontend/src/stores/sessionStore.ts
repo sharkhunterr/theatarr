@@ -152,19 +152,32 @@ export const useSessionStore = create<SessionStoreState>()((set) => ({
 
   updateSessionState: (state) =>
     set((prev) => {
-      // Also update the current session if it matches
+      const updates: Partial<SessionStoreState> = { sessionState: state };
+
+      // Update the current session if it matches
       if (prev.currentSession?.id === state.session_id) {
-        return {
-          sessionState: state,
-          currentSession: {
-            ...prev.currentSession,
-            status: state.status,
-            current_sequence_index: state.current_sequence_index,
-            current_sequence_elapsed_ms: state.current_sequence_elapsed_ms,
-          },
+        updates.currentSession = {
+          ...prev.currentSession,
+          status: state.status,
+          current_sequence_index: state.current_sequence_index,
+          current_sequence_elapsed_ms: state.current_sequence_elapsed_ms,
         };
       }
-      return { sessionState: state };
+
+      // Update the session in the sessions list
+      const idx = prev.sessions.findIndex((s) => s.id === state.session_id);
+      if (idx !== -1) {
+        const updated = [...prev.sessions];
+        updated[idx] = {
+          ...updated[idx],
+          status: state.status,
+          current_sequence_index: state.current_sequence_index,
+          current_sequence_elapsed_ms: state.current_sequence_elapsed_ms,
+        };
+        updates.sessions = updated;
+      }
+
+      return updates;
     }),
 
   clearError: () => set({ error: null }),

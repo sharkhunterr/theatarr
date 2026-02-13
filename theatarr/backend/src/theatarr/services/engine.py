@@ -187,9 +187,18 @@ class SequenceEngine:
         """Get stored media state for resume."""
         return self._media_states.get(session_id)
 
-    async def _get_session(self, session_id: str) -> Session:
-        """Get a session by ID with sequences and actions loaded."""
-        db = self._session_db(session_id)
+    async def _get_session(self, session_id: str, *, use_lifecycle_db: bool = False) -> Session:
+        """Get a session by ID with sequences and actions loaded.
+
+        Args:
+            session_id: The session ID to look up.
+            use_lifecycle_db: If True, always use self.db (the lifecycle DB)
+                instead of the background task DB.  Lifecycle methods
+                (start/pause/resume/stop/skip) must set this to True so
+                that the returned object is tracked by self.db and
+                self.db.commit() will persist changes.
+        """
+        db = self.db if use_lifecycle_db else self._session_db(session_id)
         result = await db.execute(
             select(Session).where(Session.id == session_id)
         )
@@ -237,7 +246,7 @@ class SequenceEngine:
         """Start a session."""
         lock = await self._get_lock(session_id)
         async with lock:
-            session = await self._get_session(session_id)
+            session = await self._get_session(session_id, use_lifecycle_db=True)
 
             if not session.can_start:
                 raise SessionNotRunnableError(
@@ -265,7 +274,7 @@ class SequenceEngine:
         """Pause a running session."""
         lock = await self._get_lock(session_id)
         async with lock:
-            session = await self._get_session(session_id)
+            session = await self._get_session(session_id, use_lifecycle_db=True)
 
             if not session.can_pause:
                 raise SessionNotRunnableError(
@@ -288,7 +297,7 @@ class SequenceEngine:
         """Resume a paused session."""
         lock = await self._get_lock(session_id)
         async with lock:
-            session = await self._get_session(session_id)
+            session = await self._get_session(session_id, use_lifecycle_db=True)
 
             if not session.can_resume:
                 raise SessionNotRunnableError(
@@ -310,7 +319,7 @@ class SequenceEngine:
         """Stop a session."""
         lock = await self._get_lock(session_id)
         async with lock:
-            session = await self._get_session(session_id)
+            session = await self._get_session(session_id, use_lifecycle_db=True)
 
             if session.status == SessionStatus.COMPLETED:
                 return session
@@ -334,7 +343,7 @@ class SequenceEngine:
         """Skip to the next sequence."""
         lock = await self._get_lock(session_id)
         async with lock:
-            session = await self._get_session(session_id)
+            session = await self._get_session(session_id, use_lifecycle_db=True)
 
             if session.status not in (SessionStatus.RUNNING, SessionStatus.PAUSED):
                 raise SessionNotRunnableError(
@@ -947,7 +956,7 @@ class SequenceEngine:
 
     async def get_session_state(self, session_id: str) -> dict[str, Any]:
         """Get current state of a session."""
-        session = await self._get_session(session_id)
+        session = await self._get_session(session_id, use_lifecycle_db=True)
         state: dict[str, Any] = {
             "session_id": session.id,
             "status": _enum_val(session.status),
