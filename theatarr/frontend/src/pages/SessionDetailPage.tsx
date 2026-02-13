@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   ArrowLeft,
+  BarChart3,
   Calendar,
   Check,
   Clock,
@@ -15,13 +16,10 @@ import {
   Edit3,
   Eye,
   Film,
-  Lightbulb,
   Monitor,
-  Music,
   Pause,
   Play,
   ScreenShare,
-  Settings,
   Shuffle,
   SkipForward,
   Sparkles,
@@ -34,6 +32,7 @@ import {
 } from 'lucide-react';
 
 import { Button, MysteryPoster, VotePoster, VotePosterCollage } from '../components/common';
+import { TimelineDetailModal } from '../components/sessions/TimelineDetailModal';
 import { apiClient } from '../api/client';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCountdown } from '../hooks/useCountdown';
@@ -49,6 +48,14 @@ import {
   getVoteRevealCountdown,
   getSessionStartCountdown,
 } from '../utils/countdown';
+import {
+  ACTION_TYPE_COLORS,
+  ACTION_TYPE_ICONS,
+  getBlockDuration,
+  computeProportionalWidths,
+  computeKnownManualMs,
+  formatDuration,
+} from '../utils/timeline';
 
 // ============================================================================
 // Types
@@ -67,55 +74,8 @@ interface Participant {
 }
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const ACTION_TYPE_COLORS: Record<string, string> = {
-  media: '#3b82f6',
-  lighting: '#eab308',
-  audio: '#22c55e',
-  display: '#a855f7',
-  actuator: '#f97316',
-};
-
-const ACTION_TYPE_ICONS: Record<string, typeof Film> = {
-  media: Film,
-  lighting: Lightbulb,
-  audio: Music,
-  display: ScreenShare,
-  actuator: Settings,
-};
-
-const DEFAULT_SEQUENCE_DURATION = 60000;
-
-// ============================================================================
 // Helpers
 // ============================================================================
-
-function getSequenceColor(seq: Sequence): string {
-  const types = seq.action_types || [];
-  if (types.length === 0) return '#6b7280';
-  if (types.length === 1) return ACTION_TYPE_COLORS[types[0]] || '#6b7280';
-  // Multiple types: use the first one's color
-  return ACTION_TYPE_COLORS[types[0]] || '#6b7280';
-}
-
-function getSequenceDuration(seq: Sequence): number {
-  if (seq.duration_ms && seq.duration_ms > 0) return seq.duration_ms;
-  return DEFAULT_SEQUENCE_DURATION;
-}
-
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const remainMinutes = minutes % 60;
-    return `${hours}h${remainMinutes.toString().padStart(2, '0')}m`;
-  }
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -164,7 +124,7 @@ function getStatusBadge(status: string, language: string) {
 }
 
 // ============================================================================
-// Timeline Component
+// Timeline Component (improved with proportional widths + multi-stripe)
 // ============================================================================
 
 function SessionTimeline({
@@ -173,18 +133,25 @@ function SessionTimeline({
   elapsedMs,
   status,
   language,
+  movieRuntimeMs,
 }: {
   sequences: Sequence[];
   currentIndex: number;
   elapsedMs: number;
   status: string;
   language: string;
+  movieRuntimeMs: number;
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const totalDuration = useMemo(
-    () => sequences.reduce((sum, seq) => sum + getSequenceDuration(seq), 0),
-    [sequences]
+  const widths = useMemo(
+    () => computeProportionalWidths(sequences, movieRuntimeMs),
+    [sequences, movieRuntimeMs],
+  );
+
+  const knownManualMs = useMemo(
+    () => computeKnownManualMs(sequences),
+    [sequences],
   );
 
   if (sequences.length === 0) {
@@ -198,67 +165,73 @@ function SessionTimeline({
   const isActive = status === 'running' || status === 'paused';
   const isComplete = status === 'completed';
   const currentSeq = sequences[currentIndex];
-  const currentDuration = currentSeq ? getSequenceDuration(currentSeq) : 0;
+  const currentDuration = currentSeq
+    ? getBlockDuration(currentSeq, movieRuntimeMs, knownManualMs)
+    : 0;
   const progress = currentDuration > 0 ? Math.min(elapsedMs / currentDuration, 1) : 0;
 
   return (
     <div className="space-y-2">
-      {/* Progress bar */}
       <div className="relative h-8 sm:h-10 flex rounded-lg overflow-hidden bg-dark-bg border border-dark-border">
         {sequences.map((seq, index) => {
-          const duration = getSequenceDuration(seq);
-          const widthPercent = totalDuration > 0 ? (duration / totalDuration) * 100 : 100 / sequences.length;
-          const color = getSequenceColor(seq);
+          const widthPercent = widths[index] || 0;
           const isCurrent = index === currentIndex;
           const isPast = isComplete ? true : index < currentIndex;
           const isHovered = hoveredIndex === index;
+          const types = seq.action_types || [];
+          const colors = types.length > 0
+            ? types.map((t) => ACTION_TYPE_COLORS[t] || '#6b7280')
+            : ['#6b7280'];
 
           return (
             <div
               key={seq.id}
-              className="relative h-full flex items-center justify-center cursor-default group"
-              style={{ width: `${widthPercent}%`, minWidth: '8px' }}
+              className="relative h-full cursor-default"
+              style={{ width: `${widthPercent}%` }}
               onMouseEnter={() => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
             >
-              {/* Background */}
-              <div
-                className={clsx(
-                  'absolute inset-0 transition-opacity',
-                  isCurrent && isActive && 'animate-pulse',
-                )}
-                style={{
-                  backgroundColor: color,
-                  opacity: isPast ? 0.6 : isCurrent ? 0.4 : 0.15,
-                }}
-              />
+              {/* Multi-stripe background */}
+              <div className="absolute inset-0 flex flex-col">
+                {colors.map((c, ci) => (
+                  <div
+                    key={ci}
+                    className={clsx(
+                      'flex-1 transition-opacity',
+                      isCurrent && isActive && 'animate-pulse',
+                    )}
+                    style={{
+                      backgroundColor: c,
+                      opacity: isPast ? 0.6 : isCurrent ? 0.4 : 0.15,
+                    }}
+                  />
+                ))}
+              </div>
 
-              {/* Fill for current sequence */}
+              {/* Progress fill for current sequence */}
               {isCurrent && isActive && (
-                <div
-                  className="absolute inset-y-0 left-0 transition-[width] duration-1000 ease-linear"
-                  style={{
-                    width: `${progress * 100}%`,
-                    backgroundColor: color,
-                    opacity: 0.7,
-                  }}
-                />
+                <div className="absolute inset-0 overflow-hidden">
+                  <div
+                    className="h-full flex flex-col transition-[width] duration-1000 ease-linear"
+                    style={{ width: `${progress * 100}%` }}
+                  >
+                    {colors.map((c, ci) => (
+                      <div
+                        key={ci}
+                        className="flex-1"
+                        style={{ backgroundColor: c, opacity: 0.7 }}
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
 
-              {/* Sequence name (visible on wider segments) */}
-              <span className={clsx(
-                'relative z-10 text-[10px] sm:text-xs font-medium truncate px-1',
-                isPast || isCurrent ? 'text-white' : 'text-dark-muted',
-              )}>
-                {widthPercent > 12 ? seq.name : ''}
-              </span>
-
-              {/* Right border separator */}
+              {/* Separator */}
               {index < sequences.length - 1 && (
-                <div className="absolute right-0 inset-y-0 w-px bg-dark-bg/50" />
+                <div className="absolute right-0 inset-y-0 w-px bg-dark-bg/50 z-10" />
               )}
 
-              {/* Cursor on current segment */}
+              {/* Cursor */}
               {isCurrent && isActive && (
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_4px_rgba(255,255,255,0.8)] z-20 transition-[left] duration-1000 ease-linear"
@@ -272,18 +245,16 @@ function SessionTimeline({
                   <div className="bg-dark-surface border border-dark-border rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
                     <div className="text-xs font-medium text-dark-text">{seq.name}</div>
                     <div className="text-[10px] text-dark-muted mt-0.5">
-                      {seq.duration_type === 'manual'
-                        ? (language === 'fr' ? 'Manuel' : 'Manual')
-                        : formatDuration(getSequenceDuration(seq))}
+                      {formatDuration(getBlockDuration(seq, movieRuntimeMs, knownManualMs))}
                       {(seq.actions_count ?? 0) > 0 && (
                         <span className="ml-2">
                           {seq.actions_count} action{(seq.actions_count ?? 0) > 1 ? 's' : ''}
                         </span>
                       )}
                     </div>
-                    {seq.action_types && seq.action_types.length > 0 && (
-                      <div className="flex items-center gap-1 mt-1">
-                        {seq.action_types.map((type) => {
+                    {types.length > 0 && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        {types.map((type) => {
                           const Icon = ACTION_TYPE_ICONS[type] || Zap;
                           return (
                             <span
@@ -306,24 +277,36 @@ function SessionTimeline({
         })}
       </div>
 
-      {/* Current sequence info */}
-      {currentSeq && (isActive || isComplete) && (
-        <div className="flex items-center justify-between text-xs text-dark-muted">
-          <span>
-            {language === 'fr' ? 'Sequence' : 'Sequence'} {currentIndex + 1}/{sequences.length}
-            {' — '}
-            <span className="text-dark-text">{currentSeq.name}</span>
-          </span>
-          {currentSeq.duration_type !== 'manual' && (
-            <span>
-              {formatDuration(elapsedMs)} / {formatDuration(currentDuration)}
-            </span>
-          )}
-          {currentSeq.duration_type === 'manual' && (
-            <span className="italic">{language === 'fr' ? 'Manuel' : 'Manual'}</span>
+      {/* Legend + current sequence info */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-dark-muted">
+        <div className="flex items-center gap-1">
+          {currentSeq && (isActive || isComplete) && (
+            <>
+              <span>
+                Seq {currentIndex + 1}/{sequences.length}
+                {' — '}
+                <span className="text-dark-text">{currentSeq.name}</span>
+              </span>
+              <span className="ml-2">
+                {formatDuration(elapsedMs)} / {formatDuration(currentDuration)}
+              </span>
+            </>
           )}
         </div>
-      )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {Object.entries(ACTION_TYPE_COLORS).map(([type, color]) => {
+            const Icon = ACTION_TYPE_ICONS[type] || Zap;
+            const hasType = sequences.some((s) => s.action_types?.includes(type));
+            if (!hasType) return null;
+            return (
+              <span key={type} className="inline-flex items-center gap-0.5 text-[10px]" style={{ color }}>
+                <Icon size={10} />
+                {type}
+              </span>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -508,6 +491,7 @@ export function SessionDetailPage() {
   const [controllingAction, setControllingAction] = useState<string | null>(null);
   const [controlError, setControlError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [showTimelineDetail, setShowTimelineDetail] = useState(false);
 
   const handleControl = useCallback(
     async (action: 'play' | 'pause' | 'stop' | 'skip') => {
@@ -533,6 +517,7 @@ export function SessionDetailPage() {
   const currentIndex = liveState?.current_sequence_index ?? session?.current_sequence_index ?? 0;
   const elapsedMs = liveState?.current_sequence_elapsed_ms ?? session?.current_sequence_elapsed_ms ?? 0;
   const sequences = session?.sequences || [];
+  const movieRuntimeMs = (session?.movie_runtime_minutes ?? 0) * 60 * 1000;
 
   const isMysteryHidden = session?.movie_selection_mode === 'mystery' && !session?.movie_resolved;
   const isVoteHidden = session?.movie_selection_mode === 'vote' && !session?.movie_resolved;
@@ -852,6 +837,13 @@ export function SessionDetailPage() {
 
             {/* Quick links */}
             <div className="flex-1" />
+            <button
+              onClick={() => setShowTimelineDetail(true)}
+              title={language === 'fr' ? 'Detail timeline' : 'Timeline detail'}
+              className="p-1.5 rounded-lg text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
+            >
+              <BarChart3 size={16} />
+            </button>
             {session.display_code && (
               <a
                 href={`/display/${session.display_code}`}
@@ -890,9 +882,21 @@ export function SessionDetailPage() {
             elapsedMs={elapsedMs}
             status={currentStatus}
             language={language}
+            movieRuntimeMs={movieRuntimeMs}
           />
         </div>
       )}
+
+      {/* Timeline Detail Modal */}
+      <TimelineDetailModal
+        isOpen={showTimelineDetail}
+        onClose={() => setShowTimelineDetail(false)}
+        sessionId={id!}
+        language={language}
+        currentIndex={currentIndex}
+        elapsedMs={elapsedMs}
+        status={currentStatus}
+      />
 
       {/* Participants */}
       <ParticipantsSection

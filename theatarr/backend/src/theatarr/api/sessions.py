@@ -21,6 +21,7 @@ from theatarr.models.sequence import DurationType, Sequence
 from theatarr.models.session_participant import SessionParticipant, InvitationStatus
 from theatarr.models.vote import VoteSession, VoteSessionStatus
 from theatarr.schemas.session import (
+    ActionDetail,
     MovieSelectionMode as MovieSelectionModeSchema,
     MysteryConfig,
     SessionControlAction,
@@ -31,8 +32,10 @@ from theatarr.schemas.session import (
     SessionListResponse,
     SessionResponse,
     SessionState,
+    SessionTimelineResponse,
     SessionUpdate,
     SequenceSummary,
+    SequenceWithActions,
     TemplateSummary,
     VoteSessionSummary,
 )
@@ -576,6 +579,59 @@ async def create_session(
     await db.refresh(session)
 
     return _session_to_response(session)
+
+
+@router.get(
+    "/{session_id}/timeline",
+    response_model=SessionTimelineResponse,
+    summary="Get Session Timeline Data",
+)
+async def get_session_timeline(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+) -> SessionTimelineResponse:
+    """Get timeline data with full action details for Gantt view."""
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise NotFoundError("Session", session_id)
+
+    # Build sequences with actions
+    sequences = []
+    for seq in session.sequences:
+        summary = _sequence_to_summary(seq)
+        actions = [
+            ActionDetail(
+                id=a.id,
+                action_type=a.action_type.value if hasattr(a.action_type, 'value') else a.action_type,
+                command=a.command,
+                parameters=a.parameters or {},
+                delay_ms=a.delay_ms,
+                on_failure=a.on_failure.value if hasattr(a.on_failure, 'value') else a.on_failure,
+                service_id=a.service_id,
+            )
+            for a in seq.actions
+        ]
+        sequences.append(SequenceWithActions(
+            **summary.model_dump(),
+            actions=actions,
+        ))
+
+    # Fetch movie runtime if linked
+    movie_runtime_minutes = None
+    if session.movie_id:
+        movie_result = await db.execute(select(Movie).where(Movie.id == session.movie_id))
+        movie = movie_result.scalar_one_or_none()
+        if movie:
+            movie_runtime_minutes = movie.runtime_minutes
+
+    return SessionTimelineResponse(
+        session_id=session.id,
+        movie_runtime_minutes=movie_runtime_minutes,
+        sequences=sequences,
+    )
 
 
 @router.get(

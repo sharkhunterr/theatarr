@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote, Shuffle, Sparkles, Eye, Trophy, Lightbulb, Music, ScreenShare, Settings, Zap, Play, Timer } from 'lucide-react';
+import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote, Shuffle, Sparkles, Eye, Trophy, Zap, Play, Timer } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../../api/client';
@@ -15,6 +15,14 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import { MysteryPoster } from '../../components/common/MysteryPoster';
 import { VotePoster } from '../../components/common/VotePoster';
 import { VotePosterCollage } from '../../components/common/VotePosterCollage';
+import {
+  ACTION_TYPE_COLORS,
+  ACTION_TYPE_ICONS,
+  getBlockDuration,
+  computeProportionalWidths,
+  computeKnownManualMs,
+  formatDuration,
+} from '../../utils/timeline';
 
 // ============================================================================
 // Types
@@ -69,70 +77,8 @@ interface LiveState {
 }
 
 // ============================================================================
-// Timeline Constants & Helpers
+// Timeline Helpers
 // ============================================================================
-
-const ACTION_TYPE_COLORS: Record<string, string> = {
-  media: '#3b82f6',
-  lighting: '#eab308',
-  audio: '#22c55e',
-  display: '#a855f7',
-  actuator: '#f97316',
-};
-
-const ACTION_TYPE_ICONS: Record<string, typeof Film> = {
-  media: Film,
-  lighting: Lightbulb,
-  audio: Music,
-  display: ScreenShare,
-  actuator: Settings,
-};
-
-const MIN_BLOCK_PERCENT = 3;
-
-function getEffectiveDuration(seq: SequenceSummary): number {
-  if (seq.duration_type === 'fixed' && seq.duration_ms && seq.duration_ms > 0) return seq.duration_ms;
-  if (seq.duration_ms && seq.duration_ms > 0) return seq.duration_ms;
-  if (seq.duration_fallback_ms && seq.duration_fallback_ms > 0) return seq.duration_fallback_ms;
-  return 60000;
-}
-
-function getBlockDuration(seq: SequenceSummary, movieRuntimeMs: number, knownManualMs: number): number {
-  if (seq.expected_duration_ms && seq.expected_duration_ms > 0) return seq.expected_duration_ms;
-  if (seq.duration_type === 'manual') {
-    return Math.max(movieRuntimeMs - knownManualMs, 60000);
-  }
-  return getEffectiveDuration(seq);
-}
-
-function computeProportionalWidths(sequences: SequenceSummary[], movieRuntimeMs: number): number[] {
-  if (sequences.length === 0) return [];
-
-  const knownManualMs = sequences
-    .filter((s) => s.duration_type === 'manual' && s.expected_duration_ms && s.expected_duration_ms > 0)
-    .reduce((sum, s) => sum + s.expected_duration_ms!, 0);
-
-  const durations = sequences.map((seq) => getBlockDuration(seq, movieRuntimeMs, knownManualMs));
-  const total = durations.reduce((s, d) => s + d, 0);
-  if (total === 0) return sequences.map(() => 100 / sequences.length);
-
-  const raw = durations.map((d) => (d / total) * 100);
-  const clamped = raw.map((w) => Math.max(w, MIN_BLOCK_PERCENT));
-  const clampedSum = clamped.reduce((s, w) => s + w, 0);
-  return clamped.map((w) => (w / clampedSum) * 100);
-}
-
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const remainMinutes = minutes % 60;
-    return `${hours}h${remainMinutes.toString().padStart(2, '0')}m`;
-  }
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
 
 function formatTimeShort(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -163,9 +109,7 @@ function PortalTimeline({
   );
 
   const knownManualMs = useMemo(
-    () => sequences
-      .filter((s) => s.duration_type === 'manual' && s.expected_duration_ms && s.expected_duration_ms > 0)
-      .reduce((sum, s) => sum + s.expected_duration_ms!, 0),
+    () => computeKnownManualMs(sequences),
     [sequences],
   );
 
@@ -420,10 +364,8 @@ export function SessionDetail() {
   // Compute total duration and expected end time
   const totalDurationMs = useMemo(() => {
     if (sequences.length === 0) return 0;
-    const knownManualMs = sequences
-      .filter((s) => s.duration_type === 'manual' && s.expected_duration_ms && s.expected_duration_ms > 0)
-      .reduce((sum, s) => sum + s.expected_duration_ms!, 0);
-    return sequences.reduce((sum, seq) => sum + getBlockDuration(seq, movieRuntimeMs, knownManualMs), 0);
+    const km = computeKnownManualMs(sequences);
+    return sequences.reduce((sum, seq) => sum + getBlockDuration(seq, movieRuntimeMs, km), 0);
   }, [sequences, movieRuntimeMs]);
 
   if (isLoading) {

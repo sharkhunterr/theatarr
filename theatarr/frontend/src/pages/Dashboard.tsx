@@ -15,12 +15,10 @@ import {
   Film,
   Lightbulb,
   Monitor,
-  Music,
   Pause,
   Play,
   Plus,
   ScreenShare,
-  Settings,
   SkipForward,
   Square,
   Users,
@@ -36,6 +34,14 @@ import { useCountdown } from '../hooks/useCountdown';
 import { useLayoutStore } from '../stores/layoutStore';
 import type { Session, SessionState, Sequence } from '../stores/sessionStore';
 import { getSessionStartCountdown } from '../utils/countdown';
+import {
+  ACTION_TYPE_COLORS,
+  ACTION_TYPE_ICONS,
+  getBlockDuration,
+  computeProportionalWidths,
+  computeKnownManualMs,
+  formatDuration,
+} from '../utils/timeline';
 
 // ============================================================================
 // Types
@@ -71,90 +77,8 @@ interface ActivityEvent {
 }
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const ACTION_TYPE_COLORS: Record<string, string> = {
-  media: '#3b82f6',
-  lighting: '#eab308',
-  audio: '#22c55e',
-  display: '#a855f7',
-  actuator: '#f97316',
-};
-
-const ACTION_TYPE_ICONS: Record<string, typeof Film> = {
-  media: Film,
-  lighting: Lightbulb,
-  audio: Music,
-  display: ScreenShare,
-  actuator: Settings,
-};
-
-const MIN_BLOCK_PERCENT = 3; // minimum % width for any timeline block
-
-// ============================================================================
 // Helpers
 // ============================================================================
-
-function getEffectiveDuration(seq: Sequence): number {
-  if (seq.duration_type === 'fixed' && seq.duration_ms && seq.duration_ms > 0) return seq.duration_ms;
-  if (seq.duration_ms && seq.duration_ms > 0) return seq.duration_ms;
-  if (seq.duration_fallback_ms && seq.duration_fallback_ms > 0) return seq.duration_fallback_ms;
-  return 60000;
-}
-
-/**
- * Get the expected duration of a sequence for timeline display.
- * Uses expected_duration_ms from backend (based on pause_at_ms for manual),
- * movie runtime for open-ended manual sequences, or fixed duration.
- */
-function getBlockDuration(seq: Sequence, movieRuntimeMs: number, knownManualMs: number): number {
-  // Backend-computed expected duration (pause_at_ms for media:play, duration_ms for fixed)
-  if (seq.expected_duration_ms && seq.expected_duration_ms > 0) return seq.expected_duration_ms;
-  // Manual without expected_duration (media:resume): rest of movie
-  if (seq.duration_type === 'manual') {
-    return Math.max(movieRuntimeMs - knownManualMs, 60000);
-  }
-  return getEffectiveDuration(seq);
-}
-
-/**
- * Compute stable proportional widths. Computed once from sequence definitions
- * and movie runtime — does NOT depend on elapsed time, so blocks never shift.
- */
-function computeProportionalWidths(
-  sequences: Sequence[],
-  movieRuntimeMs: number,
-): number[] {
-  if (sequences.length === 0) return [];
-
-  // Sum of known manual durations (from expected_duration_ms / pause_at_ms)
-  const knownManualMs = sequences
-    .filter((s) => s.duration_type === 'manual' && s.expected_duration_ms && s.expected_duration_ms > 0)
-    .reduce((sum, s) => sum + s.expected_duration_ms!, 0);
-
-  const durations = sequences.map((seq) => getBlockDuration(seq, movieRuntimeMs, knownManualMs));
-
-  const total = durations.reduce((s, d) => s + d, 0);
-  if (total === 0) return sequences.map(() => 100 / sequences.length);
-
-  const raw = durations.map((d) => (d / total) * 100);
-  const clamped = raw.map((w) => Math.max(w, MIN_BLOCK_PERCENT));
-  const clampedSum = clamped.reduce((s, w) => s + w, 0);
-  return clamped.map((w) => (w / clampedSum) * 100);
-}
-
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const remainMinutes = minutes % 60;
-    return `${hours}h${remainMinutes.toString().padStart(2, '0')}m`;
-  }
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
 
 function formatDateShort(dateStr: string): string {
   const date = new Date(dateStr);
@@ -216,11 +140,8 @@ function DashboardTimeline({
     [sequences, movieRuntimeMs],
   );
 
-  // Sum of known manual durations for getBlockDuration
   const knownManualMs = useMemo(
-    () => sequences
-      .filter((s) => s.duration_type === 'manual' && s.expected_duration_ms && s.expected_duration_ms > 0)
-      .reduce((sum, s) => sum + s.expected_duration_ms!, 0),
+    () => computeKnownManualMs(sequences),
     [sequences],
   );
 

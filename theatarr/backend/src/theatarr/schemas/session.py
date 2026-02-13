@@ -128,6 +128,18 @@ class SequenceSummary(BaseSchema):
     expected_duration_ms: int | None = None
 
 
+class ActionDetail(BaseSchema):
+    """Action detail for timeline display."""
+
+    id: str
+    action_type: str
+    command: str
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    delay_ms: int = 0
+    on_failure: str = "warn"
+    service_id: str | None = None
+
+
 class ActionInput(BaseSchema):
     """Schema for action input in sequence."""
 
@@ -152,6 +164,20 @@ class SequenceInput(BaseSchema):
     duration_fallback_ms: int = 30000
     transition_ms: int = 1000
     actions: list[ActionInput] = Field(default_factory=list)
+
+
+class SequenceWithActions(SequenceSummary):
+    """Sequence with full action details for Gantt view."""
+
+    actions: list[ActionDetail] = []
+
+
+class SessionTimelineResponse(BaseSchema):
+    """Timeline data for Gantt modal."""
+
+    session_id: str
+    movie_runtime_minutes: int | None = None
+    sequences: list[SequenceWithActions] = []
 
 
 # ============================================================================
