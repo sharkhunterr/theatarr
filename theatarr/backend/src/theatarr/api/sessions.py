@@ -898,6 +898,86 @@ async def delete_session(
 
 
 @router.post(
+    "/{session_id}/duplicate",
+    response_model=SessionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Duplicate Session",
+)
+async def duplicate_session(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+) -> SessionResponse:
+    """Duplicate a session as a new draft (no scheduled date)."""
+    result = await db.execute(
+        select(Session)
+        .options(
+            selectinload(Session.sequences).selectinload(Sequence.actions),
+        )
+        .where(Session.id == session_id)
+    )
+    source = result.scalar_one_or_none()
+    if not source:
+        raise NotFoundError("Session", session_id)
+
+    display_code = await _unique_display_code(db)
+
+    new_session = Session(
+        name=f"{source.name} (copie)",
+        description=source.description,
+        movie_id=source.movie_id,
+        movie_title=source.movie_title,
+        movie_poster_url=source.movie_poster_url,
+        movie_source_id=source.movie_source_id,
+        movie_source=source.movie_source,
+        color_palette=source.color_palette,
+        status=SessionStatus.DRAFT,
+        scheduled_at=None,
+        auto_resume_enabled=source.auto_resume_enabled,
+        workflow=source.workflow,
+        display_code=display_code,
+        movie_selection_mode=source.movie_selection_mode,
+        movie_resolved=source.movie_selection_mode == MovieSelectionMode.FIXED.value and source.movie_title is not None,
+        template_id=source.template_id,
+        enrichment_options=source.enrichment_options,
+    )
+    db.add(new_session)
+    await db.flush()
+
+    # Duplicate sequences and actions
+    for seq in sorted(source.sequences, key=lambda s: s.order_index):
+        new_seq = Sequence(
+            session_id=new_session.id,
+            name=seq.name,
+            description=seq.description,
+            order_index=seq.order_index,
+            duration_type=DurationType(seq.duration_type) if isinstance(seq.duration_type, str) else seq.duration_type,
+            duration_ms=seq.duration_ms,
+            duration_fallback_ms=seq.duration_fallback_ms,
+            transition_ms=seq.transition_ms,
+        )
+        db.add(new_seq)
+        await db.flush()
+
+        for action in seq.actions:
+            new_action = Action(
+                sequence_id=new_seq.id,
+                action_type=action.action_type,
+                command=action.command,
+                parameters=action.parameters,
+                delay_ms=action.delay_ms,
+                on_failure=action.on_failure,
+                service_id=action.service_id,
+            )
+            db.add(new_action)
+
+    await db.commit()
+    await db.refresh(new_session)
+
+    return _session_to_response(new_session)
+
+
+@router.post(
     "/{session_id}/control",
     response_model=SessionControlResponse,
     summary="Control Session",

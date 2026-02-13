@@ -203,7 +203,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/trailers"
+        path="/media"
         element={
           <RequireAuth>
             <TrailersManager />

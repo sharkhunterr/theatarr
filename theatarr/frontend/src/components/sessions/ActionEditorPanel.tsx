@@ -537,6 +537,16 @@ function LightingForm({
 // ============================================================================
 // AUDIO FORM
 // ============================================================================
+
+interface SoundLibraryItem {
+  id: string;
+  name: string;
+  duration_seconds?: number;
+  bitrate?: number;
+  format: string;
+  tags?: string[];
+}
+
 function AudioForm({
   action,
   onChange,
@@ -550,27 +560,56 @@ function AudioForm({
 
   const t = {
     command: language === 'fr' ? 'Commande' : 'Command',
-    source: language === 'fr' ? 'Source audio' : 'Audio Source',
+    sourceType: language === 'fr' ? 'Type de source' : 'Source Type',
+    soundLibrary: language === 'fr' ? 'Bibliothèque de sons' : 'Sound Library',
+    externalUrl: language === 'fr' ? 'URL externe' : 'External URL',
+    selectSound: language === 'fr' ? 'Sélectionner un son' : 'Select a sound',
+    url: language === 'fr' ? 'URL audio' : 'Audio URL',
     volume: language === 'fr' ? 'Volume' : 'Volume',
+    fadeIn: language === 'fr' ? 'Fondu d\'entrée (ms)' : 'Fade In (ms)',
+    fadeOut: language === 'fr' ? 'Fondu de sortie (ms)' : 'Fade Out (ms)',
     fadeDuration: language === 'fr' ? 'Durée du fondu (ms)' : 'Fade Duration (ms)',
+    loop: language === 'fr' ? 'Lecture en boucle' : 'Loop',
     device: language === 'fr' ? 'Appareil cible' : 'Target Device',
   };
 
   const commands = [
     { value: 'play', label: language === 'fr' ? 'Lecture' : 'Play' },
     { value: 'pause', label: 'Pause' },
+    { value: 'resume', label: language === 'fr' ? 'Reprendre' : 'Resume' },
     { value: 'stop', label: language === 'fr' ? 'Arrêter' : 'Stop' },
     { value: 'set_volume', label: language === 'fr' ? 'Régler volume' : 'Set Volume' },
     { value: 'mute', label: language === 'fr' ? 'Couper le son' : 'Mute' },
     { value: 'unmute', label: language === 'fr' ? 'Activer le son' : 'Unmute' },
   ];
 
+  const sourceType = parameters.sound_id !== undefined ? 'library' : 'url';
+
+  // Fetch sounds from library
+  const { data: soundsData } = useQuery({
+    queryKey: ['sounds-library'],
+    queryFn: async () => apiClient.get<{ items: SoundLibraryItem[] }>('/sounds?status_filter=ready&limit=200'),
+    enabled: command === 'play',
+  });
+
+  const sounds = soundsData?.items ?? [];
+  const selectedSound = sounds.find((s) => s.id === parameters.sound_id);
+
   const handleParametersChange = (updates: Record<string, unknown>) => {
     onChange({ parameters: { ...parameters, ...updates } });
   };
 
+  const handleSourceTypeChange = (type: string) => {
+    if (type === 'library') {
+      handleParametersChange({ sound_id: '', url: undefined, source: undefined });
+    } else {
+      handleParametersChange({ sound_id: undefined, url: '' });
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Command */}
       <div>
         <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
         <select
@@ -584,27 +623,90 @@ function AudioForm({
         </select>
       </div>
 
+      {/* Play source */}
       {command === 'play' && (
-        <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.source}</label>
-          <input
-            type="text"
-            value={(parameters.source as string) || ''}
-            onChange={(e) => handleParametersChange({ source: e.target.value })}
-            className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
-            placeholder="file path, URL, or source name"
-          />
-        </div>
+        <>
+          {/* Source type selector */}
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t.sourceType}</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleSourceTypeChange('library')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  sourceType === 'library'
+                    ? 'bg-theatarr-500 text-white'
+                    : 'bg-dark-bg border border-dark-border text-dark-muted hover:text-dark-text'
+                }`}
+              >
+                {t.soundLibrary}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSourceTypeChange('url')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  sourceType === 'url'
+                    ? 'bg-theatarr-500 text-white'
+                    : 'bg-dark-bg border border-dark-border text-dark-muted hover:text-dark-text'
+                }`}
+              >
+                {t.externalUrl}
+              </button>
+            </div>
+          </div>
+
+          {/* Library sound selector */}
+          {sourceType === 'library' && (
+            <div>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t.selectSound}</label>
+              <select
+                value={(parameters.sound_id as string) || ''}
+                onChange={(e) => handleParametersChange({ sound_id: e.target.value || undefined })}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+              >
+                <option value="">-- {t.selectSound} --</option>
+                {sounds.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                    {s.duration_seconds ? ` (${Math.floor(s.duration_seconds / 60)}:${(s.duration_seconds % 60).toString().padStart(2, '0')})` : ''}
+                  </option>
+                ))}
+              </select>
+              {selectedSound && (
+                <p className="text-xs text-dark-muted mt-1">
+                  {selectedSound.format.toUpperCase()}
+                  {selectedSound.bitrate ? ` — ${selectedSound.bitrate} kbps` : ''}
+                  {selectedSound.tags?.length ? ` — ${selectedSound.tags.join(', ')}` : ''}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* External URL */}
+          {sourceType === 'url' && (
+            <div>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t.url}</label>
+              <input
+                type="text"
+                value={(parameters.url as string) || (parameters.source as string) || ''}
+                onChange={(e) => handleParametersChange({ url: e.target.value, source: e.target.value })}
+                className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+                placeholder="https://..."
+              />
+            </div>
+          )}
+        </>
       )}
 
+      {/* Volume */}
       {(command === 'set_volume' || command === 'play') && (
         <div>
           <label className="block text-sm font-medium text-dark-text mb-1">
-            {t.volume} ({(parameters.volume as number) ?? 50}%)
+            {t.volume} ({(parameters.volume as number) ?? 80}%)
           </label>
           <input
             type="range"
-            value={(parameters.volume as number) ?? 50}
+            value={(parameters.volume as number) ?? 80}
             onChange={(e) => handleParametersChange({ volume: parseInt(e.target.value) })}
             className="w-full accent-theatarr-500"
             min="0"
@@ -613,7 +715,36 @@ function AudioForm({
         </div>
       )}
 
-      {(command === 'set_volume' || command === 'play' || command === 'stop') && (
+      {/* Fade in / Fade out for play */}
+      {command === 'play' && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t.fadeIn}</label>
+            <input
+              type="number"
+              value={(parameters.fade_in_ms as number) || 0}
+              onChange={(e) => handleParametersChange({ fade_in_ms: parseInt(e.target.value) || 0 })}
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+              min="0"
+              step="100"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t.fadeOut}</label>
+            <input
+              type="number"
+              value={(parameters.fade_out_ms as number) || 0}
+              onChange={(e) => handleParametersChange({ fade_out_ms: parseInt(e.target.value) || 0 })}
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+              min="0"
+              step="100"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Fade for stop/volume */}
+      {(command === 'stop' || command === 'set_volume') && (
         <div>
           <label className="block text-sm font-medium text-dark-text mb-1">{t.fadeDuration}</label>
           <input
@@ -627,6 +758,20 @@ function AudioForm({
         </div>
       )}
 
+      {/* Loop toggle for play */}
+      {command === 'play' && (
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={(parameters.loop as boolean) || false}
+            onChange={(e) => handleParametersChange({ loop: e.target.checked })}
+            className="rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500"
+          />
+          <span className="text-sm text-dark-text">{t.loop}</span>
+        </label>
+      )}
+
+      {/* Target device */}
       <div>
         <label className="block text-sm font-medium text-dark-text mb-1">{t.device}</label>
         <input

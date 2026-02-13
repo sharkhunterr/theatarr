@@ -497,6 +497,26 @@ class SequenceEngine:
                 await self._session_db(session.id).commit()
                 remaining -= wait_ms
 
+        # Stop audio from this sequence when it ends
+        await self._cleanup_sequence_audio(session.id)
+
+    async def _cleanup_sequence_audio(self, session_id: str) -> None:
+        """Stop any audio that was started in the current sequence."""
+        states = self._display_states.get(session_id, [])
+        had_audio_play = any(
+            s.get("action_type") == "audio" and s.get("command") == "play"
+            for s in states
+        )
+        if had_audio_play:
+            from theatarr.api.ws import ws_manager
+            logger.info("Sequence ended — broadcasting audio:stop for session %s", session_id)
+            await ws_manager.broadcast_display_action(
+                session_id=session_id,
+                action_type="audio",
+                command="stop",
+                parameters={"fade_out_ms": 500},
+            )
+
     async def _execute_action(self, action: Action, *, sequence_duration_ms: int = 0, block_id: str | None = None) -> ActionResult:
         """Execute a single action via the appropriate adapter and/or display channel."""
         start_time = datetime.now(timezone.utc)
@@ -585,6 +605,15 @@ class SequenceEngine:
                             ws_params["url"] = playback_url
                 except Exception as e:
                     logger.warning("Failed to resolve playback URL: %s", e)
+
+            # Resolve sound_id → URL for audio play actions
+            if (
+                action_type_val == "audio"
+                and action.command == "play"
+                and ws_params.get("sound_id")
+                and "url" not in ws_params
+            ):
+                ws_params["url"] = f"/api/v1/sounds/{ws_params['sound_id']}/file"
 
             # Store media play state for later resume
             if action_type_val == "media" and action.command == "play":

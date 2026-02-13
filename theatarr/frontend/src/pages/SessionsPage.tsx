@@ -19,6 +19,7 @@ import {
   ScreenShare,
   Copy,
   Check,
+  CopyPlus,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { getMysteryRevealCountdown, getVoteRevealCountdown } from '../utils/countdown';
@@ -83,6 +84,7 @@ export function SessionsPage() {
     copyCode: language === 'fr' ? 'Copier le code' : 'Copy code',
     codeCopied: language === 'fr' ? 'Copié !' : 'Copied!',
     all: language === 'fr' ? 'Toutes' : 'All',
+    duplicate: language === 'fr' ? 'Dupliquer' : 'Duplicate',
   };
 
   useEffect(() => {
@@ -136,6 +138,22 @@ export function SessionsPage() {
       setDeleteError(error?.message || 'Erreur lors de la suppression');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+
+  const handleDuplicate = async (session: Session) => {
+    setDuplicatingId(session.id);
+    try {
+      await apiClient.post(`/sessions/${session.id}/duplicate`, {});
+      fetchSessions();
+    } catch (error: any) {
+      console.error('Failed to duplicate session:', error);
+      setControlError(error?.message || (language === 'fr' ? 'Erreur lors de la duplication' : 'Duplication error'));
+      setTimeout(() => setControlError(null), 4000);
+    } finally {
+      setDuplicatingId(null);
     }
   };
 
@@ -516,6 +534,15 @@ export function SessionsPage() {
             <Square size={16} />
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleDuplicate(session)}
+          title={t.duplicate}
+          disabled={duplicatingId === session.id}
+        >
+          <CopyPlus size={16} />
+        </Button>
         <Button
           variant="ghost"
           size="sm"

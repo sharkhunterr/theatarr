@@ -331,12 +331,19 @@ function SessionDisplay() {
   const handleAudioAction = useCallback(
     (command: string, params: Record<string, unknown>) => {
       switch (command) {
-        case 'play':
+        case 'play': {
+          let audioUrl = params.url as string;
+          // Resolve relative API URLs to absolute
+          if (audioUrl?.startsWith('/api/')) {
+            const baseUrl = API_BASE.replace(/\/api\/v1\/?$/, '');
+            audioUrl = baseUrl + audioUrl;
+          }
           audioEngine.play(
-            params.url as string,
+            audioUrl,
             (params.volume as number) ?? 0.8,
             (params.fade_in_ms as number) ?? 0
           );
+        }
           break;
         case 'stop':
           audioEngine.stop((params.fade_out_ms as number) ?? 0);
