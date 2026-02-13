@@ -98,6 +98,9 @@ class Sequence(UUIDMixin, TimestampMixin, Base):
             return self.duration_ms
         if self.duration_type == DurationType.MANUAL:
             return 0  # No automatic duration
+        # Dynamic: prefer explicit duration_ms, fall back to duration_fallback_ms
+        if self.duration_ms and self.duration_ms > 0:
+            return self.duration_ms
         return self.duration_fallback_ms
 
     @property

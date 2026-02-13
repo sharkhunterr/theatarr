@@ -119,6 +119,7 @@ class SequenceSummary(BaseSchema):
     order_index: int
     duration_type: str
     duration_ms: int | None
+    duration_fallback_ms: int = 60000
     transition_ms: int
     actions_count: int = 0
     action_types: list[str] = []
@@ -290,6 +291,7 @@ class SessionDetailResponse(SessionResponse):
     current_sequence: SequenceSummary | None = None
     workflow: dict | None = None
     linked_vote_session: VoteSessionSummary | None = None
+    movie_runtime_minutes: int | None = None
 
 
 class SessionListResponse(BaseSchema):

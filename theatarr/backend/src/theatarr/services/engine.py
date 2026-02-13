@@ -151,6 +151,8 @@ class SequenceEngine:
         # Stores last media play state per session for pause/resume
         # {session_id: {url, media_id, position_ms, ...original play params}}
         self._media_states: dict[str, dict[str, Any]] = {}
+        # In-memory action execution log per session (last 100 per session)
+        self._action_logs: dict[str, list[dict]] = {}
 
     @property
     def db(self) -> AsyncSession:
@@ -171,6 +173,10 @@ class SequenceEngine:
     def get_display_state(self, session_id: str) -> list[dict] | None:
         """Get all broadcast actions for the current block (for reconnection replay)."""
         return self._display_states.get(session_id) or None
+
+    def get_action_log(self, session_id: str) -> list[dict]:
+        """Get the in-memory action execution log for a session."""
+        return list(self._action_logs.get(session_id, []))
 
     def store_media_play(self, session_id: str, params: dict[str, Any]) -> None:
         """Store media play parameters for later resume."""
@@ -481,6 +487,9 @@ class SequenceEngine:
                     return
                 if session.current_sequence_index != sequence.order_index:
                     return
+                session.current_sequence_elapsed_ms += 1000
+                await self._session_db(session.id).commit()
+                await self._emit_state_change(session)
         elif duration_ms > 0:
             elapsed = session.current_sequence_elapsed_ms
             remaining = max(0, duration_ms - elapsed)
@@ -504,6 +513,7 @@ class SequenceEngine:
                     return
                 session.current_sequence_elapsed_ms += wait_ms
                 await self._session_db(session.id).commit()
+                await self._emit_state_change(session)
                 remaining -= wait_ms
 
         # Stop audio from this sequence when it ends
@@ -560,8 +570,20 @@ class SequenceEngine:
                         parameters=action.parameters,
                         targets=action.targets,
                     ))
-                    success = result.success
-                    message = result.message or ""
+                    if result.success:
+                        success = True
+                        message = result.message or ""
+                    elif "Unknown command" in (result.message or ""):
+                        # Adapter doesn't handle this command (e.g. Plex source
+                        # adapter receiving "play") — not a failure, the action
+                        # will proceed via WebSocket broadcast.
+                        logger.debug(
+                            "Adapter %s does not handle command '%s' — skipping",
+                            action.service_id, action.command,
+                        )
+                    else:
+                        success = False
+                        message = result.message or ""
 
             ws_params = dict(action.parameters or {})
             action_type_val = _enum_val(action.action_type)
@@ -670,6 +692,7 @@ class SequenceEngine:
                 message = f"{message}; {ws_msg}" if message else ws_msg
 
             elapsed = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+            self._log_action(session_id, action, action_type_val, success, message, elapsed)
             return ActionResult(
                 action_id=action.id, success=success, message=message,
                 duration_ms=elapsed, error=message if not success else None,
@@ -677,7 +700,35 @@ class SequenceEngine:
 
         except Exception as e:
             logger.exception("Error executing action %s: %s", action.id, e)
+            self._log_action(session_id, action, _enum_val(action.action_type), False, None, 0, str(e))
             return ActionResult(action_id=action.id, success=False, error=str(e))
+
+    def _log_action(
+        self,
+        session_id: str,
+        action: "Action",
+        action_type: str,
+        success: bool,
+        message: str | None,
+        duration_ms: int,
+        error: str | None = None,
+    ) -> None:
+        """Append an action result to the in-memory log for a session."""
+        self._action_logs.setdefault(session_id, []).append({
+            "action_id": action.id,
+            "sequence_id": action.sequence.id,
+            "sequence_name": action.sequence.name,
+            "action_type": action_type,
+            "command": action.command,
+            "success": success,
+            "message": message,
+            "duration_ms": duration_ms,
+            "error": error or (message if not success else None),
+            "executed_at": datetime.now(timezone.utc).isoformat(),
+        })
+        # Keep only last 100 entries per session
+        if len(self._action_logs[session_id]) > 100:
+            self._action_logs[session_id] = self._action_logs[session_id][-100:]
 
     async def _setup_quiz_for_session(
         self, session_id: str, quiz_session_id: str

@@ -15,6 +15,7 @@ from theatarr.api.errors import NotFoundError
 from theatarr.api.ws import ws_manager, Channel
 from theatarr.database import DbSession
 from theatarr.models.action import Action
+from theatarr.models.movie import Movie
 from theatarr.models.session import MovieSelectionMode, Session, SessionStatus
 from theatarr.models.sequence import DurationType, Sequence
 from theatarr.models.session_participant import SessionParticipant, InvitationStatus
@@ -202,6 +203,7 @@ def _sequence_to_summary(sequence: Sequence) -> SequenceSummary:
         order_index=sequence.order_index,
         duration_type=sequence.duration_type.value if hasattr(sequence.duration_type, 'value') else sequence.duration_type,
         duration_ms=sequence.duration_ms,
+        duration_fallback_ms=sequence.duration_fallback_ms,
         transition_ms=sequence.transition_ms,
         actions_count=len(sequence.actions),
         action_types=action_types,
@@ -612,6 +614,14 @@ async def get_session(
             template_type=template_type,
         )
 
+    # Fetch movie runtime if a movie is linked
+    movie_runtime_minutes = None
+    if session.movie_id:
+        movie_result = await db.execute(select(Movie).where(Movie.id == session.movie_id))
+        movie = movie_result.scalar_one_or_none()
+        if movie:
+            movie_runtime_minutes = movie.runtime_minutes
+
     return SessionDetailResponse(
         id=session.id,
         name=session.name,
@@ -651,6 +661,8 @@ async def get_session(
         enrichment_options=session.enrichment_options,
         # Display code
         display_code=session.display_code,
+        # Movie runtime for timeline proportioning
+        movie_runtime_minutes=movie_runtime_minutes,
     )
 
 
@@ -1096,6 +1108,24 @@ async def get_session_state(
 
     except SessionNotFoundError:
         raise NotFoundError("Session", session_id)
+
+
+@router.get(
+    "/{session_id}/action-log",
+    summary="Get Session Action Log",
+)
+async def get_session_action_log(
+    user: AdminUser,
+    session_id: str,
+) -> list[dict]:
+    """Get the in-memory action execution log for a session.
+
+    Returns the last 100 action results with success/failure status,
+    timing, and error messages. Only available for sessions that have
+    been running in the current engine lifecycle.
+    """
+    engine = get_engine()
+    return engine.get_action_log(session_id)
 
 
 @router.post(

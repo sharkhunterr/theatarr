@@ -22,6 +22,7 @@ export interface Sequence {
   order_index?: number;
   duration_type: 'fixed' | 'dynamic' | 'manual';
   duration_ms: number | null;
+  duration_fallback_ms?: number;
   transition_ms?: number;
   remaining_ms?: number;
   actions_count?: number;
@@ -110,6 +111,8 @@ export interface Session {
   // Display
   display_code?: string;
   pause_on_display_disconnect?: boolean;
+  // Movie runtime (from detail response)
+  movie_runtime_minutes?: number;
   // Enriched fields from list
   participants_accepted?: number;
   participants_total?: number;
