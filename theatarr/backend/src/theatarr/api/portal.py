@@ -22,6 +22,7 @@ from theatarr.schemas.portal import (
     PortalQuizAnswer,
     PortalQuizListResponse,
     PortalQuizSessionSummary,
+    PortalSequenceSummary,
     PortalSessionDetail,
     PortalSessionListResponse,
     PortalSessionSummary,
@@ -411,6 +412,9 @@ async def get_session_detail(
     session_id: str,
 ) -> PortalSessionDetail:
     """Get detailed session info for a participant."""
+    from theatarr.models.sequence import Sequence as SequenceModel
+    from theatarr.models.movie import Movie
+
     # Check if user is a participant
     result = await db.execute(
         select(SessionParticipant)
@@ -438,6 +442,57 @@ async def get_session_detail(
         if linked_vote:
             linked_vote_is_open = linked_vote.is_open
 
+    # Load sequences for timeline (with actions for action_types + expected_duration)
+    seq_result = await db.execute(
+        select(SequenceModel)
+        .options(selectinload(SequenceModel.actions))
+        .where(SequenceModel.session_id == session_id)
+        .order_by(SequenceModel.order_index)
+    )
+    sequences = seq_result.scalars().all()
+
+    portal_sequences = []
+    for seq in sequences:
+        action_types = list({
+            a.action_type.value if hasattr(a.action_type, 'value') else a.action_type
+            for a in seq.actions
+        })
+        # Compute expected_duration_ms for manual sequences
+        expected_duration_ms = None
+        dur_type = seq.duration_type.value if hasattr(seq.duration_type, 'value') else seq.duration_type
+        if dur_type == "manual":
+            for action in seq.actions:
+                params = action.parameters or {}
+                pat = params.get("pause_at_ms")
+                if pat is not None:
+                    pat_int = int(pat)
+                    if expected_duration_ms is None or pat_int > expected_duration_ms:
+                        expected_duration_ms = pat_int
+        elif dur_type == "fixed" and seq.duration_ms:
+            expected_duration_ms = seq.duration_ms
+
+        portal_sequences.append(PortalSequenceSummary(
+            id=seq.id,
+            name=seq.name,
+            order_index=seq.order_index,
+            duration_type=dur_type,
+            duration_ms=seq.duration_ms,
+            duration_fallback_ms=seq.duration_fallback_ms,
+            actions_count=len(seq.actions),
+            action_types=action_types,
+            expected_duration_ms=expected_duration_ms,
+        ))
+
+    # Movie runtime
+    movie_runtime_minutes = None
+    if session.movie_id:
+        movie_result = await db.execute(
+            select(Movie).where(Movie.id == session.movie_id)
+        )
+        movie = movie_result.scalar_one_or_none()
+        if movie:
+            movie_runtime_minutes = movie.runtime_minutes
+
     return PortalSessionDetail(
         id=session.id,
         name=session.name,
@@ -459,6 +514,11 @@ async def get_session_detail(
         linked_vote_session_id=session.linked_vote_session_id,
         linked_vote_is_open=linked_vote_is_open,
         vote_movie_posters=_extract_vote_movie_posters(linked_vote),
+        sequences=portal_sequences,
+        current_sequence_index=session.current_sequence_index,
+        current_sequence_elapsed_ms=session.current_sequence_elapsed_ms,
+        total_sequences=session.total_sequences,
+        movie_runtime_minutes=movie_runtime_minutes,
     )
 
 

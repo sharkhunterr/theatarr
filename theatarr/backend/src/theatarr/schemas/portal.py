@@ -28,6 +28,20 @@ class PortalSessionSummary(BaseSchema):
     vote_movie_posters: list[str] | None = None
 
 
+class PortalSequenceSummary(BaseSchema):
+    """Sequence summary for portal timeline."""
+
+    id: str
+    name: str
+    order_index: int
+    duration_type: str
+    duration_ms: int | None
+    duration_fallback_ms: int = 60000
+    actions_count: int = 0
+    action_types: list[str] = []
+    expected_duration_ms: int | None = None
+
+
 class PortalSessionDetail(BaseSchema):
     """Detailed session info for portal."""
 
@@ -52,6 +66,12 @@ class PortalSessionDetail(BaseSchema):
     linked_vote_session_id: str | None = None
     linked_vote_is_open: bool | None = None
     vote_movie_posters: list[str] | None = None
+    # Timeline data
+    sequences: list[PortalSequenceSummary] = []
+    current_sequence_index: int = 0
+    current_sequence_elapsed_ms: int = 0
+    total_sequences: int = 0
+    movie_runtime_minutes: int | None = None
 
 
 class PortalSessionListResponse(BaseSchema):
