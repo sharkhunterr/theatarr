@@ -153,6 +153,8 @@ class SequenceEngine:
         self._media_states: dict[str, dict[str, Any]] = {}
         # In-memory action execution log per session (last 100 per session)
         self._action_logs: dict[str, list[dict]] = {}
+        # Background quiz timer tasks per session
+        self._quiz_tasks: dict[str, asyncio.Task] = {}
 
     @property
     def db(self) -> AsyncSession:
@@ -297,6 +299,10 @@ class SequenceEngine:
                 self._running_sessions[session_id].cancel()
                 del self._running_sessions[session_id]
 
+            quiz_task = self._quiz_tasks.pop(session_id, None)
+            if quiz_task and not quiz_task.done():
+                quiz_task.cancel()
+
             return session
 
     async def resume_session(self, session_id: str) -> Session:
@@ -333,6 +339,10 @@ class SequenceEngine:
             if session_id in self._running_sessions:
                 self._running_sessions[session_id].cancel()
                 del self._running_sessions[session_id]
+
+            quiz_task = self._quiz_tasks.pop(session_id, None)
+            if quiz_task and not quiz_task.done():
+                quiz_task.cancel()
 
             session.status = SessionStatus.COMPLETED
             session.completed_at = datetime.now(timezone.utc)
@@ -438,6 +448,9 @@ class SequenceEngine:
             self._bg_db.pop(session_id, None)
             await bg_db.close()
             self._running_sessions.pop(session_id, None)
+            quiz_task = self._quiz_tasks.pop(session_id, None)
+            if quiz_task and not quiz_task.done():
+                quiz_task.cancel()
 
     async def _execute_sequence(self, session: Session, sequence: Sequence, skip_actions: bool = False) -> None:
         """Execute a single sequence (all actions in parallel)."""
@@ -631,6 +644,19 @@ class SequenceEngine:
                 )
                 if quiz_state:
                     ws_params["quiz_display_state"] = quiz_state
+                    # Start quiz timer for auto-advancing questions on timeout
+                    old_task = self._quiz_tasks.pop(session_id, None)
+                    if old_task and not old_task.done():
+                        old_task.cancel()
+                    total_s = (sequence_duration_ms / 1000) if sequence_duration_ms > 0 else None
+                    task = asyncio.create_task(
+                        self._run_quiz_timer(session_id, ws_params["quiz_session_id"], total_s)
+                    )
+                    self._quiz_tasks[session_id] = task
+                    logger.info(
+                        "Started quiz timer for session %s, quiz %s (total_duration=%ss)",
+                        session_id, ws_params["quiz_session_id"], total_s,
+                    )
 
             # Inject session overview for session-info waiting screens
             if (
@@ -927,6 +953,180 @@ class SequenceEngine:
         except Exception as e:
             logger.exception("Failed to auto-setup quiz %s for session %s: %s", quiz_session_id, session_id, e)
             return None
+
+    async def _run_quiz_timer(
+        self,
+        session_id: str,
+        quiz_session_id: str,
+        total_duration_s: float | None = None,
+    ) -> None:
+        """Auto-advance quiz questions when time limit expires.
+
+        Runs as a background task. Advances questions even when no display
+        is connected and no participants answer. Ends the quiz when total
+        sequence duration is exceeded.
+        """
+        from theatarr.database import async_session_maker
+        from theatarr.models.quiz import QuizSession, QuizSessionStatus
+        from theatarr.services.quiz import (
+            advance_question, end_quiz, get_scoreboard, get_question_stats,
+        )
+        from theatarr.api.ws import ws_manager, Channel
+        from theatarr.api.quiz import _build_public_question, _pending_advance_tasks
+
+        quiz_start = time.monotonic()
+
+        try:
+            while True:
+                # 1. Read current quiz state
+                async with async_session_maker() as db:
+                    result = await db.execute(
+                        select(QuizSession).where(QuizSession.id == quiz_session_id)
+                    )
+                    qs = result.scalar_one_or_none()
+                    if not qs:
+                        return
+                    qs_status = qs.status.value if isinstance(qs.status, QuizSessionStatus) else qs.status
+                    if qs_status != QuizSessionStatus.ACTIVE.value:
+                        return
+
+                    questions = qs.questions or []
+                    config = qs.config or {}
+                    current_idx = qs.current_question_index
+                    if current_idx < 0 or current_idx >= len(questions):
+                        return
+
+                    question = questions[current_idx]
+                    time_limit = question.get("time_limit_seconds") or config.get("default_time_limit_seconds", 30)
+
+                    if qs.current_question_started_at:
+                        q_elapsed = (datetime.now() - qs.current_question_started_at).total_seconds()
+                        wait_s = max(0, time_limit - q_elapsed)
+                    else:
+                        wait_s = time_limit
+
+                # Cap by total duration
+                if total_duration_s is not None:
+                    total_remaining = max(0, total_duration_s - (time.monotonic() - quiz_start))
+                    wait_s = min(wait_s, total_remaining)
+
+                # 2. Sleep until question timeout
+                if wait_s > 0:
+                    await asyncio.sleep(wait_s)
+
+                # 3. Check total time exceeded → force end quiz
+                if total_duration_s is not None and (time.monotonic() - quiz_start) >= total_duration_s:
+                    async with async_session_maker() as db:
+                        result = await db.execute(
+                            select(QuizSession).where(QuizSession.id == quiz_session_id)
+                        )
+                        qs = result.scalar_one_or_none()
+                        if qs:
+                            qs_status = qs.status.value if isinstance(qs.status, QuizSessionStatus) else qs.status
+                            if qs_status == QuizSessionStatus.ACTIVE.value:
+                                logger.info("Quiz %s: total duration exceeded, ending quiz", quiz_session_id)
+                                qs = await end_quiz(db, qs)
+                                scoreboard = await get_scoreboard(db, qs.id)
+                                all_stats = await get_question_stats(db, qs.id)
+                                await ws_manager.broadcast(
+                                    f"{Channel.QUIZ.value}:{qs.id}",
+                                    {
+                                        "type": "quiz_ended",
+                                        "payload": {
+                                            "quiz_session_id": qs.id,
+                                            "scoreboard": scoreboard,
+                                            "question_stats": all_stats,
+                                        },
+                                    },
+                                )
+                    return
+
+                # 4. Re-check state and advance
+                async with async_session_maker() as db:
+                    result = await db.execute(
+                        select(QuizSession).where(QuizSession.id == quiz_session_id)
+                    )
+                    qs = result.scalar_one_or_none()
+                    if not qs:
+                        return
+                    qs_status = qs.status.value if isinstance(qs.status, QuizSessionStatus) else qs.status
+                    if qs_status != QuizSessionStatus.ACTIVE.value:
+                        return
+
+                    # Already advanced by participants or admin
+                    if qs.current_question_index != current_idx:
+                        continue
+
+                    questions = qs.questions or []
+                    config = qs.config or {}
+                    show_feedback = config.get("show_feedback", True)
+                    feedback_delay = config.get("feedback_delay_seconds", 5)
+
+                    # Cancel any pending delayed advance from _check_auto_advance
+                    pending = _pending_advance_tasks.pop(quiz_session_id, None)
+                    if pending and not pending.done():
+                        pending.cancel()
+
+                    # Show feedback if configured
+                    if show_feedback and current_idx < len(questions):
+                        prev_q = questions[current_idx]
+                        q_stats = await get_question_stats(db, qs.id, current_idx)
+                        await ws_manager.broadcast(
+                            f"{Channel.QUIZ.value}:{qs.id}",
+                            {
+                                "type": "quiz_question_results",
+                                "payload": {
+                                    "quiz_session_id": qs.id,
+                                    "question_index": current_idx,
+                                    "correct_indices": prev_q.get("correct_indices", []),
+                                    "stats": q_stats[0] if q_stats else None,
+                                    "feedback_delay_seconds": feedback_delay,
+                                },
+                            },
+                        )
+                        await asyncio.sleep(feedback_delay)
+
+                    # Advance to next question
+                    logger.info("Quiz %s: auto-advancing from question %d (timeout)", quiz_session_id, current_idx)
+                    qs, is_ended = await advance_question(db, qs)
+
+                    if is_ended:
+                        scoreboard = await get_scoreboard(db, qs.id)
+                        all_stats = await get_question_stats(db, qs.id)
+                        await ws_manager.broadcast(
+                            f"{Channel.QUIZ.value}:{qs.id}",
+                            {
+                                "type": "quiz_ended",
+                                "payload": {
+                                    "quiz_session_id": qs.id,
+                                    "scoreboard": scoreboard,
+                                    "question_stats": all_stats,
+                                },
+                            },
+                        )
+                        return
+                    else:
+                        new_idx = qs.current_question_index
+                        if new_idx < len(questions):
+                            new_question = _build_public_question(questions[new_idx], config)
+                            await ws_manager.broadcast(
+                                f"{Channel.QUIZ.value}:{qs.id}",
+                                {
+                                    "type": "quiz_question",
+                                    "payload": {
+                                        "quiz_session_id": qs.id,
+                                        "question_index": new_idx,
+                                        "question": new_question,
+                                        "total_questions": len(questions),
+                                    },
+                                },
+                            )
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception("Quiz timer error for session %s, quiz %s", session_id, quiz_session_id)
+        finally:
+            self._quiz_tasks.pop(session_id, None)
 
     async def _transition_to_next_sequence(self, session: Session) -> None:
         """Transition to the next sequence."""
