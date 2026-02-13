@@ -479,7 +479,27 @@ class SequenceEngine:
 
         dur_type = _enum_val(sequence.duration_type)
         if dur_type == "manual":
-            logger.info("Sequence %s is MANUAL — waiting for external signal (skip/stop)", sequence.name)
+            # Check if any action has a pause_at_ms — use it as an auto-skip timer
+            # so the engine advances even without a display sending video_paused_at.
+            auto_skip_ms = None
+            for action in sequence.actions:
+                params = action.parameters or {}
+                pat = params.get("pause_at_ms")
+                if pat is not None:
+                    pat_int = int(pat)
+                    if auto_skip_ms is None or pat_int > auto_skip_ms:
+                        auto_skip_ms = pat_int
+
+            if auto_skip_ms is not None:
+                # Add a small buffer (3s) to let the display handle it first
+                auto_skip_ms += 3000
+                logger.info(
+                    "Sequence %s is MANUAL with auto-skip at %dms",
+                    sequence.name, auto_skip_ms,
+                )
+            else:
+                logger.info("Sequence %s is MANUAL — waiting for external signal (skip/stop)", sequence.name)
+
             while True:
                 await asyncio.sleep(1)
                 session = await self._get_session(session.id)
@@ -490,6 +510,17 @@ class SequenceEngine:
                 session.current_sequence_elapsed_ms += 1000
                 await self._session_db(session.id).commit()
                 await self._emit_state_change(session)
+
+                # Auto-skip when elapsed exceeds pause_at_ms
+                if auto_skip_ms is not None and session.current_sequence_elapsed_ms >= auto_skip_ms:
+                    logger.info(
+                        "Auto-skipping sequence %s — elapsed %dms >= pause_at %dms",
+                        sequence.name, session.current_sequence_elapsed_ms, auto_skip_ms,
+                    )
+                    # Store the pause position for media:resume
+                    self.store_media_pause(session.id, auto_skip_ms - 3000)
+                    await self.skip_sequence(session.id)
+                    return
         elif duration_ms > 0:
             elapsed = session.current_sequence_elapsed_ms
             remaining = max(0, duration_ms - elapsed)

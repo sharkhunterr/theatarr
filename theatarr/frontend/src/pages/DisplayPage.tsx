@@ -727,6 +727,27 @@ function SessionDisplay() {
                 }
               }, 500);
             }
+          } else if (command === 'resume') {
+            // Resume from stored pause position (display opened after engine auto-skipped)
+            const resumeUrl = parameters.resume_url as string | undefined;
+            const resumePos = parameters.resume_position_ms as number | undefined;
+            if (resumeUrl) {
+              pauseAtMsRef.current = null;
+              setVideoPausedForResume(false);
+              videoPausedForResumeRef.current = false;
+              setVideoUrl(resumeUrl);
+              setShowVideo(true);
+              setDisplayLayers([]);
+              currentBlockIdRef.current = null;
+              // Seek to resume position + elapsed since broadcast
+              setTimeout(() => {
+                const v = videoRef.current;
+                if (v) {
+                  const seekTo = ((resumePos || 0) / 1000) + elapsedSec;
+                  v.currentTime = seekTo;
+                }
+              }, 500);
+            }
           } else if (command === 'stop') {
             setShowVideo(false);
             setVideoUrl(null);
