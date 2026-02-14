@@ -195,27 +195,27 @@ async def get_my_stats(
         if vote_check.scalar_one_or_none() is None:
             pending_votes += 1
 
-    # Count pending invitations
+    # Count pending invitations (only scheduled sessions, not drafts)
     pending_invitations_query = (
         select(func.count(SessionParticipant.id))
         .join(Session)
         .where(
             SessionParticipant.user_id == user.id,
             SessionParticipant.invitation_status == InvitationStatus.PENDING.value,
-            Session.status.in_([SessionStatus.SCHEDULED.value, SessionStatus.DRAFT.value]),
+            Session.status == SessionStatus.SCHEDULED.value,
         )
     )
     pending_invitations_result = await db.execute(pending_invitations_query)
     pending_invitations = pending_invitations_result.scalar() or 0
 
-    # Count upcoming sessions
+    # Count upcoming sessions (only scheduled, not drafts)
     upcoming_sessions_query = (
         select(func.count(SessionParticipant.id))
         .join(Session)
         .where(
             SessionParticipant.user_id == user.id,
             SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value,
-            Session.status.in_([SessionStatus.SCHEDULED.value, SessionStatus.DRAFT.value]),
+            Session.status == SessionStatus.SCHEDULED.value,
         )
     )
     upcoming_sessions_result = await db.execute(upcoming_sessions_query)
@@ -284,11 +284,15 @@ async def get_my_sessions(
     query = (
         select(SessionParticipant)
         .options(selectinload(SessionParticipant.session))
-        .where(SessionParticipant.user_id == user.id)
+        .join(Session)
+        .where(
+            SessionParticipant.user_id == user.id,
+            Session.status != SessionStatus.DRAFT.value,
+        )
     )
 
     if status_filter:
-        query = query.join(Session).where(Session.status == status_filter)
+        query = query.where(Session.status == status_filter)
 
     query = query.order_by(SessionParticipant.invited_at.desc()).offset(skip).limit(limit)
 
@@ -328,12 +332,17 @@ async def get_my_sessions(
             )
         )
 
-    # Get total count
-    count_query = select(func.count(SessionParticipant.id)).where(
-        SessionParticipant.user_id == user.id
+    # Get total count (excluding drafts)
+    count_query = (
+        select(func.count(SessionParticipant.id))
+        .join(Session)
+        .where(
+            SessionParticipant.user_id == user.id,
+            Session.status != SessionStatus.DRAFT.value,
+        )
     )
     if status_filter:
-        count_query = count_query.join(Session).where(Session.status == status_filter)
+        count_query = count_query.where(Session.status == status_filter)
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
@@ -357,7 +366,7 @@ async def get_pending_invitations(
         .where(
             SessionParticipant.user_id == user.id,
             SessionParticipant.invitation_status == InvitationStatus.PENDING.value,
-            Session.status.in_([SessionStatus.SCHEDULED.value, SessionStatus.DRAFT.value]),
+            Session.status == SessionStatus.SCHEDULED.value,
         )
         .order_by(Session.scheduled_at.asc())
     )
