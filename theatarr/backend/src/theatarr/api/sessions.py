@@ -201,17 +201,30 @@ def _sequence_to_summary(sequence: Sequence) -> SequenceSummary:
         for a in sequence.actions
     })
 
-    # Infer expected_duration_ms for manual sequences from pause_at_ms
+    # Infer expected_duration_ms and effective duration_type for timeline display.
+    # Sequences with media:play (pause_at_ms) or media:resume should be treated
+    # as "manual" for proportional timeline sizing, regardless of stored duration_type.
     expected_duration_ms = None
+    has_resume = False
     dur_type = sequence.duration_type.value if hasattr(sequence.duration_type, 'value') else sequence.duration_type
-    if dur_type == "manual":
-        for action in sequence.actions:
-            params = action.parameters or {}
-            pat = params.get("pause_at_ms")
-            if pat is not None:
-                pat_int = int(pat)
-                if expected_duration_ms is None or pat_int > expected_duration_ms:
-                    expected_duration_ms = pat_int
+
+    for action in sequence.actions:
+        params = action.parameters or {}
+        # Check for media:play with pause_at_ms — dominates sequence duration
+        pat = params.get("pause_at_ms")
+        if pat is not None:
+            pat_int = int(pat)
+            if expected_duration_ms is None or pat_int > expected_duration_ms:
+                expected_duration_ms = pat_int
+        # Check for media:resume — open-ended, takes remaining movie time
+        cmd = action.command.value if hasattr(action.command, 'value') else action.command
+        if cmd == "resume":
+            has_resume = True
+
+    # Override duration_type to "manual" for sequences driven by media actions,
+    # so the frontend computes proportional widths from movie runtime.
+    if expected_duration_ms is not None or has_resume:
+        dur_type = "manual"
     elif dur_type == "fixed" and sequence.duration_ms:
         expected_duration_ms = sequence.duration_ms
 
