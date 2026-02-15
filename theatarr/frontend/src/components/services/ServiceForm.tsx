@@ -37,13 +37,28 @@ const categoryLabels: Record<string, string> = {
   metadata: 'Metadata',
 };
 
+const MASKED_VALUE = '********';
+
+function isSensitiveKey(key: string): boolean {
+  const sensitive = ['api_key', 'token', 'password', 'secret', 'key'];
+  return sensitive.some((s) => key.toLowerCase().includes(s));
+}
+
 export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFormProps) {
+  // Pre-fill config from existing service, replacing masked values with empty string
+  const initialConfig: Record<string, unknown> = {};
+  if (service?.config) {
+    for (const [key, value] of Object.entries(service.config)) {
+      initialConfig[key] = value === MASKED_VALUE ? '' : value;
+    }
+  }
+
   const [formData, setFormData] = useState<ServiceFormData>({
     name: service?.name || '',
     description: service?.description || '',
     adapter_type: service?.adapter_type || '',
     category: service?.category || 'lighting',
-    config: {},
+    config: initialConfig,
     is_enabled: service?.is_enabled ?? true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,10 +110,12 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
       newErrors.adapter_type = 'Adapter type is required';
     }
 
-    // Validate required config fields
+    // Validate required config fields (skip sensitive fields when editing — already stored)
     if (selectedAdapter?.config_schema?.required) {
       selectedAdapter.config_schema.required.forEach((field) => {
-        if (!formData.config[field]) {
+        const isEmpty = !formData.config[field];
+        const isMaskedEdit = !!service && isSensitiveKey(field);
+        if (isEmpty && !isMaskedEdit) {
           newErrors[`config.${field}`] = `${field} is required`;
         }
       });
@@ -113,9 +130,21 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
 
     if (!validate()) return;
 
+    // When editing, strip empty sensitive fields so the backend merge preserves originals
+    const submitData = { ...formData };
+    if (service) {
+      const cleanConfig = { ...submitData.config };
+      for (const key of Object.keys(cleanConfig)) {
+        if (isSensitiveKey(key) && !cleanConfig[key]) {
+          delete cleanConfig[key];
+        }
+      }
+      submitData.config = cleanConfig;
+    }
+
     setIsSubmitting(true);
     try {
-      await onSubmit(formData);
+      await onSubmit(submitData);
     } catch (error) {
       console.error('Failed to submit service:', error);
     } finally {
@@ -232,6 +261,8 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
             {Object.entries(selectedAdapter.config_schema.properties).map(([key, schema]) => {
               const isRequired = selectedAdapter.config_schema.required?.includes(key);
               const error = errors[`config.${key}`];
+              const sensitive = isSensitiveKey(key);
+              const wasMasked = !!service && sensitive;
 
               return (
                 <Input
@@ -240,8 +271,8 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
                   value={(formData.config[key] as string) || ''}
                   onChange={(e) => handleConfigChange(key, e.target.value)}
                   error={error}
-                  placeholder={schema.description || `Enter ${key}`}
-                  type={key.toLowerCase().includes('password') || key.toLowerCase().includes('key') ? 'password' : 'text'}
+                  placeholder={wasMasked ? 'Leave empty to keep current value' : (schema.description || `Enter ${key}`)}
+                  type={sensitive ? 'password' : 'text'}
                 />
               );
             })}

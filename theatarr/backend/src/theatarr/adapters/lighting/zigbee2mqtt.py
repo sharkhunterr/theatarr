@@ -31,12 +31,19 @@ class Zigbee2MQTTAdapter(ServiceAdapter):
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config)
-        self.mqtt_host = config.get("mqtt_host", "")
-        self.mqtt_port = config.get("mqtt_port", 1883)
+        # Strip protocol prefixes (mqtt://, tcp://) — user may paste full URL
+        host = config.get("mqtt_host", "")
+        for prefix in ("mqtt://", "mqtts://", "tcp://", "ssl://"):
+            if host.startswith(prefix):
+                host = host[len(prefix):]
+                break
+        self.mqtt_host = host.rstrip("/")
+        self.mqtt_port = int(config.get("mqtt_port", 1883))
         self.mqtt_username = config.get("mqtt_username") or None
         self.mqtt_password = config.get("mqtt_password") or None
         self.base_topic = config.get("base_topic", "zigbee2mqtt")
         self._devices: dict[str, dict[str, Any]] = {}
+        self._groups: dict[str, dict[str, Any]] = {}
 
     @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
@@ -94,6 +101,7 @@ class Zigbee2MQTTAdapter(ServiceAdapter):
     async def disconnect(self) -> None:
         """Disconnect and clear cached devices."""
         self._devices.clear()
+        self._groups.clear()
         self._is_connected = False
 
     async def test_connection(self) -> ConnectionTestResult:
@@ -106,11 +114,12 @@ class Zigbee2MQTTAdapter(ServiceAdapter):
                 await client.subscribe(f"{self.base_topic}/bridge/state")
 
                 # Request bridge state
+                state_payload: dict[str, Any] | None = None
                 try:
-                    state_payload: dict[str, Any] | None = None
-                    async for message in asyncio.wait_for(
+                    message = await asyncio.wait_for(
                         self._collect_one(client), timeout=5.0
-                    ):
+                    )
+                    if message:
                         raw = message.payload
                         if isinstance(raw, bytes):
                             raw = raw.decode()
@@ -118,29 +127,30 @@ class Zigbee2MQTTAdapter(ServiceAdapter):
                             state_payload = json.loads(raw)
                         except (json.JSONDecodeError, TypeError):
                             state_payload = {"state": raw}
-                        break
-                except (asyncio.TimeoutError, StopAsyncIteration):
+                except asyncio.TimeoutError:
                     # No state message yet — Z2M might not have published recently
                     # But MQTT connection succeeded
                     pass
 
-                # Also try to discover devices for the details
+                # Also try to discover devices + groups for the details
                 device_count = 0
+                group_count = 0
                 try:
                     devices = await asyncio.wait_for(
-                        self._do_discover(client), timeout=DISCOVERY_TIMEOUT
+                        self._do_discover_all(client), timeout=DISCOVERY_TIMEOUT
                     )
                     device_count = len(devices)
+                    group_count = len(self._groups)
                 except asyncio.TimeoutError:
                     pass
 
-                details: dict[str, Any] = {"light_count": device_count}
+                details: dict[str, Any] = {"light_count": device_count, "group_count": group_count}
                 if state_payload and isinstance(state_payload, dict):
                     details["z2m_state"] = state_payload.get("state", "unknown")
 
                 return ConnectionTestResult(
                     status=ConnectionStatus.CONNECTED,
-                    message=f"Connected — {device_count} light(s) found",
+                    message=f"Connected — {device_count} light(s), {group_count} group(s) found",
                     details=details,
                 )
 
@@ -151,10 +161,15 @@ class Zigbee2MQTTAdapter(ServiceAdapter):
             )
         except Exception as e:
             err_str = str(e)
+            if "not authorized" in err_str.lower() or "bad user name" in err_str.lower():
+                return ConnectionTestResult(
+                    status=ConnectionStatus.ERROR,
+                    message="MQTT authentication failed — verify username and password",
+                )
             if "Connect" in type(e).__name__ or "refused" in err_str.lower():
                 return ConnectionTestResult(
                     status=ConnectionStatus.ERROR,
-                    message="Could not connect to MQTT broker — verify host and port",
+                    message=f"Could not connect to MQTT broker — {err_str}",
                 )
             return ConnectionTestResult(
                 status=ConnectionStatus.ERROR,
@@ -222,51 +237,95 @@ class Zigbee2MQTTAdapter(ServiceAdapter):
     # ------------------------------------------------------------------
 
     async def _discover_devices(self) -> list[dict[str, Any]]:
-        """Discover light devices from Zigbee2MQTT via MQTT."""
+        """Discover light devices and groups from Zigbee2MQTT via MQTT."""
         async with self._get_mqtt_client() as client:
-            devices = await asyncio.wait_for(
-                self._do_discover(client), timeout=DISCOVERY_TIMEOUT
+            result = await asyncio.wait_for(
+                self._do_discover_all(client), timeout=DISCOVERY_TIMEOUT
             )
-            return devices
+            return result
 
-    async def _do_discover(self, client: "aiomqtt.Client") -> list[dict[str, Any]]:
-        """Inner discovery: subscribe, request, parse."""
-        topic = f"{self.base_topic}/bridge/devices"
-        await client.subscribe(topic)
+    async def _do_discover_all(self, client: "aiomqtt.Client") -> list[dict[str, Any]]:
+        """Subscribe to devices + groups topics, request both, parse in a single loop."""
+        devices_topic = f"{self.base_topic}/bridge/devices"
+        groups_topic = f"{self.base_topic}/bridge/groups"
+
+        await client.subscribe(devices_topic)
+        await client.subscribe(groups_topic)
         await client.publish(
             f"{self.base_topic}/bridge/request/device/list", payload=""
         )
+        await client.publish(
+            f"{self.base_topic}/bridge/request/group/list", payload=""
+        )
+
+        got_devices = False
+        got_groups = False
+        lights: list[dict[str, Any]] = []
 
         async for message in client.messages:
-            if str(message.topic) == topic:
-                raw = message.payload
-                if isinstance(raw, bytes):
-                    raw = raw.decode()
-                all_devices = json.loads(raw)
+            topic = str(message.topic)
+            raw = message.payload
+            if isinstance(raw, bytes):
+                raw = raw.decode()
 
-                lights: list[dict[str, Any]] = []
+            if topic == devices_topic and not got_devices:
+                all_devices = json.loads(raw)
                 self._devices.clear()
                 for dev in all_devices:
                     if self._is_light_device(dev):
                         info = self._parse_light_device(dev)
                         self._devices[info["id"]] = info
                         lights.append(info)
-
                 logger.info(
                     "Zigbee2MQTT: discovered %d light(s) out of %d device(s)",
                     len(lights),
                     len(all_devices),
                 )
+                got_devices = True
+
+            elif topic == groups_topic and not got_groups:
+                all_groups = json.loads(raw)
+                self._groups.clear()
+                for grp in all_groups:
+                    info = self._parse_group(grp)
+                    if info["member_count"] > 0:
+                        self._groups[info["id"]] = info
+                logger.info(
+                    "Zigbee2MQTT: discovered %d group(s)",
+                    len(self._groups),
+                )
+                got_groups = True
+
+            if got_devices and got_groups:
                 return lights
 
-        return []
+        return lights
+
+    @staticmethod
+    def _parse_group(group: dict[str, Any]) -> dict[str, Any]:
+        """Extract group info from a Z2M group."""
+        friendly_name = group.get("friendly_name", "")
+        group_id = group.get("id", 0)
+        members = group.get("members", [])
+        # Z2M members are {ieee_address: str, endpoint: int}
+        member_addresses = [
+            m.get("ieee_address", "") if isinstance(m, dict) else str(m)
+            for m in members
+        ]
+        return {
+            "id": friendly_name,
+            "name": friendly_name,
+            "group_id": group_id,
+            "member_count": len(members),
+            "members": member_addresses,
+        }
 
     @staticmethod
     async def _collect_one(client: "aiomqtt.Client"):
-        """Yield one message from the client (for use with wait_for)."""
+        """Return the first message from the client."""
         async for message in client.messages:
-            yield message
-            return
+            return message
+        return None
 
     @staticmethod
     def _is_light_device(device: dict[str, Any]) -> bool:
@@ -337,12 +396,24 @@ class Zigbee2MQTTAdapter(ServiceAdapter):
 
         return CommandResult(
             success=True,
-            data={"lights": list(self._devices.values())},
+            data={
+                "lights": list(self._devices.values()),
+                "groups": list(self._groups.values()),
+            },
         )
 
-    def _resolve_targets(self, targets: list[str] | None) -> list[str]:
-        """Resolve target list to device friendly_names."""
-        if not targets or "all" in targets:
+    def _resolve_targets(self, targets: list[str] | str | None) -> list[str]:
+        """Resolve target list to device/group friendly_names.
+
+        Groups are valid Z2M targets — publishing to ``{base_topic}/{group}/set``
+        controls all members at once.
+        """
+        if targets is None:
+            return list(self._devices.keys())
+        # Handle comma-separated string from frontend
+        if isinstance(targets, str):
+            targets = [t.strip() for t in targets.split(",") if t.strip()]
+        if not targets or targets == ["all"]:
             return list(self._devices.keys())
         return targets
 

@@ -84,7 +84,13 @@ class Action(UUIDMixin, TimestampMixin, Base):
     @property
     def targets(self) -> list[str]:
         """Get the target identifiers from parameters."""
-        return self.parameters.get("targets", [])
+        targets = self.parameters.get("targets", [])
+        if not targets:
+            # Also check singular "target" key
+            target = self.parameters.get("target")
+            if target:
+                return [target] if isinstance(target, str) else target
+        return targets
 
     def to_command(self) -> dict[str, Any]:
         """Convert action to command format for adapter execution."""

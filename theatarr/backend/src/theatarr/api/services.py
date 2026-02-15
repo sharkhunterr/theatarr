@@ -561,11 +561,13 @@ async def get_service_resources(
 
     try:
         if service.category == "lighting":
-            # Get lights
+            # Get lights (and groups if supported)
             cmd = Command(action="get_lights", parameters={})
             result = await adapter.execute(cmd)
             if result.success and result.data:
                 resources["items"] = result.data.get("lights", [])
+                if result.data.get("groups"):
+                    resources["groups"] = result.data["groups"]
 
             # Also get scenes if available
             try:

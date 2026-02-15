@@ -46,8 +46,12 @@ export function LightingActionForm({
       {/* Target Lights */}
       <Input
         label="Target Lights"
-        value={(parameters.targets as string) || ''}
-        onChange={(e) => onParametersChange({ ...parameters, targets: e.target.value })}
+        value={Array.isArray(parameters.targets) ? (parameters.targets as string[]).join(', ') : (parameters.targets as string) || ''}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const list = raw ? raw.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+          onParametersChange({ ...parameters, targets: list });
+        }}
         placeholder="e.g., living_room, bedroom (comma-separated or 'all')"
       />
 

@@ -283,9 +283,13 @@ class HomeAssistantAdapter(ServiceAdapter):
 
         return await self._call_ha_service(domain, service, service_data)
 
-    def _resolve_targets(self, targets: list[str] | None) -> list[str]:
+    def _resolve_targets(self, targets: list[str] | str | None) -> list[str]:
         """Resolve target names to entity IDs."""
-        if not targets or "all" in targets:
+        if targets is None:
+            return list(self._lights.keys())
+        if isinstance(targets, str):
+            targets = [t.strip() for t in targets.split(",") if t.strip()]
+        if not targets or targets == ["all"]:
             return list(self._lights.keys())
 
         entity_ids = []

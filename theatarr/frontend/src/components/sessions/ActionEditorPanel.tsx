@@ -38,6 +38,7 @@ interface ServiceResources {
   service_name: string;
   category: string;
   items: Array<{ id: string; name: string; [key: string]: unknown }>;
+  groups?: Array<{ id: string; name: string; member_count: number; members?: string[] }>;
   scenes?: Array<{ id: string; name: string }>;
   libraries?: Array<{ id: string; title: string; type: string }>;
   error?: string;
@@ -288,6 +289,7 @@ function LightingForm({
   ];
 
   const lights = resources?.items || [];
+  const groups = resources?.groups || [];
   const scenes = resources?.scenes || [];
 
   const handleParametersChange = (updates: Record<string, unknown>) => {
@@ -325,16 +327,34 @@ function LightingForm({
           </div>
           {isLoading ? (
             <div className="p-3 text-center"><Spinner size="sm" /></div>
-          ) : lights.length > 0 ? (
+          ) : lights.length > 0 || groups.length > 0 ? (
             <select
-              value={(parameters.target as string) || 'all'}
-              onChange={(e) => handleParametersChange({ target: e.target.value })}
+              value={
+                Array.isArray(parameters.targets) && (parameters.targets as string[]).length > 0
+                  ? (parameters.targets as string[])[0]
+                  : (parameters.target as string) || 'all'
+              }
+              onChange={(e) => {
+                const val = e.target.value;
+                handleParametersChange({ targets: val === 'all' ? [] : [val], target: undefined });
+              }}
               className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
             >
               <option value="all">{t.allLights}</option>
-              {lights.map((light) => (
-                <option key={light.id} value={light.id}>{light.name}</option>
-              ))}
+              {groups.length > 0 && (
+                <optgroup label={language === 'fr' ? 'Groupes' : 'Groups'}>
+                  {groups.map((group) => (
+                    <option key={`group-${group.id}`} value={group.id}>
+                      {group.name} ({group.member_count})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label={language === 'fr' ? 'Lumières individuelles' : 'Individual lights'}>
+                {lights.map((light) => (
+                  <option key={light.id} value={light.id}>{light.name}</option>
+                ))}
+              </optgroup>
             </select>
           ) : (
             <div className="text-sm text-dark-muted p-2 bg-dark-bg rounded-lg">{t.noLights}</div>

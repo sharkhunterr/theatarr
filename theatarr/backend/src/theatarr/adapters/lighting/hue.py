@@ -281,7 +281,7 @@ class HueAdapter(ServiceAdapter):
             return CommandResult(success=False, message="Not connected")
 
         try:
-            if targets is None or "all" in targets:
+            if targets is None or (isinstance(targets, list) and "all" in targets):
                 # Apply to all lights (group 0)
                 response = await self._client.put(
                     f"{self._base_url}/groups/0/action",
