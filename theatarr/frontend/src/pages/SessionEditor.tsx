@@ -27,7 +27,6 @@ import {
   Layers,
   Plus,
   GripVertical,
-  HelpCircle,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { Button, Spinner } from '../components/common';
@@ -825,77 +824,57 @@ export function SessionEditor() {
   const addSmartActions = () => {
     const base = nextBlockIndex;
     const smartActions: ActionItem[] = [
+      // ── Block 1: Accueil — display (attente ambiance) + audio + lighting ──
       {
         id: generateId(),
         action_type: 'display',
         command: 'show',
         parameters: {
           content_type: 'waiting_screen',
-          template_name: 'Salle de Cinema',
+          template_name: 'Attente Ambiance',
+          mode: 'waiting_screen',
           layout: {
-            style: 'waiting-cinema',
+            style: 'waiting-ambient',
             components: [
-              { type: 'session_info', position: 'center', fields: ['name'] },
-              { type: 'custom_text', text: 'La seance va bientot commencer', position: 'center', style: 'cinema-label' },
+              { type: 'backdrop', opacity: 0.4, blur: 20 },
+              { type: 'poster', position: 'left', size: 'large' },
+              { type: 'title', size: 'xlarge' },
+              { type: 'tagline', style: 'italic' },
+              { type: 'genres', style: 'pills' },
+              { type: 'metadata', fields: ['year', 'runtime', 'rating'] },
+              { type: 'session_info', position: 'bottom', fields: ['name'] },
             ],
           },
-          config: { theme: 'cinema' },
+          config: { theme: 'dark', use_palette_colors: true, show_genres: true, show_rating: true },
+          action_duration_ms: 30000,
         },
         delay_ms: 0,
-        duration_ms: 10000,
+        duration_ms: 30000,
         on_failure: 'warn',
         block_index: base,
       },
       {
         id: generateId(),
-        action_type: 'display',
-        command: 'show',
-        parameters: {
-          content_type: 'waiting_screen',
-          template_name: 'Bandes-Annonces',
-          layout: {
-            style: 'waiting-trailers',
-            components: [
-              { type: 'badge', text: 'Bandes-Annonces', position: 'top-center', style: 'glass-pill' },
-              { type: 'session_info', position: 'bottom-center', fields: ['name'] },
-            ],
-          },
-          config: { theme: 'cinema' },
-        },
+        action_type: 'audio',
+        command: 'play',
+        parameters: { sound_id: '', fade_out_ms: 0, action_duration_ms: 30000 },
         delay_ms: 0,
-        duration_ms: 10000,
+        duration_ms: 30000,
         on_failure: 'warn',
-        block_index: base + 1,
+        block_index: base,
       },
       {
         id: generateId(),
-        action_type: 'display',
-        command: 'show',
-        parameters: {
-          content_type: 'waiting_screen',
-          template_name: 'Teaser',
-          layout: {
-            style: 'waiting-teaser',
-            components: [
-              { type: 'backdrop', opacity: 1, blur: 0 },
-              { type: 'logo', position: 'center', size: 'large' },
-              { type: 'genres', style: 'pills' },
-              { type: 'session_info', position: 'bottom-center', fields: ['name'] },
-            ],
-          },
-          config: {
-            theme: 'dark',
-            use_palette_colors: true,
-            use_logo_image: true,
-            rotate_backdrops: true,
-            rotate_interval: 20,
-          },
-        },
+        action_type: 'lighting',
+        command: 'set_color',
+        parameters: { targets: [], color: '#09494c', transition_ms: 50, action_duration_ms: 10000 },
         delay_ms: 0,
         duration_ms: 10000,
         on_failure: 'warn',
-        block_index: base + 2,
+        block_index: base,
       },
+
+      // ── Block 2: Film partie 1 — media:play + lighting:turn_off ──
       {
         id: generateId(),
         action_type: 'media',
@@ -904,7 +883,167 @@ export function SessionEditor() {
         delay_ms: 0,
         duration_ms: 0,
         on_failure: 'warn',
+        block_index: base + 1,
+      },
+      {
+        id: generateId(),
+        action_type: 'lighting',
+        command: 'turn_off',
+        parameters: { targets: [], action_duration_ms: 10000 },
+        delay_ms: 0,
+        duration_ms: 10000,
+        on_failure: 'warn',
+        block_index: base + 1,
+      },
+
+      // ── Block 3: Entracte — display (entracte) + lighting:turn_on ──
+      {
+        id: generateId(),
+        action_type: 'display',
+        command: 'show',
+        parameters: {
+          content_type: 'waiting_screen',
+          template_name: 'Entracte',
+          mode: 'waiting_screen',
+          layout: {
+            style: 'waiting-intermission',
+            components: [
+              { type: 'custom_text', text: 'Entracte', position: 'center', style: 'elegant-title' },
+              { type: 'session_info', position: 'bottom-center', fields: ['name'] },
+            ],
+          },
+          config: { theme: 'elegant', show_countdown: true },
+          action_duration_ms: 60000,
+        },
+        delay_ms: 0,
+        duration_ms: 60000,
+        on_failure: 'warn',
+        block_index: base + 2,
+      },
+      {
+        id: generateId(),
+        action_type: 'lighting',
+        command: 'turn_on',
+        parameters: { color: '#d4cbc4', transition_ms: 100, action_duration_ms: 10000 },
+        delay_ms: 0,
+        duration_ms: 10000,
+        on_failure: 'warn',
+        block_index: base + 2,
+      },
+
+      // ── Block 4: Quiz / Animation — display (quiz) + audio + lighting ──
+      {
+        id: generateId(),
+        action_type: 'display',
+        command: 'show',
+        parameters: {
+          content_type: 'quiz',
+          quiz_session_id: '',
+          template_name: 'Quiz Gameshow',
+          layout: {
+            style: 'quiz-gameshow',
+            components: [
+              { type: 'quiz_header' },
+              { type: 'quiz_question' },
+              { type: 'quiz_choices' },
+              { type: 'quiz_timer', style: 'circular' },
+              { type: 'quiz_scoreboard', position: 'right', limit: 5 },
+              { type: 'quiz_qrcode', position: 'bottom-right' },
+              { type: 'quiz_feedback' },
+              { type: 'quiz_podium' },
+              { type: 'quiz_participant_count' },
+              { type: 'quiz_join_message' },
+            ],
+          },
+          config: {
+            theme: 'gameshow',
+            accent_color: '#f59e0b',
+            secondary_color: '#8b5cf6',
+            show_scoreboard_during_question: true,
+            show_qr_during_waiting: true,
+            show_answer_distribution: true,
+            feedback_duration_seconds: 5,
+            podium_animation: true,
+            choice_colors: ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899'],
+          },
+          action_duration_ms: 70000,
+        },
+        delay_ms: 0,
+        duration_ms: 70000,
+        on_failure: 'warn',
         block_index: base + 3,
+      },
+      {
+        id: generateId(),
+        action_type: 'audio',
+        command: 'play',
+        parameters: { sound_id: '', fade_out_ms: 50, fade_in_ms: 50, action_duration_ms: 60000 },
+        delay_ms: 0,
+        duration_ms: 60000,
+        on_failure: 'warn',
+        block_index: base + 3,
+      },
+      {
+        id: generateId(),
+        action_type: 'lighting',
+        command: 'set_color',
+        parameters: { targets: [], color: '#13a3af', transition_ms: 100, brightness: 26, action_duration_ms: 10000 },
+        delay_ms: 0,
+        duration_ms: 10000,
+        on_failure: 'warn',
+        block_index: base + 3,
+      },
+
+      // ── Block 5: Rappel avant reprise — display (attente ambiance) ──
+      {
+        id: generateId(),
+        action_type: 'display',
+        command: 'show',
+        parameters: {
+          content_type: 'waiting_screen',
+          template_name: 'Attente Ambiance',
+          mode: 'waiting_screen',
+          layout: {
+            style: 'waiting-ambient',
+            components: [
+              { type: 'backdrop', opacity: 0.4, blur: 20 },
+              { type: 'poster', position: 'left', size: 'large' },
+              { type: 'title', size: 'xlarge' },
+              { type: 'tagline', style: 'italic' },
+              { type: 'genres', style: 'pills' },
+              { type: 'metadata', fields: ['year', 'runtime', 'rating'] },
+              { type: 'session_info', position: 'bottom', fields: ['name'] },
+            ],
+          },
+          config: { theme: 'dark', use_palette_colors: true, show_genres: true, show_rating: true },
+          action_duration_ms: 20000,
+        },
+        delay_ms: 0,
+        duration_ms: 20000,
+        on_failure: 'warn',
+        block_index: base + 4,
+      },
+
+      // ── Block 6: Reprise du film — media:resume + lighting:turn_off ──
+      {
+        id: generateId(),
+        action_type: 'media',
+        command: 'resume',
+        parameters: {},
+        delay_ms: 0,
+        duration_ms: 0,
+        on_failure: 'warn',
+        block_index: base + 5,
+      },
+      {
+        id: generateId(),
+        action_type: 'lighting',
+        command: 'turn_off',
+        parameters: { targets: [], action_duration_ms: 10000 },
+        delay_ms: 0,
+        duration_ms: 10000,
+        on_failure: 'warn',
+        block_index: base + 5,
       },
     ];
     const newActions = [...actions, ...smartActions];
@@ -912,29 +1051,6 @@ export function SessionEditor() {
     setSelectedActionIndex(newActions.length - smartActions.length);
   };
 
-  // Quiz preset: adds a quiz display action block
-  const addQuizAction = () => {
-    const base = nextBlockIndex;
-    const quizAction: ActionItem = {
-      id: generateId(),
-      action_type: 'display',
-      command: 'show',
-      parameters: {
-        content_type: 'quiz',
-        quiz_session_id: '', // To be filled by user
-        template_name: 'Quiz',
-        layout: { style: 'quiz-classic', components: [] },
-        config: {},
-      },
-      delay_ms: 0,
-      duration_ms: 0,
-      on_failure: 'warn',
-      block_index: base,
-    };
-    const newActions = [...actions, quizAction];
-    setActions(newActions);
-    setSelectedActionIndex(newActions.length - 1);
-  };
 
   if (isLoading) {
     return (
@@ -1445,7 +1561,7 @@ export function SessionEditor() {
                   <div className="p-3 border-b border-dark-border">
                     <h3 className="text-sm font-medium text-dark-text mb-2 hidden md:block">{t.actions}</h3>
                     {/* Add Action Buttons */}
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5">
                       {(Object.keys(actionTypeConfig) as ActionType[]).map((type) => {
                         const config = actionTypeConfig[type];
                         const Icon = config.icon;
@@ -1453,29 +1569,21 @@ export function SessionEditor() {
                           <button
                             key={type}
                             onClick={() => { addAction(type); setMobilePanel('properties'); }}
-                            className={`px-2 py-1.5 rounded text-xs font-medium flex items-center gap-1 ${config.bgColor} ${config.color} hover:opacity-80 transition-opacity`}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${config.bgColor} ${config.color} hover:opacity-80 transition-opacity border ${config.color.replace('text-', 'border-').replace('400', '500/30')}`}
                             title={language === 'fr' ? config.label.fr : config.label.en}
                           >
-                            <Icon size={12} />
-                            <span className="hidden sm:inline">{language === 'fr' ? config.label.fr : config.label.en}</span>
+                            <Icon size={16} />
+                            {language === 'fr' ? config.label.fr : config.label.en}
                           </button>
                         );
                       })}
                       <button
                         onClick={() => { addSmartActions(); setMobilePanel('properties'); }}
-                        className="px-2 py-1.5 rounded text-xs font-medium flex items-center gap-1 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 hover:opacity-80 transition-opacity border border-amber-500/30"
+                        className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 hover:opacity-80 transition-opacity border border-amber-500/30"
                         title={language === 'fr' ? 'Preset Smart : séance complète' : 'Smart preset: complete session'}
                       >
-                        <Sparkles size={12} />
-                        <span className="hidden sm:inline">Smart</span>
-                      </button>
-                      <button
-                        onClick={() => { addQuizAction(); setMobilePanel('properties'); }}
-                        className="px-2 py-1.5 rounded text-xs font-medium flex items-center gap-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-400 hover:opacity-80 transition-opacity border border-indigo-500/30"
-                        title={language === 'fr' ? 'Preset Quiz : action quiz' : 'Quiz preset: quiz action'}
-                      >
-                        <HelpCircle size={12} />
-                        <span className="hidden sm:inline">Quiz</span>
+                        <Sparkles size={16} />
+                        Smart
                       </button>
                     </div>
                   </div>
@@ -1492,25 +1600,25 @@ export function SessionEditor() {
                           return (
                             <div key={blockIndex} className="border border-dark-border rounded-lg bg-dark-bg/40">
                               {/* Block header */}
-                              <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-dark-border/50">
+                              <div className="flex items-center gap-1.5 px-2 py-2 border-b border-dark-border/50">
                                 <div className="flex flex-col">
                                   <button
                                     onClick={() => moveBlock(blockIndex, 'up')}
-                                    className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-0.5"
+                                    className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-1"
                                     disabled={blockPos === 0}
                                   >
-                                    <ChevronUp size={10} />
+                                    <ChevronUp size={14} />
                                   </button>
                                   <button
                                     onClick={() => moveBlock(blockIndex, 'down')}
-                                    className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-0.5"
+                                    className="text-dark-muted hover:text-dark-text disabled:opacity-30 p-1"
                                     disabled={blockPos === actionBlocks.length - 1}
                                   >
-                                    <ChevronDown size={10} />
+                                    <ChevronDown size={14} />
                                   </button>
                                 </div>
-                                <GripVertical size={12} className="text-dark-muted/50" />
-                                <span className="text-[10px] font-semibold text-dark-muted uppercase tracking-wider">
+                                <GripVertical size={14} className="text-dark-muted/50" />
+                                <span className="text-xs font-semibold text-dark-muted uppercase tracking-wider">
                                   {t.block} {blockPos + 1}
                                 </span>
                                 {isParallel && (
@@ -1523,12 +1631,12 @@ export function SessionEditor() {
                                 {/* Add action to this block - dropdown */}
                                 <div className="relative group">
                                   <button
-                                    className="p-0.5 text-dark-muted hover:text-theatarr-400 transition-colors"
+                                    className="p-1.5 text-dark-muted hover:text-theatarr-400 transition-colors rounded hover:bg-dark-bg/60"
                                     title={t.addToBlock}
                                   >
-                                    <Plus size={12} />
+                                    <Plus size={16} />
                                   </button>
-                                  <div className="hidden group-hover:block absolute right-0 top-full z-10 mt-1 bg-dark-surface border border-dark-border rounded-lg shadow-lg p-1 min-w-[120px]">
+                                  <div className="hidden group-hover:block absolute right-0 top-full z-10 mt-1 bg-dark-surface border border-dark-border rounded-lg shadow-lg p-1.5 min-w-[150px]">
                                     {(Object.keys(actionTypeConfig) as ActionType[]).map((type) => {
                                       const cfg = actionTypeConfig[type];
                                       const TypeIcon = cfg.icon;
@@ -1536,9 +1644,9 @@ export function SessionEditor() {
                                         <button
                                           key={type}
                                           onClick={() => { addAction(type, blockIndex); setMobilePanel('properties'); }}
-                                          className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-dark-text hover:bg-dark-bg rounded transition-colors"
+                                          className="w-full flex items-center gap-2 px-2.5 py-1.5 text-sm text-dark-text hover:bg-dark-bg rounded transition-colors"
                                         >
-                                          <TypeIcon size={11} className={cfg.color} />
+                                          <TypeIcon size={14} className={cfg.color} />
                                           {language === 'fr' ? cfg.label.fr : cfg.label.en}
                                         </button>
                                       );
@@ -1547,15 +1655,15 @@ export function SessionEditor() {
                                 </div>
                                 <button
                                   onClick={() => deleteBlock(blockIndex)}
-                                  className="p-0.5 text-dark-muted hover:text-red-400 transition-colors"
+                                  className="p-1.5 text-dark-muted hover:text-red-400 transition-colors rounded hover:bg-dark-bg/60"
                                   title={t.deleteBlock}
                                 >
-                                  <Trash2 size={11} />
+                                  <Trash2 size={14} />
                                 </button>
                               </div>
 
                               {/* Block actions */}
-                              <div className="p-1 space-y-0.5">
+                              <div className="p-1.5 space-y-1">
                                 {blockActions.map((action) => {
                                   const globalIndex = actions.indexOf(action);
                                   const config = actionTypeConfig[action.action_type];
@@ -1567,38 +1675,38 @@ export function SessionEditor() {
                                       key={action.id}
                                       onClick={() => { setSelectedActionIndex(globalIndex); setMobilePanel('properties'); }}
                                       className={clsx(
-                                        'p-1.5 rounded border cursor-pointer transition-all',
+                                        'p-2 rounded-lg border cursor-pointer transition-all',
                                         isSelected
                                           ? 'border-theatarr-500 bg-theatarr-500/10'
                                           : 'border-transparent hover:bg-dark-bg/60'
                                       )}
                                     >
                                       <div className="flex items-center gap-2">
-                                        <div className={`p-1 rounded ${config.bgColor}`}>
-                                          <Icon size={12} className={config.color} />
+                                        <div className={`p-1.5 rounded-lg ${config.bgColor}`}>
+                                          <Icon size={16} className={config.color} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                          <div className="text-xs font-medium text-dark-text truncate">
+                                          <div className="text-sm font-medium text-dark-text truncate">
                                             {action.command}
                                           </div>
-                                          <div className="text-[10px] text-dark-muted truncate">
+                                          <div className="text-xs text-dark-muted truncate">
                                             {language === 'fr' ? config.label.fr : config.label.en}
                                           </div>
                                         </div>
                                         {isParallel && (
                                           <button
                                             onClick={(e) => { e.stopPropagation(); removeActionFromBlock(globalIndex); }}
-                                            className="p-0.5 text-dark-muted hover:text-amber-400 transition-colors"
+                                            className="p-1.5 text-dark-muted hover:text-amber-400 transition-colors rounded hover:bg-dark-bg/60"
                                             title={language === 'fr' ? 'Extraire du bloc' : 'Extract from block'}
                                           >
-                                            <Layers size={11} />
+                                            <Layers size={14} />
                                           </button>
                                         )}
                                         <button
                                           onClick={(e) => { e.stopPropagation(); deleteAction(globalIndex); }}
-                                          className="p-0.5 text-dark-muted hover:text-red-400 transition-colors"
+                                          className="p-1.5 text-dark-muted hover:text-red-400 transition-colors rounded hover:bg-dark-bg/60"
                                         >
-                                          <Trash2 size={11} />
+                                          <Trash2 size={14} />
                                         </button>
                                       </div>
                                     </div>
@@ -1612,9 +1720,9 @@ export function SessionEditor() {
                         {/* Add new block button */}
                         <button
                           onClick={() => addAction('display')}
-                          className="w-full p-2 border border-dashed border-dark-border rounded-lg text-dark-muted text-xs hover:border-theatarr-500/50 hover:text-theatarr-400 transition-colors flex items-center justify-center gap-1.5"
+                          className="w-full py-3 px-4 border border-dashed border-dark-border rounded-lg text-dark-muted text-sm hover:border-theatarr-500/50 hover:text-theatarr-400 transition-colors flex items-center justify-center gap-2"
                         >
-                          <Plus size={12} />
+                          <Plus size={16} />
                           {t.newBlock}
                         </button>
                       </div>
