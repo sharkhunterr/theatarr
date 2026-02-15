@@ -4,13 +4,13 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Film, Lightbulb, Volume2, Monitor, Zap, X, RefreshCw, Sparkles } from 'lucide-react';
+import { Search, Film, Lightbulb, Volume2, Monitor, Zap, ClipboardCheck, X, RefreshCw, Sparkles, Star } from 'lucide-react';
 import { Spinner } from '../common';
 import { apiClient } from '../../api/client';
 import { useLayoutStore } from '../../stores/layoutStore';
 
 // Types
-export type ActionType = 'lighting' | 'audio' | 'display' | 'media' | 'actuator';
+export type ActionType = 'lighting' | 'audio' | 'display' | 'media' | 'actuator' | 'session';
 
 export interface ActionItem {
   id: string;
@@ -78,6 +78,7 @@ const actionTypeConfig: Record<ActionType, {
   media: { icon: Film, color: 'text-green-400', bgColor: 'bg-green-500/20', label: { en: 'Media', fr: 'Média' }, category: 'media_source' },
   display: { icon: Monitor, color: 'text-purple-400', bgColor: 'bg-purple-500/20', label: { en: 'Display', fr: 'Affichage' }, category: 'player' },
   actuator: { icon: Zap, color: 'text-orange-400', bgColor: 'bg-orange-500/20', label: { en: 'Actuator', fr: 'Actionneur' }, category: 'actuator' },
+  session: { icon: ClipboardCheck, color: 'text-teal-400', bgColor: 'bg-teal-500/20', label: { en: 'Session', fr: 'Session' }, category: '' },
 };
 
 export function ActionEditorPanel({ action, services, onChange, onDelete, colorPalette }: ActionEditorPanelProps) {
@@ -105,6 +106,7 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
     if (action.action_type === 'lighting') return s.category === 'lighting';
     if (action.action_type === 'audio' || action.action_type === 'display') return s.category === 'player';
     if (action.action_type === 'actuator') return s.category === 'actuator';
+    if (action.action_type === 'session') return false;
     return false;
   }).filter(s => s.is_enabled);
 
@@ -173,6 +175,13 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
         )}
         {action.action_type === 'actuator' && (
           <ActuatorForm
+            action={action}
+            onChange={onChange}
+            language={language}
+          />
+        )}
+        {action.action_type === 'session' && (
+          <SessionForm
             action={action}
             onChange={onChange}
             language={language}
@@ -1392,6 +1401,10 @@ function DisplayForm({
     (t) => t.template_type === 'quiz'
   );
 
+  const feedbackTemplates = (templatesData?.items || []).filter(
+    (t) => t.template_type === 'feedback'
+  );
+
   // Fetch quiz sessions for quiz content type
   const { data: quizSessionsData } = useQuery<{ items: QuizSessionListItem[] }>({
     queryKey: ['quiz-sessions-for-action'],
@@ -1563,17 +1576,13 @@ function DisplayForm({
                 const { template_id, template_name, mode, layout, config,
                   quiz_session_id, quiz_template_id, quiz_name, total_questions,
                   ...rest } = parameters;
-                if (newType === 'waiting_screen' || newType === 'quiz') {
-                  // These types use layout/config, keep content_type only
-                  onChange({ parameters: { ...rest, content_type: newType } });
-                } else {
-                  onChange({ parameters: { ...rest, content_type: newType } });
-                }
+                onChange({ parameters: { ...rest, content_type: newType } });
               }}
               className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
             >
               <option value="waiting_screen">{language === 'fr' ? 'Waiting Screen' : 'Waiting Screen'}</option>
               <option value="quiz">Quiz</option>
+              <option value="feedback">Feedback</option>
               <option value="text">{language === 'fr' ? 'Texte' : 'Text'}</option>
               <option value="image">Image</option>
               <option value="template">Template</option>
@@ -1712,6 +1721,53 @@ function DisplayForm({
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {(parameters.content_type as string) === 'feedback' && (
+            <div>
+              <label className="block text-sm font-medium text-dark-text mb-1">{language === 'fr' ? 'Template Feedback' : 'Feedback Template'}</label>
+              {feedbackTemplates.length > 0 ? (
+                <div className="space-y-2">
+                  {feedbackTemplates.map((tmpl) => {
+                    const isSelected = (parameters.template_id as string) === tmpl.id ||
+                      (!parameters.template_id && (parameters.layout as Record<string, unknown>)?.style === (tmpl.layout as Record<string, unknown>)?.style);
+                    return (
+                      <button
+                        key={tmpl.id}
+                        type="button"
+                        onClick={() => {
+                          handleParametersChange({
+                            template_id: tmpl.id,
+                            template_name: tmpl.name,
+                            layout: tmpl.layout || { style: 'feedback-classic', components: [] },
+                            config: tmpl.config || {},
+                          });
+                        }}
+                        className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                          isSelected
+                            ? 'border-amber-500 bg-amber-500/10'
+                            : 'border-dark-border bg-dark-bg hover:border-dark-muted'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Star size={16} className={isSelected ? 'text-amber-400' : 'text-dark-muted'} />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-dark-text text-sm">{tmpl.name}</div>
+                            {tmpl.description && (
+                              <div className="text-xs text-dark-muted truncate">{tmpl.description}</div>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">
+                  {language === 'fr' ? 'Aucun template feedback disponible' : 'No feedback templates available'}
+                </div>
+              )}
             </div>
           )}
 
@@ -2031,6 +2087,56 @@ function ActuatorForm({
           placeholder={language === 'fr' ? 'Valeur optionnelle' : 'Optional value'}
         />
       </div>
+    </div>
+  );
+}
+
+
+// ============================================================================
+// Session Action Form
+// ============================================================================
+
+const SESSION_COMMANDS = [
+  { value: 'open_feedback', label_fr: 'Ouvrir les feedbacks', label_en: 'Open Feedback' },
+];
+
+function SessionForm({ action, onChange, language }: {
+  action: ActionItem;
+  onChange: (updates: Partial<ActionItem>) => void;
+  language: string;
+}) {
+  const command = action.command;
+
+  const t = {
+    command: language === 'fr' ? 'Commande' : 'Command',
+    description: language === 'fr'
+      ? 'Cette action affiche le template feedback sur le wallmount et invite les participants à noter la séance.'
+      : 'This action displays the feedback template on the wallmount and invites participants to rate the session.',
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
+        <select
+          value={command}
+          onChange={(e) => onChange({ command: e.target.value })}
+          className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+        >
+          {SESSION_COMMANDS.map((cmd) => (
+            <option key={cmd.value} value={cmd.value}>
+              {language === 'fr' ? cmd.label_fr : cmd.label_en}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {command === 'open_feedback' && (
+        <div className="text-sm text-dark-muted bg-teal-500/10 border border-teal-500/20 rounded-lg p-3">
+          <ClipboardCheck size={14} className="inline mr-1 text-teal-400" />
+          {t.description}
+        </div>
+      )}
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   Layers,
   Plus,
   GripVertical,
+  ClipboardCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { Button, Spinner } from '../components/common';
@@ -263,6 +264,7 @@ const actionTypeConfig: Record<ActionType, { icon: typeof Lightbulb; color: stri
   media: { icon: Play, color: 'text-green-400', bgColor: 'bg-green-500/20', label: { en: 'Media', fr: 'Média' } },
   display: { icon: Monitor, color: 'text-purple-400', bgColor: 'bg-purple-500/20', label: { en: 'Display', fr: 'Affichage' } },
   actuator: { icon: Zap, color: 'text-orange-400', bgColor: 'bg-orange-500/20', label: { en: 'Actuator', fr: 'Actionneur' } },
+  session: { icon: ClipboardCheck, color: 'text-teal-400', bgColor: 'bg-teal-500/20', label: { en: 'Session', fr: 'Session' } },
 };
 
 const defaultCommands: Record<ActionType, string> = {
@@ -271,6 +273,7 @@ const defaultCommands: Record<ActionType, string> = {
   media: 'play',
   display: 'show',
   actuator: 'execute',
+  session: 'open_feedback',
 };
 
 export function SessionEditor() {
@@ -754,13 +757,15 @@ export function SessionEditor() {
 
   const addAction = (type: ActionType, targetBlockIndex?: number) => {
     const bi = targetBlockIndex ?? nextBlockIndex;
+    // session actions are instant — default to 1s to avoid becoming MANUAL (infinite wait)
+    const defaultDuration = type === 'session' ? 1000 : 0;
     const newAction: ActionItem = {
       id: generateId(),
       action_type: type,
       command: defaultCommands[type],
       parameters: {},
       delay_ms: 0,
-      duration_ms: 0,
+      duration_ms: defaultDuration,
       on_failure: 'warn',
       block_index: bi,
     };

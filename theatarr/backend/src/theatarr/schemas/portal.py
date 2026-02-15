@@ -26,6 +26,11 @@ class PortalSessionSummary(BaseSchema):
     linked_vote_session_id: str | None = None
     linked_vote_is_open: bool | None = None
     vote_movie_posters: list[str] | None = None
+    # Feedback
+    feedback_available: bool = False
+    has_submitted_feedback: bool = False
+    feedback_count: int = 0
+    feedback_average: float | None = None
 
 
 class PortalSequenceSummary(BaseSchema):
@@ -72,6 +77,11 @@ class PortalSessionDetail(BaseSchema):
     current_sequence_elapsed_ms: int = 0
     total_sequences: int = 0
     movie_runtime_minutes: int | None = None
+    # Feedback
+    feedback_available: bool = False
+    has_submitted_feedback: bool = False
+    feedback_count: int = 0
+    feedback_average: float | None = None
 
 
 class PortalSessionListResponse(BaseSchema):
@@ -155,6 +165,7 @@ class PortalStatsResponse(BaseSchema):
     pending_votes: int
     pending_quiz: int = 0
     pending_invitations: int
+    pending_feedback: int = 0
     upcoming_sessions: int
     total_sessions_attended: int
     total_votes_cast: int

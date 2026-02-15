@@ -2,7 +2,7 @@
  * Session card component for portal.
  */
 
-import { Calendar, Check, X, Clock, Vote, Shuffle, Trophy, Sparkles, Film } from 'lucide-react';
+import { Calendar, Check, X, Clock, Vote, Shuffle, Trophy, Sparkles, Film, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { getMysteryRevealCountdown, getVoteRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
@@ -26,6 +26,10 @@ interface SessionCardProps {
   linkedVoteSessionId?: string | null;
   linkedVoteIsOpen?: boolean | null;
   voteMoviePosters?: string[] | null;
+  feedbackAvailable?: boolean;
+  hasSubmittedFeedback?: boolean;
+  feedbackCount?: number;
+  feedbackAverage?: number | null;
 }
 
 export function SessionCard({
@@ -43,6 +47,9 @@ export function SessionCard({
   linkedVoteSessionId,
   linkedVoteIsOpen,
   voteMoviePosters,
+  feedbackAvailable,
+  hasSubmittedFeedback,
+  feedbackAverage,
 }: SessionCardProps) {
   const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
   const formatDate = (dateStr: string) => {
@@ -248,6 +255,19 @@ export function SessionCard({
                   </span>
                 );
               })()}
+              {/* Feedback badge */}
+              {feedbackAvailable && !hasSubmittedFeedback && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 animate-pulse">
+                  <Star size={10} />
+                  Notez
+                </span>
+              )}
+              {hasSubmittedFeedback && feedbackAverage != null && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-500/20 text-teal-400">
+                  <Star size={10} />
+                  {feedbackAverage}/10
+                </span>
+              )}
             </div>
 
             {scheduledAt && (

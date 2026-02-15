@@ -32,10 +32,7 @@ export function ConfigPage() {
   // Fetch settings
   const { data: settingsData, isLoading: settingsLoading } = useQuery<SettingsData>({
     queryKey: ['settings'],
-    queryFn: async () => {
-      const response = await apiClient.get('/config/settings');
-      return response.data;
-    },
+    queryFn: () => apiClient.get<SettingsData>('/config/settings'),
   });
 
   // Save settings mutation

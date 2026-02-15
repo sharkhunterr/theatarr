@@ -3,6 +3,7 @@
  */
 
 import {
+  ClipboardCheck,
   Film,
   Lightbulb,
   Music,
@@ -33,6 +34,7 @@ export const ACTION_TYPE_COLORS: Record<string, string> = {
   audio: '#22c55e',
   display: '#a855f7',
   actuator: '#f97316',
+  session: '#14b8a6',
 };
 
 export const ACTION_TYPE_ICONS: Record<string, typeof Film> = {
@@ -41,6 +43,7 @@ export const ACTION_TYPE_ICONS: Record<string, typeof Film> = {
   audio: Music,
   display: ScreenShare,
   actuator: Settings,
+  session: ClipboardCheck,
 };
 
 export const MIN_BLOCK_PERCENT = 3;

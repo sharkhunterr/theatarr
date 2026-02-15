@@ -297,6 +297,8 @@ function SessionDisplay() {
   const quizSubscribedRef = useRef<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [sessionOverview, setSessionOverview] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [feedbackDisplayData, setFeedbackDisplayData] = useState<any>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -513,6 +515,17 @@ function SessionDisplay() {
               },
               config: { transparent_bg: true },
             };
+          } else if (contentType === 'feedback') {
+            // Feedback display action
+            template = {
+              name: (params.template_name as string) || 'Feedback',
+              template_type: 'feedback',
+              layout: params.layout || { style: 'feedback-classic', components: [] },
+              config: params.config || {},
+            };
+            if (params.feedback_display_data) {
+              setFeedbackDisplayData(params.feedback_display_data);
+            }
           } else if (contentType === 'image' && params.image_url) {
             // Image overlay
             template = {
@@ -1186,6 +1199,7 @@ function SessionDisplay() {
     palette: session.color_palette || undefined,
     quiz_info: quizState || undefined,
     session_overview: sessionOverview || undefined,
+    feedback_info: feedbackDisplayData || undefined,
   };
 
   // Before session starts or after it ends: simple black screen with status text.

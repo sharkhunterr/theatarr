@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from theatarr import __version__
 from theatarr.adapters.registry import discover_adapters
-from theatarr.api import auth, config, display, logs, movies, portal, quiz, services, sessions, sequences, sounds, templates, trailers, users, vote, wallmount
+from theatarr.api import auth, config, display, feedback, logs, movies, portal, quiz, services, sessions, sequences, sounds, templates, trailers, users, vote, wallmount
 from theatarr.api.errors import (
     AppException,
     app_exception_handler,
@@ -149,6 +149,7 @@ app.include_router(config.router, prefix="/api/v1")
 app.include_router(logs.router, prefix="/api/v1")
 app.include_router(movies.router, prefix="/api/v1")
 app.include_router(display.router, prefix="/api/v1")
+app.include_router(feedback.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["Health"])

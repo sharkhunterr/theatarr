@@ -97,6 +97,9 @@ async def _describe_action(action: "Action", db: "AsyncSession | None" = None) -
     if at == "lighting":
         return "Eclairage", "lighting", {}
 
+    if at == "session" and cmd == "open_feedback":
+        return "Ouverture des feedbacks", "clipboard-check", {}
+
     return f"{at}:{cmd}", "default", {}
 
 
@@ -658,6 +661,23 @@ class SequenceEngine:
                         session_id, ws_params["quiz_session_id"], total_s,
                     )
 
+            # session:open_feedback — marks feedback as available on the session
+            if action_type_val == "session" and action.command == "open_feedback":
+                logger.info("Feedback opened for session %s via action", session_id)
+                # Persist feedback_opened flag on the session
+                db = self._session_db(session_id)
+                session_obj = await self._get_session(session_id)
+                session_obj.feedback_opened = True
+                await db.commit()
+                elapsed = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                self._log_action(session_id, action, action_type_val, True, "Feedback opened", elapsed)
+                return ActionResult(
+                    action_id=action.id, success=True, message="Feedback opened",
+                    duration_ms=elapsed, error=None,
+                )
+
+            action_cmd_override = None
+
             # Inject session overview for session-info waiting screens
             if (
                 action_type_val == "display"
@@ -671,6 +691,19 @@ class SequenceEngine:
                         ws_params["session_overview"] = overview
                     except Exception as e:
                         logger.warning("Failed to build session overview: %s", e)
+
+            # Inject feedback display data for feedback templates
+            if (
+                action_type_val == "display"
+                and action.command == "show"
+                and ws_params.get("content_type") == "feedback"
+            ):
+                try:
+                    feedback_data = await self._build_feedback_display_data(session_id)
+                    ws_params["feedback_display_data"] = feedback_data
+                    logger.info("Injected feedback display data for session %s", session_id)
+                except Exception as e:
+                    logger.exception("Failed to build feedback display data: %s", e)
 
             if (
                 action_type_val == "media"
@@ -724,20 +757,21 @@ class SequenceEngine:
                 ws_params['sequence_duration_ms'] = sequence_duration_ms
                 ws_params['sequence_started_at'] = datetime.now(timezone.utc).isoformat()
 
+            broadcast_cmd = action_cmd_override or action.command
             logger.info(
                 "Broadcasting action_execute: %s:%s to session %s",
-                action_type_val, action.command, session_id,
+                action_type_val, broadcast_cmd, session_id,
             )
             sent = await ws_manager.broadcast_display_action(
                 session_id=session_id,
                 action_type=action_type_val,
-                command=action.command,
+                command=broadcast_cmd,
                 parameters=ws_params,
                 block_id=block_id,
             )
             self._display_states.setdefault(session_id, []).append({
                 "action_type": action_type_val,
-                "command": action.command,
+                "command": broadcast_cmd,
                 "parameters": ws_params,
                 "broadcast_at": datetime.now(timezone.utc).isoformat(),
                 "block_id": block_id,
@@ -1234,6 +1268,27 @@ class SequenceEngine:
             "total_duration_ms": total_duration_ms,
             "estimated_end_time": estimated_end,
             "current_sequence_index": session.current_sequence_index,
+        }
+
+    async def _build_feedback_display_data(self, session_id: str) -> dict[str, Any]:
+        """Build feedback display data for the wallmount template."""
+        from theatarr.api.feedback import _get_session_action_types
+        from theatarr.models.settings import get_frontend_url
+
+        db = self._session_db(session_id)
+        session = await self._get_session(session_id)
+        action_types = await _get_session_action_types(db, session_id)
+
+        frontend_url = await get_frontend_url(db)
+        feedback_url = f"{frontend_url}/portal/sessions/{session_id}#feedback"
+
+        return {
+            "session_id": session_id,
+            "session_name": session.name,
+            "movie_title": session.movie_title,
+            "movie_poster_url": session.movie_poster_url,
+            "action_types": sorted(action_types),
+            "feedback_url": feedback_url,
         }
 
     async def get_session_state(self, session_id: str) -> dict[str, Any]:

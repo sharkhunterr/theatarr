@@ -20,6 +20,7 @@ import {
   Monitor,
   Play,
   Zap,
+  ClipboardCheck,
   GitBranch,
   GitMerge,
   Clock,
@@ -48,7 +49,7 @@ export type WorkflowNodeType =
   | 'condition'
   | 'delay';
 
-export type ActionType = 'lighting' | 'audio' | 'display' | 'media' | 'actuator';
+export type ActionType = 'lighting' | 'audio' | 'display' | 'media' | 'actuator' | 'session';
 
 export interface WorkflowNodeData {
   label: string;
@@ -83,6 +84,7 @@ const actionIcons: Record<ActionType, typeof Lightbulb> = {
   display: Monitor,
   media: Play,
   actuator: Zap,
+  session: ClipboardCheck,
 };
 
 const actionColors: Record<ActionType, string> = {
@@ -91,6 +93,7 @@ const actionColors: Record<ActionType, string> = {
   display: '#a855f7',
   media: '#22c55e',
   actuator: '#f97316',
+  session: '#14b8a6',
 };
 
 // Custom Node Components

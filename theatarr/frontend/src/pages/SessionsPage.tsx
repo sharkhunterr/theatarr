@@ -20,6 +20,7 @@ import {
   Copy,
   Check,
   CopyPlus,
+  Star,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { getMysteryRevealCountdown, getVoteRevealCountdown } from '../utils/countdown';
@@ -467,6 +468,15 @@ export function SessionsPage() {
                   />
                 ))}
             </div>
+          )}
+
+          {/* Feedback badge */}
+          {(session.feedback_count ?? 0) > 0 && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">
+              <Star size={10} />
+              <span>{session.feedback_average?.toFixed(1) || '—'}/10</span>
+              <span className="text-amber-400/50">({session.feedback_count})</span>
+            </span>
           )}
         </div>
       </div>

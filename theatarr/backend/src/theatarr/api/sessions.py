@@ -18,6 +18,7 @@ from theatarr.models.action import Action
 from theatarr.models.movie import Movie
 from theatarr.models.session import MovieSelectionMode, Session, SessionStatus
 from theatarr.models.sequence import DurationType, Sequence
+from theatarr.models.session_feedback import SessionFeedback
 from theatarr.models.session_participant import SessionParticipant, InvitationStatus
 from theatarr.models.vote import VoteSession, VoteSessionStatus
 from theatarr.schemas.session import (
@@ -95,6 +96,8 @@ def _session_to_response(
     participants_accepted: int = 0,
     participants_total: int = 0,
     actions_count: int = 0,
+    feedback_count: int = 0,
+    feedback_average: float | None = None,
 ) -> SessionResponse:
     """Convert Session model to response schema."""
     # Parse mystery config if present
@@ -159,6 +162,8 @@ def _session_to_response(
         participants_accepted=participants_accepted,
         participants_total=participants_total,
         actions_count=actions_count,
+        feedback_count=feedback_count,
+        feedback_average=feedback_average,
     )
 
 
@@ -351,11 +356,28 @@ async def _sync_sequences_from_workflow(
             for a in block_actions
         )
 
+        # Determine duration type: MANUAL only for blocks with open-ended media playback
+        if duration_ms > 0:
+            dur_type = DurationType.FIXED
+        else:
+            # Check if block contains media:play or media:resume (open-ended playback)
+            has_open_media = any(
+                a.get("actionType") == "media"
+                and a.get("command") in ("play", "resume")
+                for a in block_actions
+            )
+            if has_open_media:
+                dur_type = DurationType.MANUAL
+            else:
+                # Instant actions (session, display, etc.) — use 1s fixed
+                dur_type = DurationType.FIXED
+                duration_ms = 1000
+
         sequence = Sequence(
             session_id=session.id,
             name=name,
             order_index=order_index,
-            duration_type=DurationType.FIXED if duration_ms > 0 else DurationType.MANUAL,
+            duration_type=dur_type,
             duration_ms=duration_ms if duration_ms > 0 else None,
             duration_fallback_ms=0,
             transition_ms=0,
@@ -444,12 +466,28 @@ async def list_sessions(
         # Count actions in workflow
         actions_count = _count_actions_in_workflow(session.workflow)
 
+        # Feedback stats
+        feedback_count = 0
+        feedback_average = None
+        fb_result = await db.execute(
+            select(
+                func.count(SessionFeedback.id),
+                func.avg(SessionFeedback.overall_rating),
+            ).where(SessionFeedback.session_id == session.id)
+        )
+        fb_row = fb_result.first()
+        if fb_row and fb_row[0]:
+            feedback_count = fb_row[0]
+            feedback_average = round(fb_row[1], 1) if fb_row[1] is not None else None
+
         enriched_items.append(_session_to_response(
             session,
             linked_vote_session=linked_vote,
             participants_accepted=participants_accepted,
             participants_total=participants_total,
             actions_count=actions_count,
+            feedback_count=feedback_count,
+            feedback_average=feedback_average,
         ))
 
     return SessionListResponse(

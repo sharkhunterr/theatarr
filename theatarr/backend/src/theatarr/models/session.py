@@ -167,6 +167,14 @@ class Session(UUIDMixin, TimestampMixin, Base):
         nullable=True,
     )
 
+    # Feedback opened (set by session:open_feedback action or auto on complete)
+    feedback_opened: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="0",
+    )
+
     # Display code for pairing a browser to this session
     display_code: Mapped[str | None] = mapped_column(
         String(8),

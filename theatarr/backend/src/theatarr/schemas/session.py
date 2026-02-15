@@ -311,6 +311,9 @@ class SessionResponse(SessionBase, IDTimestampSchema):
     participants_accepted: int = 0
     participants_total: int = 0
     actions_count: int = 0
+    # Feedback
+    feedback_count: int = 0
+    feedback_average: float | None = None
 
 
 class SessionDetailResponse(SessionResponse):

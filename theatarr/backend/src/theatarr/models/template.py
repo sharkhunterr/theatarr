@@ -18,6 +18,7 @@ class TemplateType(str, Enum):
     SESSION_STATUS = "session_status"
     WAITING_SCREEN = "waiting_screen"
     QUIZ = "quiz"
+    FEEDBACK = "feedback"
     CUSTOM = "custom"
 
 
@@ -1225,6 +1226,32 @@ BUILTIN_TEMPLATES = {
             "show_answer_distribution": False,
             "feedback_duration_seconds": 3,
             "podium_animation": True,
+        },
+    },
+    # ------------------------------------------------------------------
+    # Feedback templates
+    # ------------------------------------------------------------------
+    "feedback_classic": {
+        "name": "Feedback Classique",
+        "description": "Ecran de feedback avec info session, film et QR code pour donner son avis",
+        "template_type": TemplateType.FEEDBACK,
+        "is_builtin": True,
+        "layout": {
+            "style": "feedback-classic",
+            "components": [
+                {"type": "feedback_header"},
+                {"type": "feedback_movie_info"},
+                {"type": "feedback_qrcode", "position": "center"},
+                {"type": "feedback_message"},
+            ],
+        },
+        "config": {
+            "theme": "dark",
+            "accent_color": "#f59e0b",
+            "message_fr": "Donnez-nous votre avis !",
+            "message_en": "Give us your feedback!",
+            "subtitle_fr": "Scannez le QR code ou rendez-vous sur le portail",
+            "subtitle_en": "Scan the QR code or visit the portal",
         },
     },
 }

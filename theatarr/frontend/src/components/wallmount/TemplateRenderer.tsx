@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { MovieInfo } from './MovieInfo';
 import { CountdownTimer } from './CountdownTimer';
 import { formatCountdownShort } from '../../utils/countdown';
@@ -451,12 +452,20 @@ interface TemplateRendererProps {
       estimated_end_time: string;
       current_sequence_index: number;
     };
+    feedback_info?: {
+      session_id: string;
+      session_name: string;
+      movie_title: string | null;
+      movie_poster_url: string | null;
+      action_types: string[];
+      feedback_url: string;
+    };
   };
 }
 
 export function TemplateRenderer({ template, data }: TemplateRendererProps) {
   const { layout, config } = template;
-  const { movie, session, countdown_to, palette, vote_info, mystery_info, quiz_info, session_overview } = data;
+  const { movie, session, countdown_to, palette, vote_info, mystery_info, quiz_info, session_overview, feedback_info } = data;
 
   // Apply CSS variables from palette
   const cssVars = useMemo(() => {
@@ -6513,6 +6522,84 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
               <img src={effectivePoster} alt={movie?.title || ''} className="w-32 rounded-lg shadow-2xl" style={{ boxShadow: `0 25px 50px -12px ${palette?.primary || '#000'}80` }} />
             </div>
           )}
+        </div>
+      );
+    }
+
+    // ======================== FEEDBACK-CLASSIC ========================
+    if (layoutStyle === 'feedback-classic') {
+      // Build feedback data from feedback_info or fall back to movie/session data
+      const posterUrl = feedback_info?.movie_poster_url || movie?.poster_url || null;
+      const movieTitle = feedback_info?.movie_title || movie?.title || null;
+      const sessionName = feedback_info?.session_name || session?.name || '';
+      const feedbackUrl = feedback_info?.feedback_url || '';
+
+      const accent = (config as any)?.accent_color || palette?.primary || '#f59e0b';
+      const txt = palette?.text || '#ffffff';
+      const bg = palette?.background || '#0a0a0f';
+      const msgFr = (config as any)?.message_fr || 'Donnez-nous votre avis !';
+      const subtitleFr = (config as any)?.subtitle_fr || 'Scannez le QR code ou rendez-vous sur le portail';
+
+      return (
+        <div className="relative w-full h-full overflow-hidden flex" style={{ backgroundColor: bg, ...cssVars as React.CSSProperties }}>
+          {hasAnimations && <style>{animationStyles}</style>}
+
+          {/* Blurred poster background */}
+          {posterUrl && (
+            <div className="absolute inset-0 z-0">
+              <img
+                src={posterUrl}
+                alt=""
+                className="w-full h-full object-cover blur-3xl scale-110 opacity-30"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80" />
+            </div>
+          )}
+
+          {/* Left side — poster + movie info */}
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-12 gap-8">
+            {posterUrl && (
+              <div className="ws-info" style={{ animationDelay: '0.1s' }}>
+                <img
+                  src={posterUrl}
+                  alt={movieTitle || ''}
+                  className="w-64 rounded-2xl shadow-2xl"
+                  style={{ boxShadow: `0 25px 60px -12px ${accent}40` }}
+                />
+              </div>
+            )}
+            {movieTitle && (
+              <h2 className="ws-info text-3xl font-bold text-center" style={{ color: txt, animationDelay: '0.2s' }}>
+                {movieTitle}
+              </h2>
+            )}
+            <div className="ws-info text-lg uppercase tracking-[0.2em] opacity-50" style={{ color: txt, animationDelay: '0.3s' }}>
+              {sessionName}
+            </div>
+          </div>
+
+          {/* Right side — CTA + QR code */}
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-12 gap-8">
+            <h1 className="ws-info text-5xl font-black text-center leading-tight" style={{ color: accent, animationDelay: '0.4s' }}>
+              {msgFr}
+            </h1>
+            <div className="ws-info flex flex-col items-center gap-6" style={{ animationDelay: '0.6s' }}>
+              {feedbackUrl && (
+                <div className="bg-white p-4 rounded-2xl shadow-2xl" style={{ boxShadow: `0 20px 50px -12px ${accent}30` }}>
+                  <QRCodeSVG
+                    value={feedbackUrl}
+                    size={220}
+                    level="M"
+                    bgColor="#ffffff"
+                    fgColor="#000000"
+                  />
+                </div>
+              )}
+              <span className="text-xl text-center opacity-60" style={{ color: txt }}>
+                {subtitleFr}
+              </span>
+            </div>
+          </div>
         </div>
       );
     }

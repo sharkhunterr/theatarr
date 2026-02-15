@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     port: int = Field(default=8080, ge=1, le=65535, description="Server port")
     debug: bool = Field(default=False, description="Debug mode")
 
+    # Frontend
+    frontend_url: str = Field(
+        default="http://localhost:2173",
+        description="Frontend URL for QR codes and links",
+    )
+
     # Features
     wallmount_requires_token: bool = Field(
         default=False,

@@ -32,6 +32,24 @@ class Settings(Base):
         return f"<Settings(key={self.key!r})>"
 
 
+async def get_frontend_url(db) -> str:
+    """Get the frontend URL from DB settings, falling back to config."""
+    from sqlalchemy import select as sa_select
+
+    try:
+        result = await db.execute(
+            sa_select(Settings.value).where(Settings.key == "site.frontend_url")
+        )
+        db_url = result.scalar_one_or_none()
+        if db_url and str(db_url).strip():
+            return str(db_url).strip().rstrip("/")
+    except Exception:
+        pass
+    from theatarr.config import settings as app_settings
+
+    return getattr(app_settings, "frontend_url", None) or "http://localhost:2173"
+
+
 # Default settings values
 DEFAULT_SETTINGS = {
     "vote_token_expiry_hours": 24,

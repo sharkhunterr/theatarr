@@ -40,6 +40,14 @@ const SETTINGS_SCHEMA: SettingDefinition[] = [
     category: 'General',
   },
   {
+    key: 'site.frontend_url',
+    label: 'URL du site',
+    description: 'URL publique de l\'application (pour QR codes, liens portail). Ex: http://192.168.1.10:2173 ou https://theatarr.mondomaine.fr',
+    type: 'string',
+    defaultValue: '',
+    category: 'General',
+  },
+  {
     key: 'app.language',
     label: 'Language',
     description: 'Default language for the UI',

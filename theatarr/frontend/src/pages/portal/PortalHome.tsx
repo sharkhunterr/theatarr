@@ -45,6 +45,10 @@ interface PortalSession {
   linked_vote_session_id?: string | null;
   linked_vote_is_open?: boolean | null;
   vote_movie_posters?: string[] | null;
+  feedback_available?: boolean;
+  has_submitted_feedback?: boolean;
+  feedback_count?: number;
+  feedback_average?: number | null;
 }
 
 interface PortalVote {
@@ -154,6 +158,10 @@ export function PortalHome() {
                 linkedVoteSessionId={session.linked_vote_session_id}
                 linkedVoteIsOpen={session.linked_vote_is_open}
                 voteMoviePosters={session.vote_movie_posters}
+              feedbackAvailable={session.feedback_available}
+              hasSubmittedFeedback={session.has_submitted_feedback}
+              feedbackCount={session.feedback_count}
+              feedbackAverage={session.feedback_average}
               />
             ))}
           </div>
@@ -264,6 +272,10 @@ export function PortalHome() {
                 linkedVoteSessionId={session.linked_vote_session_id}
                 linkedVoteIsOpen={session.linked_vote_is_open}
                 voteMoviePosters={session.vote_movie_posters}
+              feedbackAvailable={session.feedback_available}
+              hasSubmittedFeedback={session.has_submitted_feedback}
+              feedbackCount={session.feedback_count}
+              feedbackAverage={session.feedback_average}
               />
             ))}
           </div>

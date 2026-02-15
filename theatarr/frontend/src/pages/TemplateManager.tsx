@@ -45,7 +45,7 @@ export function TemplateManager() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'wallmount' | 'waiting_screen' | 'quiz' | 'custom'>('all');
+  const [filter, setFilter] = useState<'all' | 'wallmount' | 'waiting_screen' | 'quiz' | 'feedback' | 'custom'>('all');
 
   const { data, isLoading, error } = useQuery<TemplateListResponse>({
     queryKey: ['templates'],
@@ -131,6 +131,7 @@ export function TemplateManager() {
     if (filter === 'wallmount') return t.is_builtin && WALLMOUNT_TYPES.includes(t.template_type);
     if (filter === 'waiting_screen') return t.is_builtin && t.template_type === 'waiting_screen';
     if (filter === 'quiz') return t.template_type === 'quiz';
+    if (filter === 'feedback') return t.template_type === 'feedback';
     if (filter === 'custom') return !t.is_builtin;
     return true;
   });
@@ -293,7 +294,7 @@ export function TemplateManager() {
 
       {/* Filters */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
-        {(['all', 'wallmount', 'waiting_screen', 'quiz', 'custom'] as const).map((f) => (
+        {(['all', 'wallmount', 'waiting_screen', 'quiz', 'feedback', 'custom'] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -303,7 +304,7 @@ export function TemplateManager() {
                 : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
             }`}
           >
-            {f === 'all' ? 'Tous' : f === 'wallmount' ? 'Wallmount' : f === 'waiting_screen' ? 'Waiting' : f === 'quiz' ? 'Quiz' : 'Custom'}
+            {f === 'all' ? 'Tous' : f === 'wallmount' ? 'Wallmount' : f === 'waiting_screen' ? 'Waiting' : f === 'quiz' ? 'Quiz' : f === 'feedback' ? 'Feedback' : 'Custom'}
           </button>
         ))}
       </div>

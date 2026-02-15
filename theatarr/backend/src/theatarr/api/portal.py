@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from theatarr.api.errors import NotFoundError
 from theatarr.database import DbSession
 from theatarr.models.session import Session, SessionStatus
+from theatarr.models.session_feedback import SessionFeedback
 from theatarr.models.session_participant import InvitationStatus, SessionParticipant
 from theatarr.models.user import User
 from theatarr.models.vote import Vote, VoteSession, VoteSessionStatus
@@ -253,10 +254,36 @@ async def get_my_stats(
     pending_quiz_result = await db.execute(pending_quiz_query)
     pending_quiz = pending_quiz_result.scalar() or 0
 
+    # Count pending feedback (completed sessions where user is accepted but hasn't submitted)
+    completed_accepted_query = (
+        select(SessionParticipant.session_id)
+        .join(Session)
+        .where(
+            SessionParticipant.user_id == user.id,
+            SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value,
+            Session.status == SessionStatus.COMPLETED.value,
+        )
+    )
+    completed_accepted_result = await db.execute(completed_accepted_query)
+    completed_session_ids = [row[0] for row in completed_accepted_result.all()]
+
+    pending_feedback = 0
+    if completed_session_ids:
+        submitted_query = (
+            select(SessionFeedback.session_id).where(
+                SessionFeedback.user_id == user.id,
+                SessionFeedback.session_id.in_(completed_session_ids),
+            )
+        )
+        submitted_result = await db.execute(submitted_query)
+        submitted_ids = {row[0] for row in submitted_result.all()}
+        pending_feedback = len(completed_session_ids) - len(submitted_ids)
+
     return PortalStatsResponse(
         pending_votes=pending_votes,
         pending_quiz=pending_quiz,
         pending_invitations=pending_invitations,
+        pending_feedback=pending_feedback,
         upcoming_sessions=upcoming_sessions,
         total_sessions_attended=total_sessions_attended,
         total_votes_cast=total_votes_cast,
@@ -313,13 +340,45 @@ async def get_my_sessions(
             if linked_vote:
                 linked_vote_is_open = linked_vote.is_open
 
+        # Feedback data — available when session completes OR open_feedback action has run
+        session_status = session.status.value if isinstance(session.status, SessionStatus) else session.status
+        feedback_available = (
+            (session_status == "completed" or session.feedback_opened)
+            and p.invitation_status == InvitationStatus.ACCEPTED.value
+        )
+        has_submitted_feedback = False
+        feedback_count = 0
+        feedback_average = None
+        if feedback_available:
+            fb_check = await db.execute(
+                select(SessionFeedback.id).where(
+                    SessionFeedback.session_id == session.id,
+                    SessionFeedback.user_id == user.id,
+                )
+            )
+            has_submitted_feedback = fb_check.scalar_one_or_none() is not None
+            fb_count_result = await db.execute(
+                select(func.count(SessionFeedback.id)).where(
+                    SessionFeedback.session_id == session.id,
+                )
+            )
+            feedback_count = fb_count_result.scalar() or 0
+            if feedback_count > 0:
+                fb_avg_result = await db.execute(
+                    select(func.avg(SessionFeedback.overall_rating)).where(
+                        SessionFeedback.session_id == session.id,
+                    )
+                )
+                avg_val = fb_avg_result.scalar()
+                feedback_average = round(avg_val, 1) if avg_val else None
+
         items.append(
             PortalSessionSummary(
                 id=session.id,
                 name=session.name,
                 movie_title=session.movie_title,
                 movie_poster_url=session.movie_poster_url,
-                status=session.status.value if isinstance(session.status, SessionStatus) else session.status,
+                status=session_status,
                 scheduled_at=session.scheduled_at,
                 invitation_status=p.invitation_status,
                 movie_selection_mode=session.movie_selection_mode,
@@ -329,6 +388,10 @@ async def get_my_sessions(
                 linked_vote_session_id=session.linked_vote_session_id,
                 linked_vote_is_open=linked_vote_is_open,
                 vote_movie_posters=_extract_vote_movie_posters(linked_vote),
+                feedback_available=feedback_available,
+                has_submitted_feedback=has_submitted_feedback,
+                feedback_count=feedback_count,
+                feedback_average=feedback_average,
             )
         )
 
@@ -420,7 +483,7 @@ async def get_session_detail(
     user: CurrentUser,
     session_id: str,
 ) -> PortalSessionDetail:
-    """Get detailed session info for a participant."""
+    """Get detailed session info for a participant (or admin)."""
     from theatarr.models.sequence import Sequence as SequenceModel
     from theatarr.models.movie import Movie
 
@@ -436,9 +499,18 @@ async def get_session_detail(
     participation = result.scalar_one_or_none()
 
     if not participation:
-        raise NotFoundError("Session", session_id)
-
-    session = participation.session
+        # Allow admins to view any session even if not a participant
+        if user.role == "admin":
+            sess_result = await db.execute(
+                select(Session).where(Session.id == session_id)
+            )
+            session = sess_result.scalar_one_or_none()
+            if not session:
+                raise NotFoundError("Session", session_id)
+        else:
+            raise NotFoundError("Session", session_id)
+    else:
+        session = participation.session
 
     # Check if linked vote session is open
     linked_vote_is_open = None
@@ -502,6 +574,39 @@ async def get_session_detail(
         if movie:
             movie_runtime_minutes = movie.runtime_minutes
 
+    # Feedback data — available when session completes OR open_feedback action has run
+    detail_status = session.status.value if isinstance(session.status, SessionStatus) else session.status
+    is_accepted = participation and participation.invitation_status == InvitationStatus.ACCEPTED.value
+    feedback_available = (
+        (detail_status == "completed" or session.feedback_opened)
+        and (is_accepted or user.role == "admin")
+    )
+    has_submitted_feedback = False
+    feedback_count = 0
+    feedback_average = None
+    if feedback_available:
+        fb_check = await db.execute(
+            select(SessionFeedback.id).where(
+                SessionFeedback.session_id == session.id,
+                SessionFeedback.user_id == user.id,
+            )
+        )
+        has_submitted_feedback = fb_check.scalar_one_or_none() is not None
+        fb_count_result = await db.execute(
+            select(func.count(SessionFeedback.id)).where(
+                SessionFeedback.session_id == session.id,
+            )
+        )
+        feedback_count = fb_count_result.scalar() or 0
+        if feedback_count > 0:
+            fb_avg_result = await db.execute(
+                select(func.avg(SessionFeedback.overall_rating)).where(
+                    SessionFeedback.session_id == session.id,
+                )
+            )
+            avg_val = fb_avg_result.scalar()
+            feedback_average = round(avg_val, 1) if avg_val else None
+
     return PortalSessionDetail(
         id=session.id,
         name=session.name,
@@ -510,12 +615,12 @@ async def get_session_detail(
         movie_poster_url=session.movie_poster_url,
         movie_source=session.movie_source,
         color_palette=session.color_palette,
-        status=session.status.value if isinstance(session.status, SessionStatus) else session.status,
+        status=detail_status,
         scheduled_at=session.scheduled_at,
         started_at=session.started_at,
         completed_at=session.completed_at,
-        invitation_status=participation.invitation_status,
-        responded_at=participation.responded_at,
+        invitation_status=participation.invitation_status if participation else "accepted",
+        responded_at=participation.responded_at if participation else None,
         movie_selection_mode=session.movie_selection_mode,
         movie_resolved=session.movie_resolved,
         mystery_reveal_at=session.mystery_reveal_at,
@@ -528,6 +633,10 @@ async def get_session_detail(
         current_sequence_elapsed_ms=session.current_sequence_elapsed_ms,
         total_sequences=session.total_sequences,
         movie_runtime_minutes=movie_runtime_minutes,
+        feedback_available=feedback_available,
+        has_submitted_feedback=has_submitted_feedback,
+        feedback_count=feedback_count,
+        feedback_average=feedback_average,
     )
 
 

@@ -20,6 +20,7 @@ const actionTypeLabels: Record<ActionType, { en: string; fr: string }> = {
   display: { en: 'Display', fr: 'Affichage' },
   media: { en: 'Media', fr: 'Média' },
   actuator: { en: 'Actuator', fr: 'Actionneur' },
+  session: { en: 'Session', fr: 'Session' },
 };
 
 const onFailureOptions = [
@@ -53,6 +54,7 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
       display: 'show',
       media: 'play',
       actuator: 'execute',
+      session: 'open_feedback',
     };
     onUpdate({
       actionType,

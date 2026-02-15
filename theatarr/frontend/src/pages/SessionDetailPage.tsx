@@ -29,9 +29,10 @@ import {
   Vote,
   X,
   Zap,
+  Star,
 } from 'lucide-react';
 
-import { Button, MysteryPoster, VotePoster, VotePosterCollage } from '../components/common';
+import { Button, Modal, MysteryPoster, VotePoster, VotePosterCollage } from '../components/common';
 import { TimelineDetailModal } from '../components/sessions/TimelineDetailModal';
 import { apiClient } from '../api/client';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -492,6 +493,7 @@ export function SessionDetailPage() {
   const [controlError, setControlError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [showTimelineDetail, setShowTimelineDetail] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   const handleControl = useCallback(
     async (action: 'play' | 'pause' | 'stop' | 'skip') => {
@@ -518,6 +520,13 @@ export function SessionDetailPage() {
   const elapsedMs = liveState?.current_sequence_elapsed_ms ?? session?.current_sequence_elapsed_ms ?? 0;
   const sequences = session?.sequences || [];
   const movieRuntimeMs = (session?.movie_runtime_minutes ?? 0) * 60 * 1000;
+
+  // Feedback status query (must be after currentStatus is defined)
+  const { data: feedbackStatus } = useQuery({
+    queryKey: ['feedback-status', id],
+    queryFn: () => apiClient.get<{ has_submitted: boolean; feedback_count: number; overall_average: number | null }>(`/feedback/sessions/${id}/status`),
+    enabled: !!id && (currentStatus === 'completed' || currentStatus === 'running'),
+  });
 
   const isMysteryHidden = session?.movie_selection_mode === 'mystery' && !session?.movie_resolved;
   const isVoteHidden = session?.movie_selection_mode === 'vote' && !session?.movie_resolved;
@@ -775,6 +784,16 @@ export function SessionDetailPage() {
                   {copiedCode ? <Check size={10} className="text-green-400" /> : <Copy size={10} />}
                 </button>
               )}
+              {feedbackStatus && feedbackStatus.feedback_count > 0 && (
+                <button
+                  onClick={() => setShowFeedbackModal(true)}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 transition-colors"
+                >
+                  <Star size={10} />
+                  <span>{feedbackStatus.overall_average?.toFixed(1) || '—'}/10</span>
+                  <span className="text-white/40">({feedbackStatus.feedback_count})</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -898,6 +917,14 @@ export function SessionDetailPage() {
         status={currentStatus}
       />
 
+      {/* Feedback Modal */}
+      {showFeedbackModal && id && (
+        <FeedbackModal
+          sessionId={id}
+          onClose={() => setShowFeedbackModal(false)}
+        />
+      )}
+
       {/* Participants */}
       <ParticipantsSection
         participants={participants}
@@ -1005,5 +1032,117 @@ export function SessionDetailPage() {
         )}
       </div>
     </div>
+  );
+}
+
+
+// ============================================================================
+// FeedbackModal
+// ============================================================================
+
+interface FeedbackSummary {
+  session_id: string;
+  total_submissions: number;
+  overall_average: number;
+  category_averages: Array<{
+    slug: string;
+    label_fr: string;
+    label_en: string;
+    average: number;
+    count: number;
+  }>;
+  entries: Array<{
+    id: string;
+    user_id: string;
+    username: string;
+    ratings: Record<string, { rating: number; comment?: string | null }>;
+    overall_rating: number;
+    submitted_at: string;
+  }>;
+}
+
+function FeedbackModal({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['feedback-summary', sessionId],
+    queryFn: () => apiClient.get<FeedbackSummary>(`/feedback/sessions/${sessionId}/summary`),
+  });
+
+  return (
+    <Modal isOpen onClose={onClose} title="Feedback" size="lg">
+      {isLoading && (
+        <div className="flex justify-center py-8">
+          <div className="w-6 h-6 border-2 border-theatarr-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {data && (
+        <div className="space-y-6">
+          {/* Overall stats */}
+          <div className="text-center">
+            <div className="text-4xl font-bold text-amber-400">
+              {data.overall_average.toFixed(1)}<span className="text-lg text-white/40">/10</span>
+            </div>
+            <p className="text-sm text-dark-muted mt-1">
+              {data.total_submissions} avis
+            </p>
+          </div>
+
+          {/* Category averages */}
+          {data.category_averages.length > 0 && (
+            <div className="space-y-2">
+              {data.category_averages.map((cat) => (
+                <div key={cat.slug} className="flex items-center gap-3">
+                  <span className="text-sm text-dark-muted w-36 truncate">{cat.label_fr}</span>
+                  <div className="flex-1 h-2 bg-dark-border rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 rounded-full transition-all"
+                      style={{ width: `${(cat.average / 10) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-dark-text tabular-nums w-10 text-right">
+                    {cat.average.toFixed(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Individual entries */}
+          {data.entries.length > 0 && (
+            <div className="border-t border-dark-border pt-4 space-y-3">
+              <h4 className="text-sm font-medium text-dark-text">Avis individuels</h4>
+              {data.entries.map((entry) => (
+                <div key={entry.id} className="bg-dark-bg rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-dark-text text-sm">{entry.username}</span>
+                    <span className="text-amber-400 font-medium text-sm">
+                      {entry.overall_rating.toFixed(1)}/10
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(entry.ratings).map(([slug, r]) => (
+                      <span key={slug} className="text-xs px-2 py-0.5 rounded bg-dark-border text-dark-muted">
+                        {slug}: {r.rating}/10
+                      </span>
+                    ))}
+                  </div>
+                  {Object.entries(entry.ratings).some(([, r]) => r.comment) && (
+                    <div className="space-y-1">
+                      {Object.entries(entry.ratings)
+                        .filter(([, r]) => r.comment)
+                        .map(([slug, r]) => (
+                          <p key={slug} className="text-xs text-dark-muted italic">
+                            {slug}: &laquo;{r.comment}&raquo;
+                          </p>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 }

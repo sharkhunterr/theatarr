@@ -808,9 +808,9 @@ async def get_quiz_display_state(
                 dist[key] = dist.get(key, 0) + 1
         answer_distribution = dist
 
-    # Join URL
-    base_url = str(request.base_url).rstrip("/")
-    frontend_url = base_url.replace(":2273", ":2173")  # Backend → frontend port
+    # Join URL — use configurable site URL
+    from theatarr.models.settings import get_frontend_url
+    frontend_url = await get_frontend_url(db)
     join_url = f"{frontend_url}/portal/quiz/{qs.id}"
 
     return QuizDisplayState(

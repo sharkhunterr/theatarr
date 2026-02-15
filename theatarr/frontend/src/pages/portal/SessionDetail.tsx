@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote, Shuffle, Sparkles, Eye, Trophy, Zap, Play, Timer } from 'lucide-react';
+import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote, Shuffle, Sparkles, Eye, Trophy, Zap, Play, Timer, Star, MessageSquare, Send } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../../api/client';
@@ -66,6 +66,10 @@ interface SessionDetailData {
   current_sequence_elapsed_ms: number;
   total_sequences: number;
   movie_runtime_minutes: number | null;
+  feedback_available: boolean;
+  has_submitted_feedback: boolean;
+  feedback_count: number;
+  feedback_average: number | null;
 }
 
 interface LiveState {
@@ -690,6 +694,11 @@ export function SessionDetail() {
         </div>
       )}
 
+      {/* Feedback section */}
+      {session.feedback_available && (
+        <FeedbackSection sessionId={session.id} hasSubmitted={session.has_submitted_feedback} />
+      )}
+
       {/* Vote section - show if there's a linked vote */}
       {session.movie_selection_mode === 'vote' && session.linked_vote_session_id && (
         <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
@@ -745,6 +754,192 @@ export function SessionDetail() {
                 <p className="text-sm text-dark-muted">Le vote n'est pas encore ouvert</p>
               </div>
             </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ============================================================================
+// FeedbackSection
+// ============================================================================
+
+interface FeedbackCategory {
+  slug: string;
+  label_fr: string;
+  label_en: string;
+  icon: string;
+}
+
+interface FeedbackCategoriesResponse {
+  session_id: string;
+  categories: FeedbackCategory[];
+  has_submitted: boolean;
+  session_name: string;
+  movie_title: string | null;
+  movie_poster_url: string | null;
+}
+
+const ICON_MAP: Record<string, string> = {
+  film: '🎬',
+  lightbulb: '💡',
+  'volume-2': '🔊',
+  monitor: '🖥️',
+  zap: '⚡',
+  'clipboard-check': '📋',
+};
+
+function FeedbackSection({ sessionId, hasSubmitted: initialHasSubmitted }: { sessionId: string; hasSubmitted: boolean }) {
+  const queryClient = useQueryClient();
+  const [ratings, setRatings] = useState<Record<string, { rating: number; comment: string }>>({});
+  const [submitted, setSubmitted] = useState(initialHasSubmitted);
+
+  const { data: categories } = useQuery({
+    queryKey: ['feedback-categories', sessionId],
+    queryFn: () => apiClient.get<FeedbackCategoriesResponse>(`/feedback/sessions/${sessionId}/categories`),
+  });
+
+  const { data: myFeedback } = useQuery({
+    queryKey: ['my-feedback', sessionId],
+    queryFn: () => apiClient.get<{ has_submitted: boolean; ratings?: Record<string, { rating: number; comment?: string }>; overall_rating?: number }>(`/feedback/sessions/${sessionId}/my-feedback`),
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: (data: { ratings: Record<string, { rating: number; comment: string | null }> }) =>
+      apiClient.post(`/feedback/sessions/${sessionId}/submit`, data),
+    onSuccess: () => {
+      setSubmitted(true);
+      queryClient.invalidateQueries({ queryKey: ['feedback-categories', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['my-feedback', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['portal-session', sessionId] });
+    },
+  });
+
+  const effectiveSubmitted = submitted || myFeedback?.has_submitted || categories?.has_submitted;
+
+  // Initialize ratings from categories
+  useEffect(() => {
+    if (categories?.categories && Object.keys(ratings).length === 0 && !effectiveSubmitted) {
+      const initial: Record<string, { rating: number; comment: string }> = {};
+      for (const cat of categories.categories) {
+        initial[cat.slug] = { rating: 7, comment: '' };
+      }
+      setRatings(initial);
+    }
+  }, [categories, ratings, effectiveSubmitted]);
+
+  if (!categories) return null;
+
+  const handleSubmit = () => {
+    const payload: Record<string, { rating: number; comment: string | null }> = {};
+    for (const [slug, data] of Object.entries(ratings)) {
+      payload[slug] = { rating: data.rating, comment: data.comment || null };
+    }
+    submitMutation.mutate({ ratings: payload });
+  };
+
+  return (
+    <div id="feedback" className="bg-dark-surface rounded-xl border border-dark-border p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Star size={18} className="text-amber-400" />
+        <h2 className="font-medium text-dark-text">Donnez votre avis</h2>
+      </div>
+
+      {effectiveSubmitted ? (
+        <div>
+          <div className="flex items-center gap-3 p-3 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+            <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center">
+              <Check className="text-teal-400" size={20} />
+            </div>
+            <div>
+              <p className="font-medium text-dark-text">Merci pour votre avis !</p>
+              {myFeedback?.overall_rating != null && (
+                <p className="text-sm text-dark-muted">
+                  Votre note globale : {myFeedback.overall_rating.toFixed(1)}/10
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Show submitted ratings */}
+          {myFeedback?.ratings && (
+            <div className="mt-3 space-y-2">
+              {Object.entries(myFeedback.ratings).map(([slug, data]) => {
+                const cat = categories.categories.find(c => c.slug === slug);
+                return (
+                  <div key={slug} className="flex items-center justify-between text-sm">
+                    <span className="text-dark-muted flex items-center gap-1.5">
+                      <span>{ICON_MAP[cat?.icon || ''] || '📌'}</span>
+                      {cat?.label_fr || slug}
+                    </span>
+                    <span className="text-dark-text font-medium">{data.rating}/10</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {categories.categories.map((cat) => {
+            const r = ratings[cat.slug];
+            if (!r) return null;
+            return (
+              <div key={cat.slug} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm text-dark-text flex items-center gap-1.5">
+                    <span>{ICON_MAP[cat.icon] || '📌'}</span>
+                    {cat.label_fr}
+                  </label>
+                  <span className="text-sm font-medium text-dark-text tabular-nums">{r.rating}/10</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={r.rating}
+                  onChange={(e) =>
+                    setRatings((prev) => ({
+                      ...prev,
+                      [cat.slug]: { ...prev[cat.slug], rating: parseInt(e.target.value) },
+                    }))
+                  }
+                  className="w-full accent-amber-500"
+                />
+                <div className="relative">
+                  <MessageSquare size={12} className="absolute left-2.5 top-2.5 text-dark-muted" />
+                  <input
+                    type="text"
+                    value={r.comment}
+                    onChange={(e) =>
+                      setRatings((prev) => ({
+                        ...prev,
+                        [cat.slug]: { ...prev[cat.slug], comment: e.target.value },
+                      }))
+                    }
+                    placeholder="Commentaire optionnel..."
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg pl-8 pr-3 py-1.5 text-sm text-dark-text placeholder-dark-muted"
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+          <button
+            onClick={handleSubmit}
+            disabled={submitMutation.isPending}
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-medium rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Send size={16} />
+            {submitMutation.isPending ? 'Envoi...' : 'Envoyer mon avis'}
+          </button>
+
+          {submitMutation.isError && (
+            <p className="text-sm text-red-400 text-center">
+              Erreur lors de l'envoi. Veuillez reessayer.
+            </p>
           )}
         </div>
       )}

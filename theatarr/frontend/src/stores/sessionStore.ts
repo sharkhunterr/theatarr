@@ -118,6 +118,9 @@ export interface Session {
   participants_accepted?: number;
   participants_total?: number;
   actions_count?: number;
+  // Feedback
+  feedback_count?: number;
+  feedback_average?: number | null;
 }
 
 export interface SessionState {

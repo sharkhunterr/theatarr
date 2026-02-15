@@ -22,6 +22,7 @@ class ActionType(str, Enum):
     DISPLAY = "display"
     MEDIA = "media"
     ACTUATOR = "actuator"
+    SESSION = "session"
 
 
 class OnFailure(str, Enum):
