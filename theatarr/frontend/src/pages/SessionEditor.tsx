@@ -128,6 +128,7 @@ interface Session {
   movie_poster_url?: string | null;
   movie_source_id?: string | null;
   movie_source?: string | null;
+  movie_genres?: string[] | null;
   color_palette?: ColorPalette | null;
   // Movie selection mode fields
   movie_selection_mode?: MovieSelectionMode;
@@ -408,10 +409,14 @@ export function SessionEditor() {
   // Fetch movie enrichment state when movie_id changes (for green badge display)
   useEffect(() => {
     if (session?.movie_id) {
-      apiClient.get<{ enrichment_sources?: string[] }>(`/movies/${session.movie_id}`)
+      apiClient.get<{ enrichment_sources?: string[]; genres?: string[] }>(`/movies/${session.movie_id}`)
         .then((movie) => {
           const sources = movie.enrichment_sources || [];
           setEnrichedSources(sources);
+          // Store genres from DB movie for auto-trailer matching
+          if (movie.genres && movie.genres.length > 0 && !session.movie_genres) {
+            setSession(prev => prev ? { ...prev, movie_genres: movie.genres } : prev);
+          }
           // Only init enrichment options from movie if no session-level options are set
           if (!session.enrichment_options) {
             setEnrichmentOptions({
@@ -455,6 +460,7 @@ export function SessionEditor() {
     poster_url?: string;
     source: string;
     source_id?: string;
+    genres?: string[];
   }>>({
     queryKey: ['movie-search-session', movieSearchQuery],
     queryFn: async () => {
@@ -469,6 +475,13 @@ export function SessionEditor() {
       fetchSession(id);
     }
   }, [id, isNew]);
+
+  // Auto-refresh when trailers are being prepared in background
+  useEffect(() => {
+    if (!id || isNew || !(session?.preparing_trailers)) return;
+    const interval = setInterval(() => fetchSession(id), 5000);
+    return () => clearInterval(interval);
+  }, [id, isNew, session?.preparing_trailers]);
 
   // Sync actions from workflow when loading
   useEffect(() => {
@@ -548,6 +561,7 @@ export function SessionEditor() {
     poster_url?: string;
     source: string;
     source_id?: string;
+    genres?: string[];
   }) => {
     if (!session) return;
 
@@ -558,6 +572,7 @@ export function SessionEditor() {
       movie_poster_url: movie.poster_url || null,
       movie_source_id: movie.source_id || movie.id,
       movie_source: movie.source,
+      movie_genres: movie.genres || null,
       // Auto-set session name to movie title if creating new session with default name
       name: session.name === t.newSession ? movie.title : session.name,
     };
@@ -1751,6 +1766,11 @@ export function SessionEditor() {
                         onChange={(updates) => updateAction(selectedActionIndex!, updates)}
                         onDelete={() => { deleteAction(selectedActionIndex!); setMobilePanel('actions'); }}
                         colorPalette={session.color_palette}
+                        sessionId={id}
+                        movieId={session.movie_id}
+                        movieSourceId={session.movie_source_id}
+                        movieGenres={session.movie_genres}
+                        allActions={actions}
                       />
                     ) : (
                       <div className="text-center text-dark-muted text-sm py-12">

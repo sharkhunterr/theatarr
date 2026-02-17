@@ -62,6 +62,7 @@ class SessionScheduler:
                 await self._check_mystery_reveals()
                 await self._check_vote_closes()
                 await self._check_vote_reveals()
+                await self._check_trailer_rules()
                 await asyncio.sleep(self._check_interval)
             except asyncio.CancelledError:
                 break
@@ -297,6 +298,52 @@ class SessionScheduler:
                         "Failed to reveal vote movie for session %s: %s",
                         session.id, e,
                     )
+
+    async def _check_trailer_rules(self) -> None:
+        """Check and run trailer rules that are due."""
+        from theatarr.adapters.registry import AdapterRegistry
+        from theatarr.models.service import Service
+        from theatarr.models.trailer import TrailerRule, TrailerRuleFrequency
+        from theatarr.services.trailer_manager import run_trailer_rule
+
+        now = datetime.now()
+
+        async with async_session_maker() as db:
+            result = await db.execute(
+                select(TrailerRule).where(
+                    TrailerRule.is_enabled == True,
+                    TrailerRule.frequency != TrailerRuleFrequency.MANUAL.value,
+                    TrailerRule.next_run_at <= now,
+                )
+            )
+            rules = result.scalars().all()
+            if not rules:
+                return
+
+            # Find TMDB service
+            svc_result = await db.execute(
+                select(Service).where(
+                    Service.adapter_type == "tmdb", Service.is_enabled == True,
+                )
+            )
+            tmdb_service = svc_result.scalar_one_or_none()
+            if not tmdb_service:
+                logger.debug("No active TMDB service, skipping trailer rules")
+                return
+
+            tmdb_adapter = AdapterRegistry.create_adapter("tmdb", tmdb_service.config)
+            await tmdb_adapter.connect()
+
+            try:
+                for rule in rules:
+                    try:
+                        logger.info("Running scheduled trailer rule: %s (%s)", rule.id, rule.name)
+                        result = await run_trailer_rule(db, rule, tmdb_adapter)
+                        logger.info("Trailer rule %s result: %s", rule.name, result)
+                    except Exception:
+                        logger.exception("Failed to run trailer rule %s", rule.id)
+            finally:
+                await tmdb_adapter.disconnect()
 
     async def _auto_resume_interrupted_sessions(self) -> None:
         """Auto-resume sessions that were interrupted (e.g., by system restart)."""

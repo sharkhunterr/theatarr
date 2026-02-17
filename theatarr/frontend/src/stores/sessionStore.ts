@@ -121,6 +121,8 @@ export interface Session {
   // Feedback
   feedback_count?: number;
   feedback_average?: number | null;
+  // Trailer preparation
+  preparing_trailers?: number;
 }
 
 export interface SessionState {

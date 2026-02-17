@@ -15,12 +15,14 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from theatarr.adapters.base import Command
 from theatarr.adapters.registry import AdapterRegistry
 from theatarr.models.action import Action, OnFailure
 from theatarr.models.sequence import Sequence
 from theatarr.models.session import Session, SessionStatus
+from theatarr.services.session_logger import log_session_event
 from theatarr.utils.performance import get_performance_monitor
 
 logger = logging.getLogger(__name__)
@@ -158,6 +160,8 @@ class SequenceEngine:
         self._action_logs: dict[str, list[dict]] = {}
         # Background quiz timer tasks per session
         self._quiz_tasks: dict[str, asyncio.Task] = {}
+        # Events to wake up sequence wait loops immediately on playback_ended
+        self._playback_events: dict[str, asyncio.Event] = {}
 
     @property
     def db(self) -> AsyncSession:
@@ -198,6 +202,252 @@ class SequenceEngine:
         """Get stored media state for resume."""
         return self._media_states.get(session_id)
 
+    async def _resolve_trailer_url(self, session_id: str, ws_params: dict[str, Any]) -> None:
+        """Resolve trailer URL based on trailer_mode parameter."""
+        import random
+
+        from theatarr.database import async_session_maker
+        from theatarr.models.trailer import Trailer, TrailerStatus
+
+        trailer_mode = ws_params.get("trailer_mode", "manual")
+
+        if trailer_mode == "manual":
+            trailer_id = ws_params.get("trailer_id")
+            if trailer_id:
+                ws_params["url"] = f"/api/v1/trailers/{trailer_id}/file"
+                await self._increment_play_count("trailer", trailer_id)
+                logger.info("Resolved manual trailer %s for session %s", trailer_id, session_id)
+                await log_session_event(session_id, "trailer_resolved", {
+                    "trailer_id": trailer_id, "mode": "manual",
+                })
+
+        elif trailer_mode == "auto":
+            # Check if trailer was pre-resolved at session save time
+            resolved_id = ws_params.get("_resolved_trailer_id")
+            resolved_name = ws_params.get("_resolved_trailer_name", "?")
+            preview_tmdb = ws_params.get("_preview_tmdb_id")
+            preview_name = ws_params.get("_preview_trailer_name", "?")
+            logger.info("Auto trailer: resolved_id=%s (%s), preview_tmdb=%s (%s)", resolved_id, resolved_name, preview_tmdb, preview_name)
+            if resolved_id:
+                async with async_session_maker() as db:
+                    result = await db.execute(
+                        select(Trailer).where(Trailer.id == resolved_id, Trailer.status == TrailerStatus.READY.value)
+                    )
+                    resolved = result.scalar_one_or_none()
+                    if resolved:
+                        ws_params["url"] = f"/api/v1/trailers/{resolved.id}/file"
+                        await self._increment_play_count("trailer", resolved.id)
+                        logger.info("Using pre-resolved trailer %s (%s) for session %s", resolved.id, resolved.movie_title, session_id)
+                        await log_session_event(session_id, "trailer_resolved", {
+                            "trailer_id": resolved.id, "movie_title": resolved.movie_title,
+                            "trailer_title": resolved.title, "mode": "auto", "source": "pre-resolved",
+                        })
+                        return
+
+            # Fallback: resolve at runtime (shouldn't normally happen)
+            async with async_session_maker() as db:
+                session = await self._get_session(session_id)
+                session_tmdb_id: str | None = None
+                if session.movie_id:
+                    from theatarr.models.movie import Movie
+                    movie_result = await db.execute(
+                        select(Movie).where(Movie.id == session.movie_id)
+                    )
+                    movie = movie_result.scalar_one_or_none()
+                    if movie:
+                        session_tmdb_id = movie.tmdb_id
+
+                # 1) Check local trailers (exclude session's own movie)
+                query = select(Trailer).where(Trailer.status == TrailerStatus.READY.value)
+                if session_tmdb_id:
+                    query = query.where(Trailer.movie_tmdb_id != session_tmdb_id)
+                result = await db.execute(query)
+                local_trailers = result.scalars().all()
+
+                if local_trailers:
+                    chosen = random.choice(local_trailers)
+                    ws_params["url"] = f"/api/v1/trailers/{chosen.id}/file"
+                    await self._increment_play_count("trailer", chosen.id)
+                    logger.info("Auto-selected local trailer %s (%s) for session %s", chosen.id, chosen.movie_title, session_id)
+                    await log_session_event(session_id, "trailer_resolved", {
+                        "trailer_id": chosen.id, "movie_title": chosen.movie_title,
+                        "trailer_title": chosen.title, "mode": "auto", "source": "local_random",
+                    })
+                else:
+                    # 2) Fallback: download from TMDB
+                    file_url = await self._get_tmdb_upcoming_trailer(db, exclude_tmdb_id=session_tmdb_id)
+                    if file_url:
+                        ws_params["url"] = file_url
+                        logger.info("Auto-downloaded TMDB trailer for session %s: %s", session_id, file_url)
+                        await log_session_event(session_id, "trailer_resolved", {
+                            "mode": "auto", "source": "tmdb_download", "url": file_url,
+                        })
+                    else:
+                        logger.warning("No trailers available (local or TMDB) for session %s", session_id)
+
+        elif trailer_mode == "rule":
+            trailer_rule_id = ws_params.get("trailer_rule_id")
+            if trailer_rule_id:
+                async with async_session_maker() as db:
+                    result = await db.execute(
+                        select(Trailer).where(
+                            Trailer.rule_id == trailer_rule_id,
+                            Trailer.status == TrailerStatus.READY.value,
+                        )
+                    )
+                    pool = result.scalars().all()
+                    if pool:
+                        chosen = random.choice(pool)
+                        ws_params["url"] = f"/api/v1/trailers/{chosen.id}/file"
+                        await self._increment_play_count("trailer", chosen.id)
+                        logger.info("Rule-selected trailer %s for session %s", chosen.id, session_id)
+                        await log_session_event(session_id, "trailer_resolved", {
+                            "trailer_id": chosen.id, "movie_title": chosen.movie_title,
+                            "mode": "rule", "rule_id": trailer_rule_id,
+                        })
+                    else:
+                        logger.warning("No ready trailers for rule %s (session %s)", trailer_rule_id, session_id)
+
+    async def _increment_play_count(self, media_type: str, media_id: str) -> None:
+        """Increment play_count and set last_played_at for a trailer or preroll."""
+        from theatarr.database import async_session_maker
+
+        async with async_session_maker() as db:
+            if media_type == "trailer":
+                from theatarr.models.trailer import Trailer
+                result = await db.execute(select(Trailer).where(Trailer.id == media_id))
+                item = result.scalar_one_or_none()
+            else:
+                from theatarr.models.preroll import PreRoll
+                result = await db.execute(select(PreRoll).where(PreRoll.id == media_id))
+                item = result.scalar_one_or_none()
+
+            if item:
+                item.play_count = (item.play_count or 0) + 1
+                item.last_played_at = datetime.now()
+                await db.commit()
+
+    async def _get_tmdb_upcoming_trailer(
+        self, db: AsyncSession, *, exclude_tmdb_id: str | None = None,
+    ) -> str | None:
+        """Download a trailer for a popular upcoming movie and return its file URL.
+
+        Picks the most popular upcoming movie from TMDB (excluding the session
+        movie), downloads the trailer via yt-dlp, creates a Trailer record,
+        and returns the local file serving URL.
+        """
+        try:
+            from theatarr.models.service import Service
+            from theatarr.models.trailer import Trailer, TrailerStatus
+
+            svc_result = await db.execute(
+                select(Service).where(Service.adapter_type == "tmdb", Service.is_enabled == True)
+            )
+            tmdb_service = svc_result.scalar_one_or_none()
+            if not tmdb_service:
+                logger.debug("No active TMDB service for trailer lookup")
+                return None
+
+            adapter = AdapterRegistry.create_adapter("tmdb", tmdb_service.config)
+            await adapter.connect()
+            try:
+                # Fetch upcoming + popular movies
+                candidates: list[dict] = []
+                for source in ("get_upcoming_movies", "get_popular_movies"):
+                    result = await adapter.execute(
+                        Command(action=source, parameters={"page": 1})
+                    )
+                    if result.success and result.data:
+                        candidates.extend(result.data.get("results", []))
+
+                # Deduplicate by tmdb_id
+                seen: set[str] = set()
+                unique: list[dict] = []
+                for m in candidates:
+                    tid = str(m.get("tmdb_id", ""))
+                    if tid and tid not in seen:
+                        seen.add(tid)
+                        unique.append(m)
+                candidates = unique
+
+                # Exclude the session's movie
+                if exclude_tmdb_id:
+                    candidates = [m for m in candidates if str(m.get("tmdb_id")) != str(exclude_tmdb_id)]
+
+                # Sort by popularity descending (most anticipated first)
+                candidates.sort(key=lambda m: m.get("popularity", 0), reverse=True)
+
+                if not candidates:
+                    return None
+
+                # Try top candidates until we find one with a proper trailer
+                for movie in candidates[:15]:
+                    tmdb_id = movie.get("tmdb_id")
+                    if not tmdb_id:
+                        continue
+                    trailer_result = await adapter.execute(
+                        Command(action="get_trailers", parameters={"movie_id": str(tmdb_id)})
+                    )
+                    if not (trailer_result.success and trailer_result.data):
+                        continue
+                    all_trailers = trailer_result.data.get("trailers", [])
+                    # Only full "Trailer" type (not "Teaser" which can be shorts)
+                    full_trailers = [t for t in all_trailers if t.get("type") == "Trailer"]
+                    if not full_trailers:
+                        continue
+
+                    best = full_trailers[0]  # already sorted by official+size
+                    youtube_url = best.get("youtube_url")
+                    movie_title = movie.get("title", "Unknown")
+                    movie_year = movie.get("year")
+
+                    # Check if we already have this trailer downloaded locally
+                    existing = await db.execute(
+                        select(Trailer).where(
+                            Trailer.movie_tmdb_id == str(tmdb_id),
+                            Trailer.status == TrailerStatus.READY.value,
+                        )
+                    )
+                    existing_trailer = existing.scalar_one_or_none()
+                    if existing_trailer:
+                        logger.info("Found existing local trailer for %s", movie_title)
+                        return f"/api/v1/trailers/{existing_trailer.id}/file"
+
+                    # Create a Trailer record and download via yt-dlp
+                    logger.info("Downloading trailer for %s (%s)…", movie_title, youtube_url)
+                    new_trailer = Trailer(
+                        movie_title=movie_title,
+                        movie_year=movie_year,
+                        movie_tmdb_id=str(tmdb_id),
+                        title=best.get("name", f"Trailer — {movie_title}"),
+                        source_type="youtube",
+                        source_url=youtube_url,
+                        source_id=best.get("key"),
+                        quality="hd",
+                        genres=movie.get("genres", []),
+                        rating=movie.get("rating"),
+                        status=TrailerStatus.PENDING,
+                    )
+                    db.add(new_trailer)
+                    await db.commit()
+                    await db.refresh(new_trailer)
+
+                    from theatarr.services.trailer_manager import download_trailer
+                    downloaded = await download_trailer(db, new_trailer)
+
+                    if downloaded.status == TrailerStatus.READY:
+                        logger.info("Auto-downloaded trailer: %s → %s", movie_title, downloaded.file_path)
+                        return f"/api/v1/trailers/{downloaded.id}/file"
+                    else:
+                        logger.warning("Failed to download trailer for %s: %s", movie_title, downloaded.error_message)
+
+            finally:
+                await adapter.disconnect()
+        except Exception as e:
+            logger.warning("Failed to get TMDB upcoming trailer: %s", e)
+
+        return None
+
     async def _get_session(self, session_id: str, *, use_lifecycle_db: bool = False) -> Session:
         """Get a session by ID with sequences and actions loaded.
 
@@ -211,7 +461,12 @@ class SequenceEngine:
         """
         db = self.db if use_lifecycle_db else self._session_db(session_id)
         result = await db.execute(
-            select(Session).where(Session.id == session_id)
+            select(Session)
+            .where(Session.id == session_id)
+            .options(
+                selectinload(Session.sequences).selectinload(Sequence.actions),
+            )
+            .execution_options(populate_existing=True)
         )
         session = result.scalar_one_or_none()
         if not session:
@@ -225,8 +480,16 @@ class SequenceEngine:
         return self._session_locks[session_id]
 
     async def _emit_state_change(self, session: Session) -> None:
-        """Emit session state change event via WebSocket broadcast."""
+        """Emit session state change event via WebSocket broadcast.
+
+        Re-fetches the session to ensure relationships (sequences, actions)
+        are loaded.  This avoids greenlet errors caused by expired lazy
+        attributes after commit().
+        """
         from theatarr.api.ws import ws_manager
+
+        # Re-fetch to guarantee relationships are loaded (commit() expires them)
+        session = await self._get_session(session.id)
 
         logger.info(
             "Emitting state change: session=%s status=%s seq_index=%d/%d",
@@ -275,6 +538,11 @@ class SequenceEngine:
 
             logger.info("Starting session %s", session_id)
             await self._emit_state_change(session)
+            await log_session_event(session_id, "session_started", {
+                "name": session.name,
+                "movie_title": session.movie_title,
+                "total_sequences": session.total_sequences,
+            })
 
             task = asyncio.create_task(self._run_session(session_id))
             self._running_sessions[session_id] = task
@@ -297,6 +565,10 @@ class SequenceEngine:
 
             logger.info("Paused session %s", session_id)
             await self._emit_state_change(session)
+            await log_session_event(session_id, "session_paused", {
+                "sequence_index": session.current_sequence_index,
+                "elapsed_ms": session.current_sequence_elapsed_ms,
+            })
 
             if session_id in self._running_sessions:
                 self._running_sessions[session_id].cancel()
@@ -324,6 +596,9 @@ class SequenceEngine:
 
             logger.info("Resuming session %s", session_id)
             await self._emit_state_change(session)
+            await log_session_event(session_id, "session_resumed", {
+                "sequence_index": session.current_sequence_index,
+            })
 
             task = asyncio.create_task(self._run_session(session_id, resuming=True))
             self._running_sessions[session_id] = task
@@ -355,6 +630,9 @@ class SequenceEngine:
             self._media_states.pop(session_id, None)
             logger.info("Stopped session %s", session_id)
             await self._emit_state_change(session)
+            await log_session_event(session_id, "session_stopped", {
+                "reason": "manual",
+            })
 
             return session
 
@@ -369,8 +647,10 @@ class SequenceEngine:
                     f"Cannot skip sequence in session {session_id} (status: {session.status})"
                 )
 
-            next_index = session.current_sequence_index + 1
-            if next_index >= session.total_sequences:
+            cur_index = session.current_sequence_index
+            next_index = cur_index + 1
+            is_last = next_index >= session.total_sequences
+            if is_last:
                 session.status = SessionStatus.COMPLETED
                 session.completed_at = datetime.now(timezone.utc)
             else:
@@ -378,10 +658,30 @@ class SequenceEngine:
                 session.current_sequence_elapsed_ms = 0
 
             await self.db.commit()
-            logger.info("Skipped to sequence %d in session %s", session.current_sequence_index, session_id)
+            target_index = cur_index if is_last else next_index
+            logger.info("Skipped to sequence %d in session %s", target_index, session_id)
             await self._emit_state_change(session)
+            await log_session_event(session_id, "sequence_skipped", {
+                "from_index": cur_index,
+                "to_index": target_index,
+                "session_completed": is_last,
+            })
 
             return session
+
+    async def notify_playback_ended(self, session_id: str) -> None:
+        """Signal the wait loop to wake up immediately after playback ends.
+
+        Also expires the background DB session cache so the wait loop
+        sees the updated current_sequence_index committed by skip_sequence()
+        (which uses the lifecycle DB, a separate SQLAlchemy session).
+        """
+        bg_db = self._bg_db.get(session_id)
+        if bg_db:
+            bg_db.expire_all()
+        event = self._playback_events.get(session_id)
+        if event:
+            event.set()
 
     # ------------------------------------------------------------------
     # Background session execution
@@ -397,6 +697,7 @@ class SequenceEngine:
 
         bg_db = async_session_maker()
         self._bg_db[session_id] = bg_db
+        self._playback_events[session_id] = asyncio.Event()
         try:
             while True:
                 session = await self._get_session(session_id)
@@ -406,11 +707,21 @@ class SequenceEngine:
 
                 if session.current_sequence_index >= session.total_sequences:
                     session.status = SessionStatus.COMPLETED
-                    session.completed_at = datetime.now(timezone.utc)
+                    completed_at = datetime.now(timezone.utc)
+                    session.completed_at = completed_at
+                    started_at = session.started_at
+                    total_seq = session.total_sequences
                     await bg_db.commit()
                     self._display_states.pop(session_id, None)
                     self._media_states.pop(session_id, None)
                     await self._emit_state_change(session)
+                    duration_s = None
+                    if started_at and completed_at:
+                        duration_s = int((completed_at - started_at).total_seconds())
+                    await log_session_event(session_id, "session_completed", {
+                        "duration_seconds": duration_s,
+                        "total_sequences": total_seq,
+                    })
                     break
 
                 sequence = session.current_sequence
@@ -445,10 +756,14 @@ class SequenceEngine:
                 await bg_db.commit()
                 self._display_states.pop(session_id, None)
                 await self._emit_state_change(session)
+                await log_session_event(session_id, "session_interrupted", {
+                    "error": str(e),
+                })
             except Exception:
                 pass
         finally:
             self._bg_db.pop(session_id, None)
+            self._playback_events.pop(session_id, None)
             await bg_db.close()
             self._running_sessions.pop(session_id, None)
             quiz_task = self._quiz_tasks.pop(session_id, None)
@@ -457,24 +772,43 @@ class SequenceEngine:
 
     async def _execute_sequence(self, session: Session, sequence: Sequence, skip_actions: bool = False) -> None:
         """Execute a single sequence (all actions in parallel)."""
+        # Capture IDs as local strings BEFORE any commit() can expire the ORM
+        # objects.  After commit(), accessing session.id or sequence.id would
+        # trigger a synchronous lazy-load which crashes in async context
+        # (greenlet_spawn error).
+        session_id = session.id
+        seq_id = sequence.id
+        seq_name = sequence.name
+        seq_order = sequence.order_index
+
+        seq_start_time = time.monotonic()
         duration_ms = sequence.effective_duration_ms
         logger.info(
             "Executing sequence %s (%s) — duration_type=%s duration_ms=%s effective=%dms, %d action(s), skip_actions=%s",
-            sequence.name, sequence.id,
+            seq_name, seq_id,
             _enum_val(sequence.duration_type), sequence.duration_ms,
             duration_ms, len(sequence.actions), skip_actions,
         )
+        await log_session_event(session_id, "sequence_started", {
+            "sequence_id": seq_id,
+            "sequence_name": seq_name,
+            "order_index": seq_order,
+            "duration_type": _enum_val(sequence.duration_type),
+            "duration_ms": duration_ms,
+            "action_count": len(sequence.actions),
+            "resuming": skip_actions,
+        })
 
         if skip_actions:
-            logger.info("Resuming sequence %s — skipping action execution (elapsed: %dms)", sequence.name, session.current_sequence_elapsed_ms)
+            logger.info("Resuming sequence %s — skipping action execution (elapsed: %dms)", seq_name, session.current_sequence_elapsed_ms)
         else:
-            self._display_states[session.id] = []
+            self._display_states[session_id] = []
 
             async def _exec_one(action: Action) -> ActionResult:
                 if action.delay_ms > 0:
                     await asyncio.sleep(action.delay_ms / 1000)
                 return await self._execute_action(
-                    action, sequence_duration_ms=duration_ms, block_id=sequence.id,
+                    action, sequence_duration_ms=duration_ms, block_id=seq_id,
                 )
 
             results = await asyncio.gather(
@@ -511,60 +845,89 @@ class SequenceEngine:
                 auto_skip_ms += 3000
                 logger.info(
                     "Sequence %s is MANUAL with auto-skip at %dms",
-                    sequence.name, auto_skip_ms,
+                    seq_name, auto_skip_ms,
                 )
             else:
-                logger.info("Sequence %s is MANUAL — waiting for external signal (skip/stop)", sequence.name)
+                logger.info("Sequence %s is MANUAL — waiting for external signal (skip/stop)", seq_name)
 
+            event = self._playback_events.get(session_id)
             while True:
-                await asyncio.sleep(1)
-                session = await self._get_session(session.id)
+                # Wait up to 1s, but wake immediately if playback_ended fires
+                if event:
+                    event.clear()
+                    try:
+                        await asyncio.wait_for(event.wait(), timeout=1.0)
+                    except asyncio.TimeoutError:
+                        pass
+                else:
+                    await asyncio.sleep(1)
+
+                session = await self._get_session(session_id)
                 if session.status != SessionStatus.RUNNING:
                     return
-                if session.current_sequence_index != sequence.order_index:
+                if session.current_sequence_index != seq_order:
                     return
                 session.current_sequence_elapsed_ms += 1000
-                await self._session_db(session.id).commit()
+                await self._session_db(session_id).commit()
                 await self._emit_state_change(session)
 
                 # Auto-skip when elapsed exceeds pause_at_ms
                 if auto_skip_ms is not None and session.current_sequence_elapsed_ms >= auto_skip_ms:
                     logger.info(
                         "Auto-skipping sequence %s — elapsed %dms >= pause_at %dms",
-                        sequence.name, session.current_sequence_elapsed_ms, auto_skip_ms,
+                        seq_name, session.current_sequence_elapsed_ms, auto_skip_ms,
                     )
                     # Store the pause position for media:resume
-                    self.store_media_pause(session.id, auto_skip_ms - 3000)
-                    await self.skip_sequence(session.id)
+                    self.store_media_pause(session_id, auto_skip_ms - 3000)
+                    await self.skip_sequence(session_id)
                     return
         elif duration_ms > 0:
             elapsed = session.current_sequence_elapsed_ms
             remaining = max(0, duration_ms - elapsed)
             chunk_ms = 1000
+            event = self._playback_events.get(session_id)
             while remaining > 0:
-                session = await self._get_session(session.id)
+                session = await self._get_session(session_id)
                 if session.status != SessionStatus.RUNNING:
                     return
-                if session.current_sequence_index != sequence.order_index:
+                if session.current_sequence_index != seq_order:
                     return
                 wait_ms = min(chunk_ms, remaining)
-                await asyncio.sleep(wait_ms / 1000)
+                # Wait up to wait_ms, but wake immediately if playback_ended fires
+                if event:
+                    event.clear()
+                    try:
+                        await asyncio.wait_for(event.wait(), timeout=wait_ms / 1000)
+                    except asyncio.TimeoutError:
+                        pass
+                else:
+                    await asyncio.sleep(wait_ms / 1000)
                 # Re-check after sleep: skip_sequence() may have changed the
                 # index and reset elapsed_ms while we were sleeping.  We must
                 # re-fetch BEFORE touching elapsed_ms to avoid contaminating
                 # the next sequence and to prevent stale-attribute errors.
-                session = await self._get_session(session.id)
+                session = await self._get_session(session_id)
                 if session.status != SessionStatus.RUNNING:
                     return
-                if session.current_sequence_index != sequence.order_index:
+                if session.current_sequence_index != seq_order:
                     return
                 session.current_sequence_elapsed_ms += wait_ms
-                await self._session_db(session.id).commit()
+                await self._session_db(session_id).commit()
                 await self._emit_state_change(session)
                 remaining -= wait_ms
 
+        # Log sequence completion
+        actual_ms = int((time.monotonic() - seq_start_time) * 1000)
+        await log_session_event(session_id, "sequence_completed", {
+            "sequence_id": seq_id,
+            "sequence_name": seq_name,
+            "order_index": seq_order,
+            "planned_duration_ms": duration_ms,
+            "actual_duration_ms": actual_ms,
+        })
+
         # Stop audio from this sequence when it ends
-        await self._cleanup_sequence_audio(session.id)
+        await self._cleanup_sequence_audio(session_id)
 
     async def _cleanup_sequence_audio(self, session_id: str) -> None:
         """Stop any audio that was started in the current sequence."""
@@ -670,7 +1033,7 @@ class SequenceEngine:
                 session_obj.feedback_opened = True
                 await db.commit()
                 elapsed = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-                self._log_action(session_id, action, action_type_val, True, "Feedback opened", elapsed)
+                await self._log_action(session_id, action, action_type_val, True, "Feedback opened", elapsed)
                 return ActionResult(
                     action_id=action.id, success=True, message="Feedback opened",
                     duration_ms=elapsed, error=None,
@@ -709,23 +1072,38 @@ class SequenceEngine:
                 action_type_val == "media"
                 and action.command == "play"
                 and "url" not in ws_params
-                and ws_params.get("media_id")
-                and adapter
             ):
-                try:
-                    url_params = {"media_id": ws_params["media_id"]}
-                    for key in ("audio_stream_id", "subtitle_stream_id", "video_quality"):
-                        if ws_params.get(key):
-                            url_params[key] = ws_params[key]
-                    url_result = await adapter.execute(Command(
-                        action="get_playback_url", parameters=url_params,
-                    ))
-                    if url_result.success and url_result.data:
-                        playback_url = url_result.data.get("playback_url")
-                        if playback_url:
-                            ws_params["url"] = playback_url
-                except Exception as e:
-                    logger.warning("Failed to resolve playback URL: %s", e)
+                media_source = ws_params.get("media_source", "service")
+
+                if media_source == "service" and ws_params.get("media_id") and adapter:
+                    # Existing: resolve via service adapter
+                    try:
+                        url_params = {"media_id": ws_params["media_id"]}
+                        for key in ("audio_stream_id", "subtitle_stream_id", "video_quality"):
+                            if ws_params.get(key):
+                                url_params[key] = ws_params[key]
+                        url_result = await adapter.execute(Command(
+                            action="get_playback_url", parameters=url_params,
+                        ))
+                        if url_result.success and url_result.data:
+                            playback_url = url_result.data.get("playback_url")
+                            if playback_url:
+                                ws_params["url"] = playback_url
+                    except Exception as e:
+                        logger.warning("Failed to resolve playback URL: %s", e)
+
+                elif media_source == "trailer":
+                    await self._resolve_trailer_url(session_id, ws_params)
+
+                elif media_source == "preroll":
+                    preroll_id = ws_params.get("preroll_id")
+                    if preroll_id:
+                        ws_params["url"] = f"/api/v1/prerolls/{preroll_id}/file"
+                        await self._increment_play_count("preroll", preroll_id)
+                        logger.info("Resolved preroll %s for session %s", preroll_id, session_id)
+                        await log_session_event(session_id, "preroll_resolved", {
+                            "preroll_id": preroll_id,
+                        })
 
             # Resolve sound_id → URL for audio play actions
             if (
@@ -783,7 +1161,7 @@ class SequenceEngine:
                 message = f"{message}; {ws_msg}" if message else ws_msg
 
             elapsed = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-            self._log_action(session_id, action, action_type_val, success, message, elapsed)
+            await self._log_action(session_id, action, action_type_val, success, message, elapsed)
             return ActionResult(
                 action_id=action.id, success=success, message=message,
                 duration_ms=elapsed, error=message if not success else None,
@@ -791,10 +1169,10 @@ class SequenceEngine:
 
         except Exception as e:
             logger.exception("Error executing action %s: %s", action.id, e)
-            self._log_action(session_id, action, _enum_val(action.action_type), False, None, 0, str(e))
+            await self._log_action(session_id, action, _enum_val(action.action_type), False, None, 0, str(e))
             return ActionResult(action_id=action.id, success=False, error=str(e))
 
-    def _log_action(
+    async def _log_action(
         self,
         session_id: str,
         action: "Action",
@@ -804,22 +1182,34 @@ class SequenceEngine:
         duration_ms: int,
         error: str | None = None,
     ) -> None:
-        """Append an action result to the in-memory log for a session."""
-        self._action_logs.setdefault(session_id, []).append({
+        """Log an action result to DB and keep in-memory copy."""
+        params = action.parameters or {}
+        # Strip internal/sensitive keys from logged parameters
+        safe_params = {k: v for k, v in params.items() if not k.startswith("_")}
+
+        event_data = {
             "action_id": action.id,
             "sequence_id": action.sequence.id,
             "sequence_name": action.sequence.name,
             "action_type": action_type,
             "command": action.command,
+            "parameters": safe_params,
             "success": success,
             "message": message,
             "duration_ms": duration_ms,
             "error": error or (message if not success else None),
+        }
+
+        # In-memory copy (legacy, for action-log endpoint fallback)
+        self._action_logs.setdefault(session_id, []).append({
+            **event_data,
             "executed_at": datetime.now(timezone.utc).isoformat(),
         })
-        # Keep only last 100 entries per session
         if len(self._action_logs[session_id]) > 100:
             self._action_logs[session_id] = self._action_logs[session_id][-100:]
+
+        # Persist to DB
+        await log_session_event(session_id, "action_executed", event_data)
 
     async def _setup_quiz_for_session(
         self, session_id: str, quiz_session_id: str
@@ -1164,16 +1554,18 @@ class SequenceEngine:
 
     async def _transition_to_next_sequence(self, session: Session) -> None:
         """Transition to the next sequence."""
+        # Capture IDs before any commit() can expire ORM objects
+        sid = session.id
         transition_start = time.perf_counter()
         monitor = get_performance_monitor()
-        db = self._session_db(session.id)
+        db = self._session_db(sid)
         next_index = session.current_sequence_index + 1
 
         if next_index >= session.total_sequences:
             session.status = SessionStatus.COMPLETED
             session.completed_at = datetime.now(timezone.utc)
             await db.commit()
-            logger.info("Session %s completed (all sequences done)", session.id)
+            logger.info("Session %s completed (all sequences done)", sid)
             await self._emit_state_change(session)
             return
 
@@ -1193,14 +1585,14 @@ class SequenceEngine:
         overhead_ms = pre_delay_ms + post_delay_ms
         monitor.record_sync(
             "transition_overhead", overhead_ms,
-            session_id=session.id,
-            from_index=session.current_sequence_index - 1,
+            session_id=sid,
+            from_index=next_index - 1,
             to_index=next_index,
         )
         if overhead_ms > TRANSITION_OVERHEAD_TARGET_MS:
             logger.warning(
                 "Transition overhead (%.2fms) exceeded target (%dms) for session %s",
-                overhead_ms, TRANSITION_OVERHEAD_TARGET_MS, session.id,
+                overhead_ms, TRANSITION_OVERHEAD_TARGET_MS, sid,
             )
 
     async def _build_session_overview(self, session_id: str) -> dict[str, Any]:

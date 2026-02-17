@@ -276,8 +276,12 @@ class WebSocketManager:
                 )
 
         elif msg_type == "playback_ended":
-            # Display client reports playback has ended
+            # Display client reports playback has ended — auto-skip to next sequence
             session_id = payload.get("session_id")
+            import logging as _logging
+            _logging.getLogger(__name__).info(
+                "WS received playback_ended for session %s", session_id,
+            )
             if session_id:
                 await self.broadcast(
                     Channel.SESSION.value,
@@ -286,6 +290,7 @@ class WebSocketManager:
                         "payload": {"session_id": session_id},
                     },
                 )
+                await self._handle_playback_ended(session_id)
 
         elif msg_type == "video_paused_at":
             # Display client reports video paused at pause_at_ms
@@ -365,6 +370,9 @@ class WebSocketManager:
                         },
                     })
 
+            from theatarr.services.session_logger import log_session_event
+            await log_session_event(session_id, "display_connected")
+
             # Auto-resume if session was paused and has pause_on_display_disconnect
             if (
                 session.pause_on_display_disconnect
@@ -389,12 +397,18 @@ class WebSocketManager:
 
             session = await _engine._get_session(session_id)
             from theatarr.models.session import SessionStatus
+            from theatarr.services.session_logger import log_session_event
+            auto_paused = False
             if (
                 session.pause_on_display_disconnect
                 and session.status == SessionStatus.RUNNING
             ):
                 logger.info("Display disconnected for session %s — auto-pausing", session_id)
                 await _engine.pause_session(session_id)
+                auto_paused = True
+            await log_session_event(session_id, "display_disconnected", {
+                "auto_paused": auto_paused,
+            })
         except Exception as e:
             logger.warning("Failed to auto-pause session %s on display disconnect: %s", session_id, e)
 
@@ -421,6 +435,35 @@ class WebSocketManager:
         except Exception as e:
             logging.getLogger(__name__).warning(
                 "Failed to handle video_paused_at for session %s: %s", session_id, e
+            )
+
+    async def _handle_playback_ended(self, session_id: str) -> None:
+        """Handle video playback ended — auto-skip to next sequence."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            from theatarr.services.engine import _engine
+            if not _engine:
+                return
+
+            # Only skip if the session is actually running with a media action
+            if session_id not in _engine._running_sessions:
+                return
+
+            logger.info(
+                "Playback ended for session %s — auto-skipping to next sequence",
+                session_id,
+            )
+            from theatarr.services.session_logger import log_session_event
+            await log_session_event(session_id, "playback_ended", {
+                "source": "display",
+            })
+            await _engine.notify_playback_ended(session_id)
+            await _engine.skip_sequence(session_id)
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "Failed to handle playback_ended for session %s: %s", session_id, e
             )
 
     async def broadcast_wallmount_state(self, state: dict) -> int:

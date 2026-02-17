@@ -38,10 +38,19 @@ class TMDBAdapter(ServiceAdapter):
     BASE_URL = "https://api.themoviedb.org/3"
     IMAGE_BASE_URL = "https://image.tmdb.org/t/p"
 
+    # TMDB genre ID → French name mapping (stable IDs)
+    TMDB_GENRE_MAP: dict[int, str] = {
+        28: "Action", 12: "Aventure", 16: "Animation", 35: "Comédie",
+        80: "Crime", 99: "Documentaire", 18: "Drame", 10751: "Familial",
+        14: "Fantastique", 36: "Histoire", 27: "Horreur", 10402: "Musique",
+        9648: "Mystère", 10749: "Romance", 878: "Science-Fiction",
+        10770: "Téléfilm", 53: "Thriller", 10752: "Guerre", 37: "Western",
+    }
+
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config)
         self.api_key = config.get("api_key", "")
-        self.language = config.get("language", "fr-FR")
+        self.language = config.get("language", "") or "fr-FR"
         self.include_adult = config.get("include_adult", False)
         self._client: httpx.AsyncClient | None = None
 
@@ -76,6 +85,10 @@ class TMDBAdapter(ServiceAdapter):
             Capability(name="search_movies", description="Search movies by title"),
             Capability(name="get_movie", description="Get detailed movie info by TMDB ID"),
             Capability(name="get_trailers", description="Get movie trailers"),
+            Capability(name="get_popular_movies", description="Get popular movies"),
+            Capability(name="get_upcoming_movies", description="Get upcoming movies"),
+            Capability(name="get_now_playing", description="Get now playing movies"),
+            Capability(name="get_trending_movies", description="Get trending movies"),
         ]
 
     async def _get_client(self) -> httpx.AsyncClient:
@@ -156,6 +169,27 @@ class TMDBAdapter(ServiceAdapter):
                     tmdb_id=command.parameters.get("movie_id", ""),
                 )
                 return CommandResult(success=True, data={"trailers": trailers})
+            elif command.action == "get_popular_movies":
+                results = await self.get_popular_movies(
+                    page=command.parameters.get("page", 1),
+                )
+                return CommandResult(success=True, data={"results": results})
+            elif command.action == "get_upcoming_movies":
+                results = await self.get_upcoming_movies(
+                    page=command.parameters.get("page", 1),
+                )
+                return CommandResult(success=True, data={"results": results})
+            elif command.action == "get_now_playing":
+                results = await self.get_now_playing(
+                    page=command.parameters.get("page", 1),
+                )
+                return CommandResult(success=True, data={"results": results})
+            elif command.action == "get_trending_movies":
+                results = await self.get_trending_movies(
+                    time_window=command.parameters.get("time_window", "week"),
+                    page=command.parameters.get("page", 1),
+                )
+                return CommandResult(success=True, data={"results": results})
             else:
                 return CommandResult(
                     success=False,
@@ -207,34 +241,99 @@ class TMDBAdapter(ServiceAdapter):
 
     async def get_trailers(self, tmdb_id: str) -> list[dict[str, Any]]:
         client = await self._get_client()
-        response = await client.get(
-            f"/movie/{tmdb_id}/videos",
-            params={"language": self.language},
-        )
 
-        if response.status_code != 200:
-            return []
+        # Try configured language first, then fallback to English
+        languages = [self.language]
+        lang_code = self.language[:2]  # "fr-FR" → "fr"
+        if lang_code != "en":
+            languages.append("en-US")
 
-        data = response.json()
-        trailers = []
+        seen_keys: set[str] = set()
+        trailers: list[dict[str, Any]] = []
 
-        for video in data.get("results", []):
-            if video.get("site") == "YouTube" and video.get("type") in ["Trailer", "Teaser"]:
-                trailers.append({
-                    "key": video.get("key"),
-                    "name": video.get("name"),
-                    "type": video.get("type"),
-                    "site": video.get("site"),
-                    "size": video.get("size", 1080),
-                    "official": video.get("official", False),
-                    "published_at": video.get("published_at"),
-                    "youtube_url": f"https://www.youtube.com/watch?v={video.get('key')}",
-                })
+        for lang in languages:
+            response = await client.get(
+                f"/movie/{tmdb_id}/videos",
+                params={"language": lang},
+            )
+            if response.status_code != 200:
+                continue
 
-        trailers.sort(key=lambda x: (x.get("official", False), x.get("size", 0)), reverse=True)
+            for video in response.json().get("results", []):
+                key = video.get("key")
+                if not key or key in seen_keys:
+                    continue
+                if video.get("site") == "YouTube" and video.get("type") in ["Trailer", "Teaser"]:
+                    seen_keys.add(key)
+                    trailers.append({
+                        "key": key,
+                        "name": video.get("name"),
+                        "type": video.get("type"),
+                        "site": video.get("site"),
+                        "size": video.get("size", 1080),
+                        "official": video.get("official", False),
+                        "published_at": video.get("published_at"),
+                        "language": lang,
+                        "youtube_url": f"https://www.youtube.com/watch?v={key}",
+                    })
+
+        # Sort: configured language first, then official, then highest resolution
+        trailers.sort(key=lambda x: (
+            x.get("language") == self.language,
+            x.get("official", False),
+            x.get("size", 0),
+        ), reverse=True)
         return trailers
 
+    async def get_popular_movies(self, page: int = 1) -> list[dict[str, Any]]:
+        """Get popular movies from TMDB."""
+        client = await self._get_client()
+        response = await client.get(
+            "/movie/popular",
+            params={"language": self.language, "page": page},
+        )
+        if response.status_code != 200:
+            return []
+        return [self._format_movie(m) for m in response.json().get("results", [])]
+
+    async def get_upcoming_movies(self, page: int = 1) -> list[dict[str, Any]]:
+        """Get upcoming movies from TMDB."""
+        client = await self._get_client()
+        response = await client.get(
+            "/movie/upcoming",
+            params={"language": self.language, "page": page},
+        )
+        if response.status_code != 200:
+            return []
+        return [self._format_movie(m) for m in response.json().get("results", [])]
+
+    async def get_now_playing(self, page: int = 1) -> list[dict[str, Any]]:
+        """Get now playing movies from TMDB."""
+        client = await self._get_client()
+        response = await client.get(
+            "/movie/now_playing",
+            params={"language": self.language, "page": page},
+        )
+        if response.status_code != 200:
+            return []
+        return [self._format_movie(m) for m in response.json().get("results", [])]
+
+    async def get_trending_movies(
+        self, time_window: str = "week", page: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Get trending movies from TMDB."""
+        client = await self._get_client()
+        response = await client.get(
+            f"/trending/movie/{time_window}",
+            params={"language": self.language, "page": page},
+        )
+        if response.status_code != 200:
+            return []
+        return [self._format_movie(m) for m in response.json().get("results", [])]
+
     def _format_movie(self, movie: dict[str, Any]) -> dict[str, Any]:
+        genre_ids = movie.get("genre_ids", [])
+        genres = [self.TMDB_GENRE_MAP[gid] for gid in genre_ids if gid in self.TMDB_GENRE_MAP]
         return {
             "tmdb_id": str(movie.get("id")),
             "title": movie.get("title"),
@@ -246,7 +345,8 @@ class TMDBAdapter(ServiceAdapter):
             "popularity": movie.get("popularity"),
             "poster_url": self._get_image_url(movie.get("poster_path"), "w500"),
             "backdrop_url": self._get_image_url(movie.get("backdrop_path"), "original"),
-            "genre_ids": movie.get("genre_ids", []),
+            "genre_ids": genre_ids,
+            "genres": genres,
         }
 
     def _format_movie_details(self, movie: dict[str, Any]) -> dict[str, Any]:

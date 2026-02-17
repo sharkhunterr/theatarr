@@ -54,7 +54,7 @@ async def download_trailer(
         return trailer
 
     # Set download directory
-    base_dir = download_dir or getattr(settings, "trailer_storage_path", "/data/trailers")
+    base_dir = download_dir or str(settings.trailer_path)
     output_dir = Path(base_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -350,14 +350,14 @@ async def run_trailer_rule(
 
         # Check if movie matches rule criteria
         if not rule.matches_movie(
-            genres=[],  # Would need genre ID to name mapping
+            genres=movie.get("genres", []),
             year=movie.get("year"),
             rating=movie.get("rating"),
         ):
             skipped += 1
             continue
 
-        # Check if we already have this trailer
+        # Check if we already have a trailer for this movie
         tmdb_id = movie.get("tmdb_id")
         result = await db.execute(
             select(Trailer).where(Trailer.movie_tmdb_id == tmdb_id)
@@ -388,6 +388,16 @@ async def run_trailer_rule(
 
         if not best_trailer:
             continue
+
+        # Check if we already have this exact YouTube video (prevent duplicates)
+        video_key = best_trailer.get("key")
+        if video_key:
+            dup_result = await db.execute(
+                select(Trailer).where(Trailer.source_id == video_key)
+            )
+            if dup_result.scalar_one_or_none():
+                skipped += 1
+                continue
 
         # Create trailer entry
         trailer = Trailer(

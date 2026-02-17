@@ -60,6 +60,10 @@ class Settings(BaseSettings):
         default=Path("/data/sounds"),
         description="Sound storage directory",
     )
+    preroll_path: Path = Field(
+        default=Path("/data/prerolls"),
+        description="Pre-roll storage directory",
+    )
 
     # Server
     host: str = Field(default="0.0.0.0", description="Server host")
@@ -96,7 +100,7 @@ class Settings(BaseSettings):
             return v.replace("sqlite:///", "sqlite+aiosqlite:///")
         return v
 
-    @field_validator("data_path", "trailer_path", "sound_path", mode="after")
+    @field_validator("data_path", "trailer_path", "sound_path", "preroll_path", mode="after")
     @classmethod
     def ensure_path_exists(cls, v: Path) -> Path:
         """Create directories if they don't exist."""

@@ -46,7 +46,7 @@ def _service_to_response(service: Service) -> ServiceResponse:
         description=service.description,
         adapter_type=service.adapter_type,
         category=service.category,
-        config=_mask_sensitive_config(service.config),
+        config=service.config,
         is_enabled=service.is_enabled,
         connection_status=service.connection_status,
         last_seen_at=service.last_seen_at,

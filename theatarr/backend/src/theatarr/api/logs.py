@@ -168,7 +168,7 @@ async def get_session_history(
             id=session.id,
             name=session.name,
             status=session.status,
-            movie_title=session.movie.title if session.movie else None,
+            movie_title=session.movie_title,
             started_at=session.started_at,
             completed_at=session.updated_at if session.status == "completed" else None,
             duration_seconds=duration,
@@ -269,75 +269,44 @@ async def get_session_stats(
 @router.get("/sessions/{session_id}/events")
 async def get_session_events(
     session_id: str,
+    event_type: Optional[str] = Query(None, description="Filter by event type"),
+    limit: int = Query(500, ge=1, le=2000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[SessionLogEntry]:
-    """Get event log for a specific session.
+    """Get persistent event log for a specific session."""
+    from theatarr.models.session_event import SessionEvent
 
-    Note: In a full implementation, this would query a separate events/audit log table.
-    For now, we generate synthetic events based on session state.
-    """
-    result = await db.execute(select(Session).where(Session.id == session_id))
-    session = result.scalar_one_or_none()
+    # Get session name for response
+    sess_result = await db.execute(select(Session).where(Session.id == session_id))
+    session = sess_result.scalar_one_or_none()
+    session_name = session.name if session else "Unknown"
 
-    if not session:
-        return []
+    query = (
+        select(SessionEvent)
+        .where(SessionEvent.session_id == session_id)
+        .order_by(SessionEvent.timestamp.asc())
+        .limit(limit)
+    )
+    if event_type:
+        query = query.where(SessionEvent.event_type == event_type)
 
-    events = []
+    result = await db.execute(query)
+    rows = result.scalars().all()
 
-    # Session created event
-    events.append(SessionLogEntry(
-        id=f"{session_id}_created",
-        session_id=session_id,
-        session_name=session.name,
-        event_type="session_created",
-        event_data={"name": session.name},
-        timestamp=session.created_at,
-        user_id=None,
-        user_name=None,
-    ))
-
-    # Session started event
-    if session.started_at:
-        events.append(SessionLogEntry(
-            id=f"{session_id}_started",
-            session_id=session_id,
-            session_name=session.name,
-            event_type="session_started",
-            event_data=None,
-            timestamp=session.started_at,
+    return [
+        SessionLogEntry(
+            id=row.id,
+            session_id=row.session_id,
+            session_name=session_name,
+            event_type=row.event_type,
+            event_data=row.data,
+            timestamp=row.timestamp,
             user_id=None,
             user_name=None,
-        ))
-
-    # Add sequence events if session has been running
-    if session.sequences and session.current_sequence_index:
-        for i, seq in enumerate(session.sequences[:session.current_sequence_index]):
-            events.append(SessionLogEntry(
-                id=f"{session_id}_seq_{i}",
-                session_id=session_id,
-                session_name=session.name,
-                event_type="sequence_completed",
-                event_data={"sequence_name": seq.name, "sequence_index": i},
-                timestamp=session.started_at + timedelta(seconds=i * 60),  # Estimate
-                user_id=None,
-                user_name=None,
-            ))
-
-    # Session completed/stopped event
-    if session.status in ["completed", "stopped"]:
-        events.append(SessionLogEntry(
-            id=f"{session_id}_{session.status}",
-            session_id=session_id,
-            session_name=session.name,
-            event_type=f"session_{session.status}",
-            event_data=None,
-            timestamp=session.updated_at,
-            user_id=None,
-            user_name=None,
-        ))
-
-    return sorted(events, key=lambda e: e.timestamp)
+        )
+        for row in rows
+    ]
 
 
 @router.get("/activity/recent")

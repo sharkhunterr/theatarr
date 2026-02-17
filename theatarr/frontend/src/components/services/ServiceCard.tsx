@@ -23,6 +23,7 @@ export interface Service {
   description?: string;
   adapter_type: string;
   category: string;
+  config?: Record<string, unknown>;
   is_enabled: boolean;
   connection_status: 'connected' | 'disconnected' | 'error' | 'unknown';
   last_seen_at?: string;

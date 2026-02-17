@@ -5,7 +5,7 @@ import secrets
 import string
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlalchemy import func, select, Integer, case
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
@@ -90,6 +90,325 @@ def _parse_dt(value: str | datetime | None) -> datetime | None:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+async def _prepare_auto_trailers(session_id: str) -> None:
+    """Pre-download trailers for auto-mode media actions in a session.
+
+    Scans session actions for media:play with media_source=trailer and
+    trailer_mode=auto. For each, resolves and downloads a trailer from
+    TMDB upcoming/popular movies, then stores the resolved trailer_id
+    in the action parameters so the engine can skip downloading at runtime.
+    """
+    import random
+
+    from theatarr.adapters.base import Command
+    from theatarr.adapters.registry import AdapterRegistry
+    from theatarr.database import async_session_maker
+    from theatarr.models.service import Service
+    from theatarr.models.trailer import Trailer, TrailerStatus
+    from theatarr.services.trailer_manager import download_trailer
+
+    try:
+        async with async_session_maker() as db:
+            # Load session with sequences and actions
+            result = await db.execute(
+                select(Session)
+                .options(selectinload(Session.sequences).selectinload(Sequence.actions))
+                .where(Session.id == session_id)
+            )
+            session = result.scalar_one_or_none()
+            if not session:
+                return
+
+            # Get session's movie tmdb_id and genres
+            session_tmdb_id: str | None = None
+            target_genres: set[str] = set()
+            if session.movie_id:
+                movie_result = await db.execute(
+                    select(Movie).where(Movie.id == session.movie_id)
+                )
+                movie = movie_result.scalar_one_or_none()
+                if movie:
+                    session_tmdb_id = movie.tmdb_id
+                    from theatarr.api.trailers import _normalize_genres
+                    target_genres = _normalize_genres(movie.genres or [])
+
+            # Find auto-trailer actions (with their parent sequence for duration update)
+            auto_actions: list[tuple[Action, Sequence]] = []
+            for seq in session.sequences:
+                for action in seq.actions:
+                    params = action.parameters or {}
+                    if (
+                        action.command == "play"
+                        and params.get("media_source") == "trailer"
+                        and params.get("trailer_mode") == "auto"
+                        and not params.get("_resolved_trailer_id")
+                    ):
+                        auto_actions.append((action, seq))
+
+            if not auto_actions:
+                return
+
+            logger.info("Preparing %d auto-trailer(s) for session %s", len(auto_actions), session_id)
+
+            # Get TMDB service
+            svc_result = await db.execute(
+                select(Service).where(Service.adapter_type == "tmdb", Service.is_enabled == True)
+            )
+            tmdb_service = svc_result.scalar_one_or_none()
+            if not tmdb_service:
+                logger.warning("No TMDB service for auto-trailer preparation")
+                return
+
+            adapter = AdapterRegistry.create_adapter("tmdb", tmdb_service.config)
+            await adapter.connect()
+            try:
+                # Fetch upcoming + popular candidates
+                candidates: list[dict] = []
+                for source in ("get_upcoming_movies", "get_popular_movies"):
+                    res = await adapter.execute(Command(action=source, parameters={"page": 1}))
+                    if res.success and res.data:
+                        candidates.extend(res.data.get("results", []))
+
+                # Deduplicate
+                seen: set[str] = set()
+                unique: list[dict] = []
+                for m in candidates:
+                    tid = str(m.get("tmdb_id", ""))
+                    if tid and tid not in seen:
+                        seen.add(tid)
+                        unique.append(m)
+                candidates = unique
+
+                # Exclude session movie
+                if session_tmdb_id:
+                    candidates = [m for m in candidates if str(m.get("tmdb_id")) != str(session_tmdb_id)]
+
+                # Shuffle candidates to avoid always picking the same trailers,
+                # then sort by genre match (with randomized tiebreaker)
+                random.shuffle(candidates)
+                if target_genres:
+                    candidates.sort(
+                        key=lambda m: len(target_genres & _normalize_genres(m.get("genres", []))),
+                        reverse=True,
+                    )
+
+                used_tmdb_ids: set[str] = set()
+
+                for action, parent_seq in auto_actions:
+                    # Find a candidate with a proper Trailer video
+                    resolved = False
+
+                    # If a preview tmdb_id was pre-selected, try it FIRST (directly)
+                    preview_tmdb_id = (action.parameters or {}).get("_preview_tmdb_id")
+                    preview_name = (action.parameters or {}).get("_preview_trailer_name", "")
+                    if preview_tmdb_id and str(preview_tmdb_id) not in used_tmdb_ids:
+                        logger.info("Trying preview trailer tmdb_id=%s (%s)", preview_tmdb_id, preview_name)
+                        ptid = str(preview_tmdb_id)
+                        # 1) Check if already downloaded locally
+                        existing = await db.execute(
+                            select(Trailer).where(
+                                Trailer.movie_tmdb_id == ptid,
+                                Trailer.status == TrailerStatus.READY.value,
+                            )
+                        )
+                        existing_trailer = existing.scalar_one_or_none()
+                        if existing_trailer:
+                            params = dict(action.parameters or {})
+                            params["_resolved_trailer_id"] = existing_trailer.id
+                            params["_resolved_trailer_name"] = f"{existing_trailer.movie_title} — {existing_trailer.title}"
+                            if existing_trailer.duration_seconds:
+                                dur_ms = existing_trailer.duration_seconds * 1000
+                                params["_resolved_duration_ms"] = dur_ms
+                                parent_seq.duration_ms = dur_ms
+                                if parent_seq.duration_type in (DurationType.MANUAL, DurationType.MANUAL.value):
+                                    parent_seq.duration_type = DurationType.FIXED
+                            action.parameters = params
+                            flag_modified(action, "parameters")
+                            used_tmdb_ids.add(ptid)
+                            resolved = True
+                            logger.info("Preview trailer resolved → existing %s (%s)", existing_trailer.id, existing_trailer.movie_title)
+                        else:
+                            # 2) Fetch trailer from TMDB for this specific movie
+                            trailer_result = await adapter.execute(
+                                Command(action="get_trailers", parameters={"movie_id": ptid})
+                            )
+                            if trailer_result.success and trailer_result.data:
+                                all_trailers = [
+                                    t for t in trailer_result.data.get("trailers", [])
+                                    if t.get("type") == "Trailer"
+                                ]
+                                adapter_lang = getattr(adapter, "language", "") or "fr-FR"
+                                lang_trailers = [t for t in all_trailers if t.get("language") == adapter_lang]
+                                if lang_trailers:
+                                    best = lang_trailers[0]
+                                    # Get movie details for title
+                                    movie_detail_res = await adapter.execute(
+                                        Command(action="get_movie", parameters={"movie_id": ptid})
+                                    )
+                                    movie_title = "Unknown"
+                                    movie_year = None
+                                    movie_genres: list = []
+                                    movie_rating = None
+                                    if movie_detail_res.success and movie_detail_res.data:
+                                        movie_title = movie_detail_res.data.get("title", "Unknown")
+                                        movie_year = movie_detail_res.data.get("year")
+                                        movie_genres = movie_detail_res.data.get("genres", [])
+                                        movie_rating = movie_detail_res.data.get("rating")
+
+                                    logger.info("Pre-downloading preview trailer for %s (tmdb=%s)…", movie_title, ptid)
+                                    new_trailer = Trailer(
+                                        movie_title=movie_title,
+                                        movie_year=movie_year,
+                                        movie_tmdb_id=ptid,
+                                        title=best.get("name", f"Trailer — {movie_title}"),
+                                        source_type="youtube",
+                                        source_url=best.get("youtube_url"),
+                                        source_id=best.get("key"),
+                                        quality="hd",
+                                        genres=movie_genres,
+                                        rating=movie_rating,
+                                        status=TrailerStatus.PENDING,
+                                    )
+                                    db.add(new_trailer)
+                                    await db.commit()
+                                    await db.refresh(new_trailer)
+
+                                    downloaded = await download_trailer(db, new_trailer)
+                                    if downloaded.status == TrailerStatus.READY:
+                                        params = dict(action.parameters or {})
+                                        params["_resolved_trailer_id"] = downloaded.id
+                                        params["_resolved_trailer_name"] = f"{movie_title} — {best.get('name', 'Trailer')}"
+                                        if downloaded.duration_seconds:
+                                            dur_ms = downloaded.duration_seconds * 1000
+                                            params["_resolved_duration_ms"] = dur_ms
+                                            parent_seq.duration_ms = dur_ms
+                                            if parent_seq.duration_type in (DurationType.MANUAL, DurationType.MANUAL.value):
+                                                parent_seq.duration_type = DurationType.FIXED
+                                        action.parameters = params
+                                        flag_modified(action, "parameters")
+                                        used_tmdb_ids.add(ptid)
+                                        resolved = True
+                                        logger.info("Preview trailer downloaded → %s (%s)", downloaded.id, movie_title)
+                                    else:
+                                        logger.warning("Failed to download preview trailer for %s: %s", movie_title, downloaded.error_message)
+                                else:
+                                    logger.warning("No %s trailers found for preview tmdb_id=%s", adapter_lang, ptid)
+                            else:
+                                logger.warning("Could not fetch trailers for preview tmdb_id=%s", ptid)
+
+                    # Fallback: try candidates list (random/genre-matched)
+                    if not resolved:
+                        if preview_tmdb_id:
+                            logger.info("Preview trailer failed, falling back to candidates for action %s", action.id)
+                        ordered = candidates
+
+                    if resolved:
+                        continue
+
+                    for movie_data in ordered:
+                        tmdb_id = str(movie_data.get("tmdb_id", ""))
+                        if tmdb_id in used_tmdb_ids:
+                            continue
+
+                        # Check if already downloaded locally
+                        existing = await db.execute(
+                            select(Trailer).where(
+                                Trailer.movie_tmdb_id == tmdb_id,
+                                Trailer.status == TrailerStatus.READY.value,
+                            )
+                        )
+                        existing_trailer = existing.scalar_one_or_none()
+                        if existing_trailer:
+                            params = dict(action.parameters or {})
+                            params["_resolved_trailer_id"] = existing_trailer.id
+                            params["_resolved_trailer_name"] = f"{existing_trailer.movie_title} — {existing_trailer.title}"
+                            if existing_trailer.duration_seconds:
+                                dur_ms = existing_trailer.duration_seconds * 1000
+                                params["_resolved_duration_ms"] = dur_ms
+                                # Update parent sequence duration to trailer duration
+                                parent_seq.duration_ms = dur_ms
+                                if parent_seq.duration_type in (DurationType.MANUAL, DurationType.MANUAL.value):
+                                    parent_seq.duration_type = DurationType.FIXED
+                            action.parameters = params
+                            flag_modified(action, "parameters")
+                            used_tmdb_ids.add(tmdb_id)
+                            resolved = True
+                            logger.info("Resolved auto-trailer for action %s → existing %s (%s)",
+                                        action.id, existing_trailer.id, movie_data.get("title"))
+                            break
+
+                        # Get trailers from TMDB
+                        trailer_result = await adapter.execute(
+                            Command(action="get_trailers", parameters={"movie_id": tmdb_id})
+                        )
+                        if not (trailer_result.success and trailer_result.data):
+                            continue
+                        all_trailers = [
+                            t for t in trailer_result.data.get("trailers", [])
+                            if t.get("type") == "Trailer"
+                        ]
+                        if not all_trailers:
+                            continue
+                        # Strictly prefer trailers in the configured language
+                        adapter_lang = getattr(adapter, "language", "") or "fr-FR"
+                        lang_trailers = [t for t in all_trailers if t.get("language") == adapter_lang]
+                        if not lang_trailers:
+                            # No trailer in configured language — skip this movie
+                            continue
+                        best = lang_trailers[0]
+                        movie_title = movie_data.get("title", "Unknown")
+
+                        # Download
+                        logger.info("Pre-downloading trailer for %s…", movie_title)
+                        new_trailer = Trailer(
+                            movie_title=movie_title,
+                            movie_year=movie_data.get("year"),
+                            movie_tmdb_id=tmdb_id,
+                            title=best.get("name", f"Trailer — {movie_title}"),
+                            source_type="youtube",
+                            source_url=best.get("youtube_url"),
+                            source_id=best.get("key"),
+                            quality="hd",
+                            genres=movie_data.get("genres", []),
+                            rating=movie_data.get("rating"),
+                            status=TrailerStatus.PENDING,
+                        )
+                        db.add(new_trailer)
+                        await db.commit()
+                        await db.refresh(new_trailer)
+
+                        downloaded = await download_trailer(db, new_trailer)
+                        if downloaded.status == TrailerStatus.READY:
+                            params = dict(action.parameters or {})
+                            params["_resolved_trailer_id"] = downloaded.id
+                            params["_resolved_trailer_name"] = f"{movie_title} — {best.get('name', 'Trailer')}"
+                            if downloaded.duration_seconds:
+                                dur_ms = downloaded.duration_seconds * 1000
+                                params["_resolved_duration_ms"] = dur_ms
+                                # Update parent sequence duration to trailer duration
+                                parent_seq.duration_ms = dur_ms
+                                if parent_seq.duration_type in (DurationType.MANUAL, DurationType.MANUAL.value):
+                                    parent_seq.duration_type = DurationType.FIXED
+                            action.parameters = params
+                            flag_modified(action, "parameters")
+                            used_tmdb_ids.add(tmdb_id)
+                            resolved = True
+                            logger.info("Pre-downloaded trailer %s → %s", movie_title, downloaded.id)
+                            break
+                        else:
+                            logger.warning("Failed to download trailer for %s: %s",
+                                           movie_title, downloaded.error_message)
+
+                    if not resolved:
+                        logger.warning("Could not resolve auto-trailer for action %s", action.id)
+
+                await db.commit()
+            finally:
+                await adapter.disconnect()
+    except Exception as e:
+        logger.error("Error preparing auto-trailers for session %s: %s", session_id, e)
+
+
 def _session_to_response(
     session: Session,
     linked_vote_session: VoteSession | None = None,
@@ -121,6 +440,24 @@ def _session_to_response(
             name=session.template.name,
             template_type=template_type,
         )
+
+    # Count unresolved auto-trailer actions (only for draft/scheduled sessions)
+    preparing_trailers = 0
+    if session.status in (SessionStatus.DRAFT, SessionStatus.SCHEDULED,
+                          SessionStatus.DRAFT.value, SessionStatus.SCHEDULED.value):
+        try:
+            for seq in (session.sequences or []):
+                for act in (seq.actions or []):
+                    p = act.parameters or {}
+                    if (
+                        act.command == "play"
+                        and p.get("media_source") == "trailer"
+                        and p.get("trailer_mode") == "auto"
+                        and not p.get("_resolved_trailer_id")
+                    ):
+                        preparing_trailers += 1
+        except Exception:
+            pass  # lazy-load may fail, ignore
 
     return SessionResponse(
         id=session.id,
@@ -164,6 +501,7 @@ def _session_to_response(
         actions_count=actions_count,
         feedback_count=feedback_count,
         feedback_average=feedback_average,
+        preparing_trailers=preparing_trailers,
     )
 
 
@@ -506,6 +844,7 @@ async def create_session(
     db: DbSession,
     user: AdminUser,
     data: SessionCreate,
+    background_tasks: BackgroundTasks,
 ) -> SessionResponse:
     """Create a new session."""
     # Prepare mystery config if present
@@ -628,6 +967,9 @@ async def create_session(
 
     await db.commit()
     await db.refresh(session)
+
+    # Pre-download trailers for auto-mode actions in background
+    background_tasks.add_task(_prepare_auto_trailers, session.id)
 
     return _session_to_response(session)
 
@@ -789,6 +1131,56 @@ async def get_session(
     )
 
 
+@router.post(
+    "/{session_id}/prepare-trailers",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Force Trailer Preparation",
+)
+async def prepare_trailers(
+    db: DbSession,
+    user: AdminUser,
+    session_id: str,
+    background_tasks: BackgroundTasks,
+) -> dict:
+    """Force (re)search and download of auto-trailers for a session.
+
+    Clears any previously resolved trailers on auto-mode actions
+    and triggers a fresh background search.
+    """
+    result = await db.execute(
+        select(Session)
+        .options(selectinload(Session.sequences).selectinload(Sequence.actions))
+        .where(Session.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise NotFoundError("Session", session_id)
+
+    # Clear existing resolutions on auto-trailer actions
+    cleared = 0
+    for seq in session.sequences:
+        for action in seq.actions:
+            p = action.parameters or {}
+            if (
+                p.get("media_source") == "trailer"
+                and p.get("trailer_mode") == "auto"
+            ):
+                params = dict(p)
+                params.pop("_resolved_trailer_id", None)
+                params.pop("_resolved_trailer_name", None)
+                params.pop("_resolved_duration_ms", None)
+                action.parameters = params
+                flag_modified(action, "parameters")
+                cleared += 1
+
+    await db.commit()
+
+    if cleared > 0:
+        background_tasks.add_task(_prepare_auto_trailers, session_id)
+
+    return {"status": "accepted", "actions_cleared": cleared}
+
+
 @router.patch(
     "/{session_id}",
     response_model=SessionResponse,
@@ -799,6 +1191,7 @@ async def update_session(
     user: AdminUser,
     session_id: str,
     data: SessionUpdate,
+    background_tasks: BackgroundTasks,
 ) -> SessionResponse:
     """Update a session."""
     result = await db.execute(select(Session).where(Session.id == session_id))
@@ -960,6 +1353,9 @@ async def update_session(
 
     await db.commit()
     await db.refresh(session)
+
+    # Pre-download trailers for auto-mode actions in background
+    background_tasks.add_task(_prepare_auto_trailers, session.id)
 
     return _session_to_response(session)
 
@@ -1240,13 +1636,29 @@ async def get_session_state(
 async def get_session_action_log(
     user: AdminUser,
     session_id: str,
+    db: DbSession,
 ) -> list[dict]:
-    """Get the in-memory action execution log for a session.
+    """Get action execution log for a session.
 
-    Returns the last 100 action results with success/failure status,
-    timing, and error messages. Only available for sessions that have
-    been running in the current engine lifecycle.
+    Queries persistent session_events (type=action_executed).
+    Falls back to in-memory log if no DB events found.
     """
+    from theatarr.models.session_event import SessionEvent
+
+    result = await db.execute(
+        select(SessionEvent)
+        .where(SessionEvent.session_id == session_id, SessionEvent.event_type == "action_executed")
+        .order_by(SessionEvent.timestamp.asc())
+        .limit(200)
+    )
+    rows = result.scalars().all()
+    if rows:
+        return [
+            {**(row.data or {}), "executed_at": row.timestamp.isoformat()}
+            for row in rows
+        ]
+
+    # Fallback to in-memory
     engine = get_engine()
     return engine.get_action_log(session_id)
 

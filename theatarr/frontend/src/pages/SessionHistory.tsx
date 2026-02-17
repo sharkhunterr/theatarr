@@ -10,10 +10,12 @@ import {
   Film,
   Calendar,
   TrendingUp,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { Button, Card, Spinner } from '../components/common';
 import { apiClient } from '../api/client';
+import { EventTimeline } from '../components/history/EventTimeline';
 
 interface SessionHistoryItem {
   id: string;
@@ -53,33 +55,24 @@ interface HistoryResponse {
   total_pages: number;
 }
 
-export function SessionHistory() {
-  const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>('');
+interface SessionEvent {
+  id: string;
+  session_id: string;
+  session_name: string;
+  event_type: string;
+  event_data: Record<string, unknown> | null;
+  timestamp: string;
+}
 
-  // Fetch history
-  const { data: historyData, isLoading: historyLoading } = useQuery<HistoryResponse>({
-    queryKey: ['session-history', page, statusFilter],
-    queryFn: async () => {
-      const params = new URLSearchParams({
-        page: String(page),
-        page_size: '20',
-      });
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
-      const response = await apiClient.get(`/logs/sessions/history?${params}`);
-      return response.data;
-    },
-  });
+function SessionRow({ session }: { session: SessionHistoryItem }) {
+  const [expanded, setExpanded] = useState(false);
 
-  // Fetch stats
-  const { data: statsData } = useQuery<SessionStats>({
-    queryKey: ['session-stats'],
+  const { data: events, isLoading: eventsLoading } = useQuery<SessionEvent[]>({
+    queryKey: ['session-events', session.id],
     queryFn: async () => {
-      const response = await apiClient.get('/logs/sessions/stats');
-      return response.data;
+      return apiClient.get<SessionEvent[]>(`/logs/sessions/${session.id}/events`);
     },
+    enabled: expanded,
   });
 
   const getStatusIcon = (status: string) => {
@@ -91,6 +84,7 @@ export function SessionHistory() {
       case 'paused':
         return <PauseCircle size={16} className="text-yellow-400" />;
       case 'stopped':
+      case 'interrupted':
         return <XCircle size={16} className="text-red-400" />;
       default:
         return <Clock size={16} className="text-dark-muted" />;
@@ -109,8 +103,139 @@ export function SessionHistory() {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleString();
+    return new Date(dateString).toLocaleString('fr-FR');
   };
+
+  const statusLabels: Record<string, string> = {
+    completed: 'Termine',
+    running: 'En cours',
+    paused: 'En pause',
+    stopped: 'Arrete',
+    interrupted: 'Interrompu',
+    draft: 'Brouillon',
+    scheduled: 'Planifie',
+  };
+
+  return (
+    <Card>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="block w-full text-left p-4 hover:bg-dark-border/30 transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="text-dark-muted">
+              {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </div>
+            {getStatusIcon(session.status)}
+            <div>
+              <div className="font-medium text-dark-text">{session.name}</div>
+              {session.movie_title && (
+                <div className="text-sm text-dark-muted">{session.movie_title}</div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-6 text-sm text-dark-muted">
+            <div className="hidden md:block">
+              <span className="text-dark-muted/60">Debut:</span>{' '}
+              {formatDate(session.started_at)}
+            </div>
+            <div>
+              <span className="text-dark-muted/60">Duree:</span>{' '}
+              {formatDuration(session.duration_seconds)}
+            </div>
+            <div>
+              <span className="text-dark-muted/60">Seq:</span>{' '}
+              {session.sequences_completed}/{session.total_sequences}
+            </div>
+            <span
+              className={`px-2 py-0.5 rounded text-xs font-medium ${
+                session.status === 'completed'
+                  ? 'bg-green-500/20 text-green-400'
+                  : session.status === 'running'
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : session.status === 'paused'
+                  ? 'bg-yellow-500/20 text-yellow-400'
+                  : session.status === 'interrupted'
+                  ? 'bg-red-500/20 text-red-400'
+                  : 'bg-dark-border/20 text-dark-muted'
+              }`}
+            >
+              {statusLabels[session.status] || session.status}
+            </span>
+          </div>
+        </div>
+      </button>
+
+      {/* Expanded event timeline */}
+      {expanded && (
+        <div className="border-t border-dark-border px-4 py-3">
+          {/* Session summary header */}
+          <div className="flex flex-wrap gap-4 text-xs text-dark-muted mb-3 pb-3 border-b border-dark-border/50">
+            <div>
+              <span className="text-dark-muted/60">ID:</span>{' '}
+              <span className="font-mono">{session.id.slice(0, 8)}</span>
+            </div>
+            <div>
+              <span className="text-dark-muted/60">Debut:</span> {formatDate(session.started_at)}
+            </div>
+            {session.completed_at && (
+              <div>
+                <span className="text-dark-muted/60">Fin:</span> {formatDate(session.completed_at)}
+              </div>
+            )}
+            <div>
+              <span className="text-dark-muted/60">Duree:</span> {formatDuration(session.duration_seconds)}
+            </div>
+            <div>
+              <span className="text-dark-muted/60">Sequences:</span> {session.sequences_completed}/{session.total_sequences}
+            </div>
+          </div>
+
+          {eventsLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Spinner size="sm" />
+              <span className="ml-2 text-sm text-dark-muted">Chargement des evenements...</span>
+            </div>
+          ) : events && events.length > 0 ? (
+            <EventTimeline events={events} sessionStartedAt={session.started_at} />
+          ) : (
+            <div className="text-center py-4 text-sm text-dark-muted">
+              Aucun evenement enregistre (session executée avant l'activation du suivi)
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+export function SessionHistory() {
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<string>('');
+
+  // Fetch history
+  const { data: historyData, isLoading: historyLoading } = useQuery<HistoryResponse>({
+    queryKey: ['session-history', page, statusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        page_size: '20',
+      });
+      if (statusFilter) {
+        params.append('status', statusFilter);
+      }
+      return apiClient.get<HistoryResponse>(`/logs/sessions/history?${params}`);
+    },
+  });
+
+  // Fetch stats
+  const { data: statsData } = useQuery<SessionStats>({
+    queryKey: ['session-stats'],
+    queryFn: async () => {
+      return apiClient.get<SessionStats>('/logs/sessions/stats');
+    },
+  });
 
   return (
     <div>
@@ -216,7 +341,7 @@ export function SessionHistory() {
 
       {/* Filters */}
       <div className="flex gap-2 mb-6">
-        {['', 'completed', 'running', 'paused', 'stopped'].map((status) => (
+        {['', 'completed', 'running', 'paused', 'interrupted'].map((status) => (
           <button
             key={status}
             onClick={() => {
@@ -229,7 +354,7 @@ export function SessionHistory() {
                 : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
             }`}
           >
-            {status === '' ? 'Tous' : status === 'completed' ? 'Termine' : status === 'running' ? 'En cours' : status === 'paused' ? 'En pause' : 'Arrete'}
+            {status === '' ? 'Tous' : status === 'completed' ? 'Termine' : status === 'running' ? 'En cours' : status === 'paused' ? 'En pause' : 'Interrompu'}
           </button>
         ))}
       </div>
@@ -243,48 +368,7 @@ export function SessionHistory() {
         <>
           <div className="space-y-3">
             {historyData.items.map((session) => (
-              <Card key={session.id}>
-                <Link to={`/sessions/${session.id}`} className="block p-4 hover:bg-dark-border/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      {getStatusIcon(session.status)}
-                      <div>
-                        <div className="font-medium">{session.name}</div>
-                        {session.movie_title && (
-                          <div className="text-sm text-dark-muted">{session.movie_title}</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6 text-sm text-dark-muted">
-                      <div>
-                        <span className="text-dark-muted">Debut :</span>{' '}
-                        {formatDate(session.started_at)}
-                      </div>
-                      <div>
-                        <span className="text-dark-muted">Duree :</span>{' '}
-                        {formatDuration(session.duration_seconds)}
-                      </div>
-                      <div>
-                        <span className="text-dark-muted">Sequences :</span>{' '}
-                        {session.sequences_completed}/{session.total_sequences}
-                      </div>
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          session.status === 'completed'
-                            ? 'bg-green-500/20 text-green-400'
-                            : session.status === 'running'
-                            ? 'bg-blue-500/20 text-blue-400'
-                            : session.status === 'paused'
-                            ? 'bg-yellow-500/20 text-yellow-400'
-                            : 'bg-dark-border/20 text-dark-muted'
-                        }`}
-                      >
-                        {session.status}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              </Card>
+              <SessionRow key={session.id} session={session} />
             ))}
           </div>
 

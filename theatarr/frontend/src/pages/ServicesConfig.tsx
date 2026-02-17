@@ -348,6 +348,7 @@ export function ServicesConfig() {
         size="lg"
       >
         <ServiceForm
+          key={editingService?.id || 'new'}
           service={editingService || undefined}
           adapters={adapters}
           onSubmit={editingService ? handleUpdateService : handleCreateService}

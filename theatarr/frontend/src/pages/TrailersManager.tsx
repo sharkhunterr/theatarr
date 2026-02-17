@@ -14,12 +14,17 @@ import {
   CheckSquare,
   Square,
   Loader2,
+  Clapperboard,
+  Upload,
+  Play,
+  AlertCircle,
+  CheckCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { Button, Card, Modal, Spinner, Input } from '../components/common';
-import { TrailerCard } from '../components/trailers/TrailerCard';
 import { TrailerRuleForm } from '../components/trailers/TrailerRuleForm';
 import { StorageStats } from '../components/trailers/StorageStats';
-import { apiClient } from '../api/client';
+import { apiClient, API_BASE } from '../api/client';
 
 // ============================================================================
 // Types
@@ -35,6 +40,9 @@ interface Trailer {
   quality: string;
   thumbnail_url?: string;
   status: string;
+  error_message?: string | null;
+  download_progress?: number;
+  source_url?: string | null;
   play_count: number;
   is_ready: boolean;
   created_at: string;
@@ -64,6 +72,23 @@ interface StorageStatsData {
   total_size_gb: number;
   total_duration_formatted: string;
   by_quality: Record<string, number>;
+}
+
+interface PreRollItem {
+  id: string;
+  name: string;
+  tags?: string[] | null;
+  source_type: string;
+  source_url?: string | null;
+  file_size_mb?: number | null;
+  format: string;
+  duration_seconds?: number | null;
+  status: string;
+  error_message?: string | null;
+  download_progress: number;
+  play_count: number;
+  is_ready: boolean;
+  created_at: string;
 }
 
 interface SoundItem {
@@ -111,7 +136,7 @@ interface SoundInfo {
 // ============================================================================
 
 export function TrailersManager() {
-  const [mainTab, setMainTab] = useState<'trailers' | 'sounds'>('trailers');
+  const [mainTab, setMainTab] = useState<'trailers' | 'sounds' | 'prerolls'>('trailers');
 
   return (
     <div>
@@ -119,7 +144,7 @@ export function TrailersManager() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-dark-text">Média</h1>
         <p className="text-dark-muted text-sm mt-1">
-          Gérez vos bandes-annonces et votre bibliothèque de sons
+          Gérez vos bandes-annonces, pré-rolls et votre bibliothèque de sons
         </p>
       </div>
 
@@ -137,6 +162,17 @@ export function TrailersManager() {
           Bandes-annonces
         </button>
         <button
+          onClick={() => setMainTab('prerolls')}
+          className={`pb-3 px-1 font-medium text-base transition-colors ${
+            mainTab === 'prerolls'
+              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
+              : 'text-dark-muted hover:text-dark-text'
+          }`}
+        >
+          <Clapperboard size={18} className="inline mr-2" />
+          Pré-rolls
+        </button>
+        <button
           onClick={() => setMainTab('sounds')}
           className={`pb-3 px-1 font-medium text-base transition-colors ${
             mainTab === 'sounds'
@@ -150,6 +186,7 @@ export function TrailersManager() {
       </div>
 
       {mainTab === 'trailers' && <TrailersTab />}
+      {mainTab === 'prerolls' && <PreRollsTab />}
       {mainTab === 'sounds' && <SoundsTab />}
     </div>
   );
@@ -246,25 +283,28 @@ function TrailersTab() {
 
   return (
     <>
-      {/* Actions */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex gap-2">
-          {activeTab === 'library' && (
-            <Button onClick={() => setIsDownloadOpen(true)}>
-              <Download size={16} className="mr-1" />
-              Télécharger
-            </Button>
-          )}
-          {activeTab === 'rules' && (
-            <Button onClick={() => setIsRuleFormOpen(true)}>
-              <Plus size={16} className="mr-1" />
-              Créer une règle
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {storageStats && <StorageStats stats={storageStats} className="mb-6" />}
+      {storageStats && (
+        <StorageStats
+          stats={storageStats}
+          className="mb-6"
+          actions={
+            <>
+              {activeTab === 'library' && (
+                <Button size="sm" onClick={() => setIsDownloadOpen(true)}>
+                  <Download size={14} className="mr-1" />
+                  Télécharger
+                </Button>
+              )}
+              {activeTab === 'rules' && (
+                <Button size="sm" onClick={() => setIsRuleFormOpen(true)}>
+                  <Plus size={14} className="mr-1" />
+                  Créer une règle
+                </Button>
+              )}
+            </>
+          }
+        />
+      )}
 
       {/* Sub-tabs */}
       <div className="flex gap-4 mb-6 border-b border-dark-border">
@@ -314,10 +354,142 @@ function TrailersTab() {
           {trailersLoading ? (
             <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
           ) : trailersData?.items?.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {trailersData.items.map((trailer: Trailer) => (
-                <TrailerCard key={trailer.id} trailer={trailer} onDelete={() => handleDelete(trailer)} />
-              ))}
+            <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-dark-border text-left">
+                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-16"></th>
+                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider">Film</th>
+                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden md:table-cell">Bande-annonce</th>
+                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-center">Qualité</th>
+                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-right">Durée</th>
+                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden xl:table-cell w-20 text-right">Taille</th>
+                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-24 text-center">Status</th>
+                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-20 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-dark-border">
+                  {trailersData.items.map((trailer: Trailer) => {
+                    const formatDuration = (seconds: number) => {
+                      const mins = Math.floor(seconds / 60);
+                      const secs = seconds % 60;
+                      return `${mins}:${secs.toString().padStart(2, '0')}`;
+                    };
+
+                    return (
+                      <tr key={trailer.id} className="hover:bg-dark-bg/50 transition-colors group">
+                        {/* Thumbnail */}
+                        <td className="px-4 py-2.5">
+                          <div className="w-12 h-8 rounded bg-dark-bg overflow-hidden flex-shrink-0">
+                            {trailer.thumbnail_url ? (
+                              <img src={trailer.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Film size={14} className="text-dark-muted" />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Movie title + year */}
+                        <td className="px-4 py-2.5">
+                          <div className="font-medium text-dark-text text-sm truncate max-w-[200px]">
+                            {trailer.movie_title}
+                            {trailer.movie_year && (
+                              <span className="text-dark-muted font-normal ml-1.5">({trailer.movie_year})</span>
+                            )}
+                          </div>
+                          {/* Show trailer title on mobile since the column is hidden */}
+                          <div className="text-xs text-dark-muted truncate max-w-[200px] md:hidden">{trailer.title}</div>
+                        </td>
+
+                        {/* Trailer title */}
+                        <td className="px-4 py-2.5 hidden md:table-cell">
+                          <span className="text-sm text-dark-muted truncate block max-w-[250px]">{trailer.title}</span>
+                        </td>
+
+                        {/* Quality */}
+                        <td className="px-4 py-2.5 hidden lg:table-cell text-center">
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-dark-bg border border-dark-border text-dark-text">
+                            {trailer.quality}
+                          </span>
+                        </td>
+
+                        {/* Duration */}
+                        <td className="px-4 py-2.5 hidden lg:table-cell text-right">
+                          <span className="text-sm text-dark-muted">
+                            {trailer.duration_seconds ? formatDuration(trailer.duration_seconds) : '—'}
+                          </span>
+                        </td>
+
+                        {/* Size */}
+                        <td className="px-4 py-2.5 hidden xl:table-cell text-right">
+                          <span className="text-sm text-dark-muted">
+                            {trailer.file_size_mb ? `${trailer.file_size_mb.toFixed(0)} MB` : '—'}
+                          </span>
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-4 py-2.5 text-center">
+                          {trailer.status === 'ready' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
+                              <CheckCircle size={12} />
+                              Prêt
+                            </span>
+                          ) : trailer.status === 'downloading' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
+                              <Loader2 size={12} className="animate-spin" />
+                              {((trailer.download_progress || 0) * 100).toFixed(0)}%
+                            </span>
+                          ) : trailer.status === 'pending' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/15 text-yellow-400">
+                              <Clock size={12} />
+                              En attente
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400 cursor-help"
+                              title={trailer.error_message || 'Erreur inconnue'}
+                            >
+                              <AlertCircle size={12} />
+                              Erreur
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-4 py-2.5 text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {trailer.source_url && (
+                              <a
+                                href={trailer.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border/50 transition-colors"
+                                title="Ouvrir sur YouTube"
+                              >
+                                <ExternalLink size={14} />
+                              </a>
+                            )}
+                            {trailer.play_count > 0 && (
+                              <span className="text-xs text-dark-muted flex items-center gap-0.5 mr-1" title="Nombre de lectures">
+                                <Play size={10} />{trailer.play_count}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => handleDelete(trailer)}
+                              className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="Supprimer"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div className="text-center py-12">
@@ -407,6 +579,416 @@ function TrailersTab() {
 }
 
 // ============================================================================
+// Pre-Rolls Tab
+// ============================================================================
+
+function PreRollsTab() {
+  const queryClient = useQueryClient();
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'ready' | 'pending' | 'error'>('all');
+
+  const { data: prerollsData, isLoading } = useQuery({
+    queryKey: ['prerolls', filter, searchQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filter !== 'all') params.set('status_filter', filter);
+      if (searchQuery) params.set('search', searchQuery);
+      const qs = params.toString();
+      return apiClient.get<{ items: PreRollItem[]; total: number; total_size_gb: number }>(`/prerolls${qs ? '?' + qs : ''}`);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/prerolls/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prerolls'] });
+    },
+  });
+
+  const handleDelete = async (preroll: PreRollItem) => {
+    if (window.confirm(`Supprimer "${preroll.name}" ?`)) {
+      await deleteMutation.mutateAsync(preroll.id);
+    }
+  };
+
+  const prerolls = prerollsData?.items ?? [];
+
+  const formatDur = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <>
+      {/* Stats bar */}
+      {prerollsData && (
+        <div className="bg-dark-surface border border-dark-border rounded-xl px-4 py-2.5 mb-6">
+          <div className="flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Clapperboard size={15} className="text-theatarr-400" />
+              <span className="text-sm text-dark-text">{prerollsData.total} pré-roll{prerollsData.total !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="w-px h-4 bg-dark-border" />
+            <div className="flex items-center gap-2">
+              <HardDrive size={15} className="text-indigo-400" />
+              <span className="text-sm text-dark-text">{prerollsData.total_size_gb} GB</span>
+            </div>
+            <div className="ml-auto flex items-center gap-2 shrink-0">
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-dark-muted" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Rechercher..."
+                  className="pl-8 pr-3 py-1.5 text-sm bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder:text-dark-muted w-40"
+                />
+              </div>
+              <Button size="sm" onClick={() => setIsAddOpen(true)}>
+                <Plus size={14} className="mr-1" />
+                Ajouter
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex gap-2 mb-6">
+        {(['all', 'ready', 'pending', 'error'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === f
+                ? 'bg-theatarr-500 text-white'
+                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
+            }`}
+          >
+            {f === 'all' ? 'Tous' : f === 'ready' ? 'Prêt' : f === 'pending' ? 'En cours' : 'Erreur'}
+          </button>
+        ))}
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
+      ) : prerolls.length > 0 ? (
+        <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-dark-border text-left">
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider">Nom</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden md:table-cell w-20">Source</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden md:table-cell w-20">Format</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-right">Durée</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-right">Taille</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-24 text-center">Status</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-20 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-dark-border">
+              {prerolls.map((preroll) => (
+                <tr key={preroll.id} className="hover:bg-dark-bg/50 transition-colors group">
+                  {/* Name + tags */}
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Clapperboard size={14} className="text-theatarr-400 shrink-0" />
+                      <span className="font-medium text-dark-text text-sm truncate max-w-[250px]">{preroll.name}</span>
+                    </div>
+                    {preroll.tags && preroll.tags.length > 0 && (
+                      <div className="flex gap-1 mt-1 ml-6">
+                        {preroll.tags.map((tag) => (
+                          <span key={tag} className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded text-xs text-dark-muted">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Source */}
+                  <td className="px-4 py-2.5 hidden md:table-cell">
+                    <span className="text-xs text-dark-muted">{preroll.source_type === 'youtube' ? 'YouTube' : 'Upload'}</span>
+                  </td>
+
+                  {/* Format */}
+                  <td className="px-4 py-2.5 hidden md:table-cell">
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-dark-bg border border-dark-border text-dark-text uppercase">{preroll.format}</span>
+                  </td>
+
+                  {/* Duration */}
+                  <td className="px-4 py-2.5 hidden lg:table-cell text-right">
+                    <span className="text-sm text-dark-muted">
+                      {preroll.duration_seconds != null ? formatDur(preroll.duration_seconds) : '—'}
+                    </span>
+                  </td>
+
+                  {/* Size */}
+                  <td className="px-4 py-2.5 hidden lg:table-cell text-right">
+                    <span className="text-sm text-dark-muted">
+                      {preroll.file_size_mb != null ? `${preroll.file_size_mb.toFixed(0)} MB` : '—'}
+                    </span>
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-2.5 text-center">
+                    {preroll.status === 'ready' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
+                        <CheckCircle size={12} />Prêt
+                      </span>
+                    ) : preroll.status === 'downloading' || preroll.status === 'processing' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
+                        <Loader2 size={12} className="animate-spin" />
+                        {((preroll.download_progress || 0) * 100).toFixed(0)}%
+                      </span>
+                    ) : preroll.status === 'pending' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/15 text-yellow-400">
+                        <Clock size={12} />En attente
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400 cursor-help"
+                        title={preroll.error_message || 'Erreur inconnue'}
+                      >
+                        <AlertCircle size={12} />Erreur
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Actions */}
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {preroll.play_count > 0 && (
+                        <span className="text-xs text-dark-muted flex items-center gap-0.5 mr-1" title="Lectures">
+                          <Play size={10} />{preroll.play_count}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleDelete(preroll)}
+                        className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Supprimer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Clapperboard size={48} className="mx-auto text-dark-muted mb-4" />
+          <p className="text-dark-muted">Aucun pré-roll dans la bibliothèque</p>
+          <Button className="mt-4" onClick={() => setIsAddOpen(true)}>
+            Ajouter votre premier pré-roll
+          </Button>
+        </div>
+      )}
+
+      {/* Add PreRoll Modal */}
+      <AddPreRollModal
+        isOpen={isAddOpen}
+        onClose={() => {
+          setIsAddOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['prerolls'] });
+        }}
+      />
+    </>
+  );
+}
+
+// ============================================================================
+// Add PreRoll Modal
+// ============================================================================
+
+function AddPreRollModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [mode, setMode] = useState<'upload' | 'youtube'>('upload');
+  const [name, setName] = useState('');
+  const [tags, setTags] = useState('');
+  const [url, setUrl] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setMode('upload');
+      setName('');
+      setTags('');
+      setUrl('');
+      setFile(null);
+    }
+  }, [isOpen]);
+
+  // Upload mutation
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!file || !name) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('name', name);
+      if (tags) formData.append('tags', tags);
+
+      const token = localStorage.getItem('theatarr_token');
+      const response = await fetch(`${API_BASE}/api/v1/prerolls/upload`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || 'Upload failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prerolls'] });
+      onClose();
+    },
+  });
+
+  // Download mutation
+  const downloadMutation = useMutation({
+    mutationFn: async () => {
+      return apiClient.post('/prerolls/download', {
+        source_url: url,
+        name: name || undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prerolls'] });
+      onClose();
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (selected) {
+      setFile(selected);
+      if (!name) {
+        // Auto-fill name from filename (without extension)
+        setName(selected.name.replace(/\.[^.]+$/, ''));
+      }
+    }
+  };
+
+  const handleSubmit = () => {
+    if (mode === 'upload') {
+      uploadMutation.mutate();
+    } else {
+      downloadMutation.mutate();
+    }
+  };
+
+  const isPending = uploadMutation.isPending || downloadMutation.isPending;
+  const isValid = mode === 'upload' ? (file && name) : (url && name);
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Ajouter un pré-roll">
+      <div className="space-y-4">
+        {/* Mode selector */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setMode('upload')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-colors ${
+              mode === 'upload'
+                ? 'border-theatarr-500 bg-theatarr-500/10 text-theatarr-400'
+                : 'border-dark-border bg-dark-surface text-dark-muted hover:text-dark-text'
+            }`}
+          >
+            <Upload size={18} />
+            Importer un fichier
+          </button>
+          <button
+            onClick={() => setMode('youtube')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-colors ${
+              mode === 'youtube'
+                ? 'border-theatarr-500 bg-theatarr-500/10 text-theatarr-400'
+                : 'border-dark-border bg-dark-surface text-dark-muted hover:text-dark-text'
+            }`}
+          >
+            <Download size={18} />
+            YouTube
+          </button>
+        </div>
+
+        {/* Name */}
+        <Input
+          label="Nom"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nom du pré-roll"
+        />
+
+        {/* Tags */}
+        <Input
+          label="Tags (optionnel, séparés par des virgules)"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="studio, intro, custom..."
+        />
+
+        {/* Upload mode */}
+        {mode === 'upload' && (
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-2">
+              Fichier vidéo
+            </label>
+            <input
+              type="file"
+              accept=".mp4,.mkv,.webm,.avi,.mov,.m4v"
+              onChange={handleFileChange}
+              className="w-full text-sm text-dark-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-theatarr-500/20 file:text-theatarr-400 hover:file:bg-theatarr-500/30"
+            />
+            {file && (
+              <p className="text-xs text-dark-muted mt-1">
+                {file.name} ({(file.size / (1024 * 1024)).toFixed(1)} MB)
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* YouTube mode */}
+        {mode === 'youtube' && (
+          <Input
+            label="URL YouTube"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=..."
+          />
+        )}
+
+        {/* Error */}
+        {(uploadMutation.isError || downloadMutation.isError) && (
+          <p className="text-red-400 text-sm">
+            Erreur : {((uploadMutation.error || downloadMutation.error) as Error)?.message || 'Une erreur est survenue'}
+          </p>
+        )}
+
+        {/* Actions */}
+        <div className="flex justify-end gap-4 pt-2">
+          <Button variant="ghost" onClick={onClose}>Annuler</Button>
+          <Button onClick={handleSubmit} disabled={!isValid || isPending}>
+            {isPending ? (
+              <><Loader2 size={16} className="mr-1 animate-spin" />{mode === 'upload' ? 'Import...' : 'Téléchargement...'}</>
+            ) : (
+              <>{mode === 'upload' ? <><Upload size={16} className="mr-1" />Importer</> : <><Download size={16} className="mr-1" />Télécharger</>}</>
+            )}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================================
 // Sounds Tab
 // ============================================================================
 
@@ -452,26 +1034,46 @@ function SoundsTab() {
 
   const sounds = soundsData?.items ?? [];
 
+  const formatDur = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
     <>
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-        <Button onClick={() => setIsAddOpen(true)}>
-          <Plus size={16} className="mr-1" />
-          Ajouter un son
-        </Button>
-
-        <div className="flex-1 relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher..."
-            className="w-full pl-10 pr-4 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder:text-dark-muted"
-          />
+      {/* Stats bar */}
+      {soundsData && (
+        <div className="bg-dark-surface border border-dark-border rounded-xl px-4 py-2.5 mb-6">
+          <div className="flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Music size={15} className="text-theatarr-400" />
+              <span className="text-sm text-dark-text">{soundsData.total} son{soundsData.total !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="w-px h-4 bg-dark-border" />
+            <div className="flex items-center gap-2">
+              <HardDrive size={15} className="text-indigo-400" />
+              <span className="text-sm text-dark-text">{soundsData.total_size_gb} GB</span>
+            </div>
+            <div className="ml-auto flex items-center gap-2 shrink-0">
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-dark-muted" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Rechercher..."
+                  className="pl-8 pr-3 py-1.5 text-sm bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder:text-dark-muted w-40"
+                />
+              </div>
+              <Button size="sm" onClick={() => setIsAddOpen(true)}>
+                <Plus size={14} className="mr-1" />
+                Ajouter
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-2 mb-6">
@@ -488,21 +1090,120 @@ function SoundsTab() {
             {f === 'all' ? 'Tous' : f === 'ready' ? 'Prêt' : f === 'pending' ? 'En cours' : 'Erreur'}
           </button>
         ))}
-        {soundsData && (
-          <span className="ml-auto text-sm text-dark-muted self-center">
-            {soundsData.total} son{soundsData.total !== 1 ? 's' : ''} — {soundsData.total_size_gb} GB
-          </span>
-        )}
       </div>
 
-      {/* Sound Grid */}
+      {/* Table */}
       {isLoading ? (
         <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
       ) : sounds.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {sounds.map((sound) => (
-            <SoundCard key={sound.id} sound={sound} onDelete={() => handleDelete(sound)} />
-          ))}
+        <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-dark-border text-left">
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider">Nom</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden md:table-cell w-20">Format</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-24 text-right">Durée</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-right">Taille</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden xl:table-cell w-24 text-right">Bitrate</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-24 text-center">Status</th>
+                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-20 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-dark-border">
+              {sounds.map((sound) => (
+                <tr key={sound.id} className="hover:bg-dark-bg/50 transition-colors group">
+                  {/* Name + tags + chapter */}
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Music size={14} className="text-theatarr-400 shrink-0" />
+                      <span className="font-medium text-dark-text text-sm truncate max-w-[250px]">{sound.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 ml-6 mt-0.5">
+                      {sound.chapter_title && (
+                        <span className="text-xs text-dark-muted italic truncate max-w-[200px]">{sound.chapter_title}</span>
+                      )}
+                      {sound.tags && sound.tags.length > 0 && (
+                        <div className="flex gap-1">
+                          {sound.tags.map((tag) => (
+                            <span key={tag} className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded text-xs text-dark-muted">{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Format */}
+                  <td className="px-4 py-2.5 hidden md:table-cell">
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-dark-bg border border-dark-border text-dark-text uppercase">{sound.format}</span>
+                  </td>
+
+                  {/* Duration */}
+                  <td className="px-4 py-2.5 hidden lg:table-cell text-right">
+                    <span className="text-sm text-dark-muted">
+                      {sound.duration_seconds != null ? formatDur(sound.duration_seconds) : '—'}
+                    </span>
+                  </td>
+
+                  {/* Size */}
+                  <td className="px-4 py-2.5 hidden lg:table-cell text-right">
+                    <span className="text-sm text-dark-muted">
+                      {sound.file_size_mb != null ? `${sound.file_size_mb.toFixed(0)} MB` : '—'}
+                    </span>
+                  </td>
+
+                  {/* Bitrate */}
+                  <td className="px-4 py-2.5 hidden xl:table-cell text-right">
+                    <span className="text-sm text-dark-muted">
+                      {sound.bitrate != null ? `${sound.bitrate} kbps` : '—'}
+                    </span>
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-2.5 text-center">
+                    {sound.status === 'ready' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
+                        <CheckCircle size={12} />Prêt
+                      </span>
+                    ) : sound.status === 'downloading' || sound.status === 'processing' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
+                        <Loader2 size={12} className="animate-spin" />
+                        {((sound.download_progress || 0) * 100).toFixed(0)}%
+                      </span>
+                    ) : sound.status === 'pending' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/15 text-yellow-400">
+                        <Clock size={12} />En attente
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400 cursor-help"
+                        title={sound.error_message || 'Erreur inconnue'}
+                      >
+                        <AlertCircle size={12} />Erreur
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Actions */}
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sound.play_count > 0 && (
+                        <span className="text-xs text-dark-muted flex items-center gap-0.5 mr-1" title="Lectures">
+                          <Play size={10} />{sound.play_count}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleDelete(sound)}
+                        className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Supprimer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="text-center py-12">
@@ -523,108 +1224,6 @@ function SoundsTab() {
         }}
       />
     </>
-  );
-}
-
-// ============================================================================
-// Sound Card
-// ============================================================================
-
-function SoundCard({ sound, onDelete }: { sound: SoundItem; onDelete: () => void }) {
-  const statusColors: Record<string, string> = {
-    ready: 'bg-green-500/20 text-green-400',
-    pending: 'bg-yellow-500/20 text-yellow-400',
-    downloading: 'bg-blue-500/20 text-blue-400',
-    processing: 'bg-blue-500/20 text-blue-400',
-    error: 'bg-red-500/20 text-red-400',
-  };
-
-  const statusLabels: Record<string, string> = {
-    ready: 'Prêt',
-    pending: 'En attente',
-    downloading: 'Téléchargement',
-    processing: 'Traitement',
-    error: 'Erreur',
-  };
-
-  return (
-    <Card>
-      <div className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Music size={18} className="text-theatarr-400 shrink-0" />
-            <h3 className="font-medium text-dark-text truncate" title={sound.name}>
-              {sound.name}
-            </h3>
-          </div>
-          <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${statusColors[sound.status] || 'bg-gray-500/20 text-dark-muted'}`}>
-            {statusLabels[sound.status] || sound.status}
-          </span>
-        </div>
-
-        {/* Info row */}
-        <div className="flex flex-wrap gap-3 text-xs text-dark-muted mb-3">
-          {sound.duration_seconds != null && (
-            <span className="flex items-center gap-1">
-              <Clock size={12} />
-              {formatDuration(sound.duration_seconds)}
-            </span>
-          )}
-          {sound.bitrate != null && (
-            <span>{sound.bitrate} kbps</span>
-          )}
-          {sound.file_size_mb != null && (
-            <span>{sound.file_size_mb.toFixed(1)} MB</span>
-          )}
-          <span className="uppercase">{sound.format}</span>
-        </div>
-
-        {/* Tags */}
-        {sound.tags && sound.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {sound.tags.map((tag) => (
-              <span key={tag} className="px-2 py-0.5 bg-dark-border/50 rounded text-xs text-dark-muted">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Chapter info */}
-        {sound.chapter_title && (
-          <p className="text-xs text-dark-muted mb-3 italic">
-            Chapitre : {sound.chapter_title}
-          </p>
-        )}
-
-        {/* Download progress */}
-        {(sound.status === 'downloading' || sound.status === 'processing') && (
-          <div className="mb-3">
-            <div className="w-full bg-dark-border rounded-full h-1.5">
-              <div
-                className="bg-theatarr-500 h-1.5 rounded-full transition-all"
-                style={{ width: `${(sound.download_progress || 0) * 100}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Error message */}
-        {sound.error_message && (
-          <p className="text-xs text-red-400 mb-3 line-clamp-2">{sound.error_message}</p>
-        )}
-
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-dark-muted">
-            {sound.play_count > 0 ? `${sound.play_count} lecture${sound.play_count > 1 ? 's' : ''}` : ''}
-          </span>
-          <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-400 hover:text-red-300">
-            <Trash2 size={14} />
-          </Button>
-        </div>
-      </div>
-    </Card>
   );
 }
 

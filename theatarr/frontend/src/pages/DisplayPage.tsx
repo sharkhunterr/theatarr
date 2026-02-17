@@ -266,6 +266,7 @@ function SessionDisplay() {
   const [videoPausedForResume, setVideoPausedForResume] = useState(false);
   const videoPausedForResumeRef = useRef(false);
   const pauseAtMsRef = useRef<number | null>(null);
+  const playbackEndedSentRef = useRef(false);
   const [sequenceDurationMs, setSequenceDurationMs] = useState<number | null>(null);
   const [sequenceStartedAt, setSequenceStartedAt] = useState<number | null>(null);
 
@@ -293,7 +294,7 @@ function SessionDisplay() {
     join_code?: string;
   }
   const [quizState, setQuizState] = useState<QuizDisplayInfo | null>(null);
-  const quizTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const quizTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const quizSubscribedRef = useRef<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [sessionOverview, setSessionOverview] = useState<any>(null);
@@ -594,18 +595,27 @@ function SessionDisplay() {
 
   const handleMediaAction = useCallback(
     (command: string, params: Record<string, unknown>) => {
+      console.log(`[DISPLAY] MEDIA: ${command}, url=${(params.url as string)?.slice(-50) || 'none'}`);
       switch (command) {
         case 'play': {
-          const url = params.url as string;
+          let url = params.url as string;
+          // Resolve relative API URLs to absolute
+          if (url?.startsWith('/api/')) {
+            const baseUrl = API_BASE.replace(/\/api\/v1\/?$/, '');
+            url = baseUrl + url;
+          }
           if (url) {
+            // Reset playback ended guard for new video
+            playbackEndedSentRef.current = false;
             // Store pause_at_ms if provided
             const pauseAt = params.pause_at_ms as number | undefined;
             pauseAtMsRef.current = pauseAt ?? null;
             setVideoPausedForResume(false);
             videoPausedForResumeRef.current = false;
+
             setVideoUrl(url);
             setShowVideo(true);
-            // Request fullscreen (use containerRef directly to avoid declaration order issue)
+            // Request fullscreen on video start
             const el = containerRef.current || document.documentElement;
             el.requestFullscreen?.().catch(() => {});
           } else {
@@ -630,7 +640,11 @@ function SessionDisplay() {
           break;
         case 'resume': {
           // Resume from stored pause position
-          const resumeUrl = params.resume_url as string | undefined;
+          let resumeUrl = params.resume_url as string | undefined;
+          if (resumeUrl?.startsWith('/api/')) {
+            const baseUrl = API_BASE.replace(/\/api\/v1\/?$/, '');
+            resumeUrl = baseUrl + resumeUrl;
+          }
           const video = videoRef.current;
 
           if (video && videoPausedForResumeRef.current) {
@@ -708,7 +722,11 @@ function SessionDisplay() {
       switch (action_type) {
         case 'media':
           if (command === 'play') {
-            const url = parameters.url as string;
+            let url = parameters.url as string;
+            if (url?.startsWith('/api/')) {
+              const baseUrl = API_BASE.replace(/\/api\/v1\/?$/, '');
+              url = baseUrl + url;
+            }
             if (url) {
               setVideoUrl(url);
               setShowVideo(true);
@@ -728,7 +746,11 @@ function SessionDisplay() {
             }
           } else if (command === 'pause') {
             // Session is paused with video — show video paused at position
-            const url = parameters.url as string;
+            let url = parameters.url as string;
+            if (url?.startsWith('/api/')) {
+              const baseUrl = API_BASE.replace(/\/api\/v1\/?$/, '');
+              url = baseUrl + url;
+            }
             if (url) {
               setVideoUrl(url);
               setShowVideo(true);
@@ -742,7 +764,11 @@ function SessionDisplay() {
             }
           } else if (command === 'resume') {
             // Resume from stored pause position (display opened after engine auto-skipped)
-            const resumeUrl = parameters.resume_url as string | undefined;
+            let resumeUrl = parameters.resume_url as string | undefined;
+            if (resumeUrl?.startsWith('/api/')) {
+              const baseUrl = API_BASE.replace(/\/api\/v1\/?$/, '');
+              resumeUrl = baseUrl + resumeUrl;
+            }
             const resumePos = parameters.resume_position_ms as number | undefined;
             if (resumeUrl) {
               pauseAtMsRef.current = null;
@@ -773,10 +799,6 @@ function SessionDisplay() {
               (parameters.volume as number) ?? 0.8,
               0 // No fade on replay
             );
-            // Audio seek if possible
-            if (elapsedSec > 0 && audioEngine.seek) {
-              setTimeout(() => audioEngine.seek?.(elapsedSec), 200);
-            }
           }
           break;
         case 'display':
@@ -804,6 +826,7 @@ function SessionDisplay() {
     onMessage: (message) => {
       if (message.type === 'action_execute' && message.payload) {
         const payload = message.payload as unknown as ActionPayload;
+        console.log(`[DISPLAY] WS action: ${payload.action_type}:${payload.command} replay=${!!payload.is_replay}`);
         if (payload.is_replay) {
           handleReplayAction(payload);
         } else {
@@ -821,6 +844,7 @@ function SessionDisplay() {
       } else if (message.type === 'session_state' && message.payload) {
         // Update session status
         const p = message.payload;
+        console.log(`[DISPLAY] session_state: status=${p.status}`);
         if (p.session_id === session?.session_id) {
           setSession((prev) =>
             prev ? { ...prev, session_status: p.status as string } : null
@@ -933,10 +957,14 @@ function SessionDisplay() {
     if (el.requestFullscreen) {
       el.requestFullscreen().catch(() => {});
     }
-  }, []);
+    // Unlock audio context on this user gesture too
+    audioEngine.unlock();
+  }, [audioEngine]);
 
   useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    const handler = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
     document.addEventListener('fullscreenchange', handler);
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
@@ -968,7 +996,9 @@ function SessionDisplay() {
       video.muted = false;
       const playPromise = video.play();
       if (playPromise) {
-        playPromise.catch(() => {
+        playPromise.then(() => {
+          // Playing unmuted OK
+        }).catch(() => {
           // Autoplay with sound blocked — start muted, show unmute overlay
           video.muted = true;
           setVideoMuted(true);
@@ -1050,10 +1080,12 @@ function SessionDisplay() {
     prevStatusRef.current = status || null;
 
     if (!status || !prev || status === prev) return;
+    console.log(`[DISPLAY] status: ${prev} → ${status}`);
 
     const video = videoRef.current;
 
     if (status === 'paused') {
+      // Pause video + audio
       if (video && !video.paused) {
         video.pause();
       }
@@ -1069,6 +1101,7 @@ function SessionDisplay() {
       }
       setShowVideo(false);
       setVideoUrl(null);
+
       setVideoMuted(false);
       setVideoPausedForResume(false);
       videoPausedForResumeRef.current = false;
@@ -1144,6 +1177,11 @@ function SessionDisplay() {
 
   // Video ended handler
   const handleVideoEnded = useCallback(() => {
+    console.log('[DISPLAY] video ended');
+    // Guard against duplicate onEnded events
+    if (playbackEndedSentRef.current) return;
+    playbackEndedSentRef.current = true;
+
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -1223,6 +1261,7 @@ function SessionDisplay() {
           <video
             ref={videoRef}
             className="w-full h-full object-contain"
+            playsInline
             onEnded={handleVideoEnded}
           />
           {videoMuted && videoVisible && (
@@ -1270,18 +1309,22 @@ function SessionDisplay() {
             <h2 className="text-2xl font-semibold text-white/50">
               {session.session_name}
             </h2>
-
-            {/* Fullscreen button */}
-            {!isFullscreen && (
-              <button
-                onClick={enterFullscreen}
-                className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl transition-all duration-300 hover:scale-105"
-              >
-                Passer en plein ecran
-              </button>
-            )}
           </div>
         </div>
+      )}
+
+      {/* Fullscreen button — always available when not in fullscreen */}
+      {!isFullscreen && (
+        <button
+          onClick={enterFullscreen}
+          className={`absolute z-30 transition-all duration-300 ${
+            isIdle
+              ? 'bottom-1/3 left-1/2 -translate-x-1/2 px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl hover:scale-105'
+              : 'bottom-4 left-4 px-4 py-2 bg-black/60 hover:bg-black/80 border border-white/10 text-white/60 hover:text-white rounded-lg text-sm'
+          }`}
+        >
+          Plein ecran
+        </button>
       )}
 
       {/* Paused overlay on top of display layers */}

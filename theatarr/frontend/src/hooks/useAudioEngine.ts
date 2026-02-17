@@ -4,7 +4,7 @@
  * Uses HTML5 <audio> elements with Web Audio API GainNode for volume/fade control.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface AudioEngineState {
   isPlaying: boolean;
@@ -18,6 +18,8 @@ interface UseAudioEngineReturn extends AudioEngineState {
   setVolume: (volume: number, fadeMs?: number) => void;
   pause: () => void;
   resume: () => void;
+  /** Call from a user gesture handler to unlock the AudioContext for autoplay. */
+  unlock: () => void;
 }
 
 export function useAudioEngine(): UseAudioEngineReturn {
@@ -34,13 +36,18 @@ export function useAudioEngine(): UseAudioEngineReturn {
   });
 
   const getOrCreateContext = useCallback(() => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
+    const existing = audioContextRef.current;
+    if (existing && existing.state !== 'closed') {
+      if (existing.state === 'suspended') {
+        existing.resume().catch(() => {});
+      }
+      return existing;
     }
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-    return audioContextRef.current;
+    // Create fresh context (previous was null or closed)
+    const ctx = new AudioContext();
+    audioContextRef.current = ctx;
+    gainNodeRef.current = null; // Force new gain node for new context
+    return ctx;
   }, []);
 
   const cleanup = useCallback(() => {
@@ -48,13 +55,45 @@ export function useAudioEngine(): UseAudioEngineReturn {
       clearTimeout(fadeTimeoutRef.current);
       fadeTimeoutRef.current = null;
     }
+    // Disconnect source node from audio graph
+    if (sourceNodeRef.current) {
+      try { sourceNodeRef.current.disconnect(); } catch { /* already disconnected */ }
+      sourceNodeRef.current = null;
+    }
     if (audioElementRef.current) {
       audioElementRef.current.pause();
-      audioElementRef.current.src = '';
+      audioElementRef.current.removeAttribute('src');
       audioElementRef.current.load();
+      audioElementRef.current = null;
     }
-    sourceNodeRef.current = null;
   }, []);
+
+  // Cleanup on unmount — stop audio and close context
+  useEffect(() => {
+    return () => {
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+      }
+      if (sourceNodeRef.current) {
+        try { sourceNodeRef.current.disconnect(); } catch { /* */ }
+      }
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current.removeAttribute('src');
+        audioElementRef.current.load();
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+      }
+    };
+  }, []);
+
+  const unlock = useCallback(() => {
+    const ctx = getOrCreateContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  }, [getOrCreateContext]);
 
   const play = useCallback(
     async (url: string, volume = 0.8, fadeInMs = 0) => {
@@ -68,7 +107,7 @@ export function useAudioEngine(): UseAudioEngineReturn {
       audio.src = url;
       audioElementRef.current = audio;
 
-      // Create or reuse gain node
+      // Create gain node if needed (new context or first play)
       if (!gainNodeRef.current) {
         gainNodeRef.current = ctx.createGain();
         gainNodeRef.current.connect(ctx.destination);
@@ -114,7 +153,7 @@ export function useAudioEngine(): UseAudioEngineReturn {
       const gain = gainNodeRef.current;
       const audio = audioElementRef.current;
 
-      if (!audio || !ctx || !gain) {
+      if (!audio || !ctx || ctx.state === 'closed' || !gain) {
         cleanup();
         setState({ isPlaying: false, currentUrl: null, volume: 0 });
         return;
@@ -141,7 +180,7 @@ export function useAudioEngine(): UseAudioEngineReturn {
   const setVolume = useCallback((volume: number, fadeMs = 0) => {
     const ctx = audioContextRef.current;
     const gain = gainNodeRef.current;
-    if (!ctx || !gain) return;
+    if (!ctx || ctx.state === 'closed' || !gain) return;
 
     const clamped = Math.max(0, Math.min(1, volume));
     if (fadeMs > 0) {
@@ -169,5 +208,6 @@ export function useAudioEngine(): UseAudioEngineReturn {
     setVolume,
     pause,
     resume,
+    unlock,
   };
 }

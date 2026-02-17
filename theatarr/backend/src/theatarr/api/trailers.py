@@ -1,8 +1,12 @@
 """Trailers API router for Theatarr."""
 
+import logging
+import os
+import random
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 
 from theatarr.api.deps import AdminUser
@@ -25,8 +29,59 @@ from theatarr.services.trailer_manager import (
     apply_rotation,
     download_trailer,
     get_storage_stats,
+    run_trailer_rule,
     select_contextual_trailers,
 )
+
+logger = logging.getLogger(__name__)
+
+# Bidirectional genre name mapping for EN↔FR normalisation
+_GENRE_NORMALIZE: dict[str, str] = {
+    # EN → canonical FR
+    "action": "Action",
+    "adventure": "Aventure",
+    "animation": "Animation",
+    "comedy": "Comédie",
+    "crime": "Crime",
+    "documentary": "Documentaire",
+    "drama": "Drame",
+    "family": "Familial",
+    "fantasy": "Fantastique",
+    "history": "Histoire",
+    "horror": "Horreur",
+    "music": "Musique",
+    "mystery": "Mystère",
+    "romance": "Romance",
+    "science fiction": "Science-Fiction",
+    "tv movie": "Téléfilm",
+    "thriller": "Thriller",
+    "war": "Guerre",
+    "western": "Western",
+    # FR → canonical FR (normalise case/accents)
+    "aventure": "Aventure",
+    "comédie": "Comédie",
+    "documentaire": "Documentaire",
+    "drame": "Drame",
+    "familial": "Familial",
+    "fantastique": "Fantastique",
+    "histoire": "Histoire",
+    "horreur": "Horreur",
+    "musique": "Musique",
+    "mystère": "Mystère",
+    "science-fiction": "Science-Fiction",
+    "téléfilm": "Téléfilm",
+    "guerre": "Guerre",
+}
+
+
+def _normalize_genres(genres: list[str] | set[str]) -> set[str]:
+    """Normalize genre names to canonical French, handling EN/FR/mixed inputs."""
+    result: set[str] = set()
+    for g in genres:
+        canonical = _GENRE_NORMALIZE.get(g.lower(), g)
+        result.add(canonical)
+    return result
+
 
 router = APIRouter(prefix="/trailers", tags=["Trailers"])
 
@@ -206,6 +261,17 @@ async def download_trailer_endpoint(
     data: TrailerDownloadRequest,
 ) -> TrailerResponse:
     """Create and download a trailer from URL."""
+    # Check for existing trailer with same source URL
+    if data.source_url:
+        existing = await db.execute(
+            select(Trailer).where(Trailer.source_url == data.source_url)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Une bande-annonce avec cette URL existe déjà",
+            )
+
     # Create trailer entry
     trailer = Trailer(
         movie_title=data.movie_title,
@@ -270,6 +336,165 @@ async def get_contextual_trailers(
         total=len(trailers),
         total_size_bytes=total_size,
         total_size_gb=round(total_size / (1024 * 1024 * 1024), 2),
+    )
+
+
+@router.post(
+    "/auto-preview",
+    summary="Preview auto-trailer candidates from TMDB",
+)
+async def auto_preview(
+    db: DbSession,
+    user: AdminUser,
+    count: int = 3,
+    exclude_tmdb_ids: str | None = None,
+    movie_id: str | None = None,
+    movie_tmdb_id: str | None = None,
+    genres: str | None = None,
+) -> list[dict]:
+    """Search TMDB for upcoming/popular trailer candidates without downloading.
+
+    Accepts movie_id (internal DB UUID), movie_tmdb_id (TMDB source ID),
+    or genres (comma-separated genre names from frontend, e.g. "Animation,Familial").
+    If provided, prioritises candidates matching the movie's genres.
+    Returns a list of {tmdb_id, movie_title, trailer_title, genres} for preview.
+    """
+    from theatarr.adapters.base import Command
+    from theatarr.adapters.registry import AdapterRegistry
+    from theatarr.models.movie import Movie
+    from theatarr.models.service import Service
+
+    # Resolve session movie genres if provided (normalised to canonical FR)
+    target_genres: set[str] = set()
+    session_tmdb_id: str | None = movie_tmdb_id
+
+    # Priority: direct genres param > movie_id lookup > movie_tmdb_id lookup
+    if genres:
+        target_genres = _normalize_genres([g.strip() for g in genres.split(",") if g.strip()])
+
+    if movie_id and not target_genres:
+        movie_result = await db.execute(select(Movie).where(Movie.id == movie_id))
+        movie = movie_result.scalar_one_or_none()
+        if movie:
+            target_genres = _normalize_genres(movie.genres or [])
+            session_tmdb_id = session_tmdb_id or movie.tmdb_id
+
+    svc_result = await db.execute(
+        select(Service).where(Service.adapter_type == "tmdb", Service.is_enabled == True)
+    )
+    tmdb_service = svc_result.scalar_one_or_none()
+    if not tmdb_service:
+        raise HTTPException(status_code=400, detail="No TMDB service configured")
+
+    adapter = AdapterRegistry.create_adapter("tmdb", tmdb_service.config)
+    await adapter.connect()
+    try:
+        # If we have a TMDB ID but no genres yet, fetch them from TMDB
+        if session_tmdb_id and not target_genres:
+            details_res = await adapter.execute(
+                Command(action="get_movie", parameters={"movie_id": session_tmdb_id})
+            )
+            if details_res.success and details_res.data:
+                target_genres = _normalize_genres(details_res.data.get("genres", []))
+
+        # Fetch upcoming movies (primary source) + now_playing for variety
+        upcoming: list[dict] = []
+        for page in (1, 2, 3):
+            res = await adapter.execute(
+                Command(action="get_upcoming_movies", parameters={"page": page})
+            )
+            if res.success and res.data:
+                upcoming.extend(res.data.get("results", []))
+        # Also fetch now_playing (recent releases that still have trailers)
+        res = await adapter.execute(
+            Command(action="get_now_playing", parameters={"page": 1})
+        )
+        if res.success and res.data:
+            upcoming.extend(res.data.get("results", []))
+
+        # Deduplicate
+        seen: set[str] = set()
+        candidates: list[dict] = []
+        for m in upcoming:
+            tid = str(m.get("tmdb_id", ""))
+            if tid and tid not in seen:
+                seen.add(tid)
+                candidates.append(m)
+
+        # Exclude specified IDs + session movie itself
+        exclude_set = set((exclude_tmdb_ids or "").split(",")) - {""}
+        if session_tmdb_id:
+            exclude_set.add(str(session_tmdb_id))
+        if exclude_set:
+            candidates = [m for m in candidates if str(m.get("tmdb_id")) not in exclude_set]
+
+        # Shuffle for randomness on each call
+        random.shuffle(candidates)
+
+        adapter_lang = getattr(adapter, "language", "") or "fr-FR"
+
+        # Collect viable candidates (with trailers in configured language),
+        # checking up to max_check movies to build a decent pool.
+        max_check = min(len(candidates), 25)
+        viable: list[dict] = []
+        fallback: list[dict] = []
+        for movie_data in candidates[:max_check]:
+            tmdb_id = str(movie_data.get("tmdb_id", ""))
+            trailer_result = await adapter.execute(
+                Command(action="get_trailers", parameters={"movie_id": tmdb_id})
+            )
+            if not (trailer_result.success and trailer_result.data):
+                continue
+            all_trailers = [
+                t for t in trailer_result.data.get("trailers", [])
+                if t.get("type") == "Trailer"
+            ]
+            if not all_trailers:
+                continue
+            # Strictly prefer trailers in the configured language
+            lang_trailers = [t for t in all_trailers if t.get("language") == adapter_lang]
+            entry = {
+                "tmdb_id": tmdb_id,
+                "movie_title": movie_data.get("title", "Unknown"),
+                "trailer_title": (lang_trailers or all_trailers)[0].get("name", "Trailer"),
+                "movie_year": movie_data.get("year"),
+                "poster_url": movie_data.get("poster_url"),
+                "genres": movie_data.get("genres", []),
+            }
+            if lang_trailers:
+                viable.append(entry)
+            else:
+                fallback.append(entry)
+
+        # Pick from viable pool; use fallback only if not enough
+        pool = viable if len(viable) >= count else viable + fallback
+        if len(pool) <= count:
+            return pool
+        return random.sample(pool, count)
+    finally:
+        await adapter.disconnect()
+
+
+@router.get(
+    "/{trailer_id}/file",
+    summary="Serve Trailer File",
+)
+async def serve_trailer_file(
+    db: DbSession,
+    trailer_id: str,
+) -> FileResponse:
+    """Serve a trailer file for playback. No auth required for display access."""
+    result = await db.execute(select(Trailer).where(Trailer.id == trailer_id))
+    trailer = result.scalar_one_or_none()
+    if not trailer:
+        raise NotFoundError("Trailer", trailer_id)
+    if not trailer.file_path or not os.path.exists(trailer.file_path):
+        raise HTTPException(status_code=404, detail="Trailer file not found on disk")
+    media_types = {"mp4": "video/mp4", "mkv": "video/x-matroska", "webm": "video/webm"}
+    media_type = media_types.get(trailer.format, "video/mp4")
+    return FileResponse(
+        path=trailer.file_path, media_type=media_type,
+        filename=f"{trailer.movie_title}.{trailer.format}",
     )
 
 
@@ -528,11 +753,37 @@ async def run_rule(
     if not rule:
         raise NotFoundError("TrailerRule", rule_id)
 
-    # Would need TMDB adapter instance here
-    # For now, return a placeholder
+    # Find TMDB adapter
+    from theatarr.adapters.registry import AdapterRegistry
+    from theatarr.models.service import Service
+
+    svc_result = await db.execute(
+        select(Service).where(Service.adapter_type == "tmdb", Service.is_enabled == True)
+    )
+    tmdb_service = svc_result.scalar_one_or_none()
+    if not tmdb_service:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Aucun service TMDB actif configuré",
+        )
+
+    tmdb_adapter = AdapterRegistry.create_adapter("tmdb", tmdb_service.config)
+    await tmdb_adapter.connect()
+
+    async def _run_rule() -> None:
+        try:
+            result = await run_trailer_rule(db, rule, tmdb_adapter)
+            logger.info("Trailer rule %s executed: %s", rule_id, result)
+        except Exception:
+            logger.exception("Failed to run trailer rule %s", rule_id)
+        finally:
+            await tmdb_adapter.disconnect()
+
+    background_tasks.add_task(_run_rule)
+
     return {
         "status": "queued",
-        "message": "Rule execution has been queued",
+        "message": "L'exécution de la règle a été lancée",
         "rule_id": rule_id,
     }
 

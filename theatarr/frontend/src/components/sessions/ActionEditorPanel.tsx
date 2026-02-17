@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Film, Lightbulb, Volume2, Monitor, Zap, ClipboardCheck, X, RefreshCw, Sparkles, Star } from 'lucide-react';
+import { Search, Film, Lightbulb, Volume2, Monitor, Zap, ClipboardCheck, X, RefreshCw, Sparkles, Star, Clapperboard } from 'lucide-react';
 import { Spinner } from '../common';
 import { apiClient } from '../../api/client';
 import { useLayoutStore } from '../../stores/layoutStore';
@@ -63,6 +63,11 @@ interface ActionEditorPanelProps {
   onChange: (updates: Partial<ActionItem>) => void;
   onDelete: () => void;
   colorPalette?: ColorPalette | null;
+  sessionId?: string;
+  movieId?: string | null;
+  movieSourceId?: string | null;
+  movieGenres?: string[] | null;
+  allActions?: ActionItem[];
 }
 
 // Action type configurations
@@ -81,7 +86,7 @@ const actionTypeConfig: Record<ActionType, {
   session: { icon: ClipboardCheck, color: 'text-teal-400', bgColor: 'bg-teal-500/20', label: { en: 'Session', fr: 'Session' }, category: '' },
 };
 
-export function ActionEditorPanel({ action, services, onChange, onDelete, colorPalette }: ActionEditorPanelProps) {
+export function ActionEditorPanel({ action, services, onChange, onDelete, colorPalette, sessionId, movieId, movieSourceId, movieGenres, allActions }: ActionEditorPanelProps) {
   const { language } = useLayoutStore();
   const config = actionTypeConfig[action.action_type];
   const Icon = config.icon;
@@ -164,6 +169,11 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
             action={action}
             onChange={onChange}
             language={language}
+            sessionId={sessionId}
+            movieId={movieId}
+            movieSourceId={movieSourceId}
+            movieGenres={movieGenres}
+            allActions={allActions}
           />
         )}
         {action.action_type === 'display' && (
@@ -855,10 +865,20 @@ function MediaForm({
   action,
   onChange,
   language,
+  sessionId,
+  movieId,
+  movieSourceId,
+  movieGenres,
+  allActions,
 }: {
   action: ActionItem;
   onChange: (updates: Partial<ActionItem>) => void;
   language: string;
+  sessionId?: string;
+  movieId?: string | null;
+  movieSourceId?: string | null;
+  movieGenres?: string[] | null;
+  allActions?: ActionItem[];
 }) {
   const { parameters, command, service_id } = action;
   const [searchQuery, setSearchQuery] = useState('');
@@ -1022,6 +1042,66 @@ function MediaForm({
 
       {command === 'play' && (
         <>
+          {/* Media Source Selector */}
+          <div>
+            <label className="block text-sm font-medium text-dark-text mb-2">
+              {language === 'fr' ? 'Source' : 'Source'}
+            </label>
+            <div className="flex gap-2">
+              {([
+                { value: 'service', label: language === 'fr' ? 'Service' : 'Service', icon: <Monitor size={14} /> },
+                { value: 'trailer', label: language === 'fr' ? 'Bande-annonce' : 'Trailer', icon: <Film size={14} /> },
+                { value: 'preroll', label: language === 'fr' ? 'Pré-roll' : 'Pre-roll', icon: <Clapperboard size={14} /> },
+              ] as const).map((src) => (
+                <button
+                  key={src.value}
+                  type="button"
+                  onClick={() => {
+                    const mediaSource = (parameters.media_source as string) || 'service';
+                    if (mediaSource === src.value) return;
+                    // Clear incompatible params when switching source
+                    const cleanParams: Record<string, unknown> = { media_source: src.value };
+                    onChange({ parameters: cleanParams, service_id: src.value === 'service' ? service_id : undefined });
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                    ((parameters.media_source as string) || 'service') === src.value
+                      ? 'border-theatarr-500 bg-theatarr-500/10 text-theatarr-400'
+                      : 'border-dark-border bg-dark-surface text-dark-muted hover:text-dark-text'
+                  }`}
+                >
+                  {src.icon}
+                  {src.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Trailer Source Form */}
+          {((parameters.media_source as string) === 'trailer') && (
+            <TrailerSourceForm
+              parameters={parameters}
+              onChange={handleParametersChange}
+              language={language}
+              sessionId={sessionId}
+              movieId={movieId}
+              movieSourceId={movieSourceId}
+              movieGenres={movieGenres}
+              excludeTmdbIds={
+                (allActions || [])
+                  .filter(a => a.id !== action.id && a.parameters?._preview_tmdb_id)
+                  .map(a => a.parameters._preview_tmdb_id as string)
+              }
+            />
+          )}
+
+          {/* PreRoll Source Form */}
+          {((parameters.media_source as string) === 'preroll') && (
+            <PreRollSourceForm parameters={parameters} onChange={handleParametersChange} language={language} />
+          )}
+
+          {/* Service source (existing behavior) */}
+          {((parameters.media_source as string) || 'service') === 'service' && (
+          <>
           <div>
             <label className="block text-sm font-medium text-dark-text mb-2">{t.selectMovie}</label>
 
@@ -1341,6 +1421,8 @@ function MediaForm({
               </div>
             );
           })()}
+          </>
+          )}
         </>
       )}
 
@@ -1349,6 +1431,271 @@ function MediaForm({
           <p className="text-sm text-blue-300">{t.resumeHint}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================================
+// TRAILER SOURCE FORM
+// ============================================================================
+
+function TrailerSourceForm({
+  parameters,
+  onChange,
+  language,
+  sessionId,
+  movieId,
+  movieSourceId,
+  movieGenres,
+  excludeTmdbIds,
+}: {
+  parameters: Record<string, unknown>;
+  onChange: (updates: Record<string, unknown>) => void;
+  language: string;
+  sessionId?: string;
+  movieId?: string | null;
+  movieSourceId?: string | null;
+  movieGenres?: string[] | null;
+  excludeTmdbIds?: string[];
+}) {
+  const trailerMode = (parameters.trailer_mode as string) || 'manual';
+  const [isSearching, setIsSearching] = useState(false);
+
+  const { data: trailersData } = useQuery<{ items: Array<{ id: string; movie_title: string; title: string; duration_seconds?: number; status: string; is_ready: boolean }> }>({
+    queryKey: ['trailers-ready'],
+    queryFn: () => apiClient.get('/trailers?status_filter=ready'),
+    enabled: trailerMode === 'manual',
+  });
+
+  const { data: rulesData } = useQuery<{ items: Array<{ id: string; name: string; description?: string; trailer_count: number }> }>({
+    queryKey: ['trailer-rules'],
+    queryFn: () => apiClient.get('/trailers/rules'),
+    enabled: trailerMode === 'rule',
+  });
+
+  const formatDuration = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+
+  return (
+    <div className="space-y-3">
+      {/* Mode selector */}
+      <div>
+        <label className="block text-sm font-medium text-dark-text mb-2">
+          {language === 'fr' ? 'Mode de sélection' : 'Selection mode'}
+        </label>
+        <div className="flex gap-2">
+          {([
+            { value: 'manual', label: language === 'fr' ? 'Manuel' : 'Manual' },
+            { value: 'auto', label: 'Auto' },
+            { value: 'rule', label: language === 'fr' ? 'Règle' : 'Rule' },
+          ] as const).map((m) => (
+            <button
+              key={m.value}
+              type="button"
+              onClick={() => onChange({ trailer_mode: m.value, trailer_id: undefined, trailer_rule_id: undefined })}
+              className={`flex-1 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                trailerMode === m.value
+                  ? 'border-theatarr-500 bg-theatarr-500/10 text-theatarr-400'
+                  : 'border-dark-border bg-dark-surface text-dark-muted hover:text-dark-text'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Manual: trailer dropdown */}
+      {trailerMode === 'manual' && (
+        <div>
+          <label className="block text-sm font-medium text-dark-text mb-1">
+            {language === 'fr' ? 'Bande-annonce' : 'Trailer'}
+          </label>
+          <select
+            value={(parameters.trailer_id as string) || ''}
+            onChange={(e) => onChange({ trailer_id: e.target.value || undefined })}
+            className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+          >
+            <option value="">{language === 'fr' ? 'Sélectionner...' : 'Select...'}</option>
+            {trailersData?.items?.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.movie_title} — {t.title}
+                {t.duration_seconds ? ` (${formatDuration(t.duration_seconds)})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Auto: resolved/preview trailer name or idle state */}
+      {trailerMode === 'auto' && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg space-y-2">
+          {parameters._resolved_trailer_id ? (
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-sm text-green-300 truncate">
+                {(parameters._resolved_trailer_name as string) || 'Bande-annonce résolue'}
+              </span>
+              {typeof parameters._resolved_duration_ms === 'number' && (
+                <span className="text-xs text-dark-muted shrink-0">
+                  {formatDuration(Math.round(parameters._resolved_duration_ms / 1000))}
+                </span>
+              )}
+            </div>
+          ) : parameters._preview_trailer_name ? (
+            <div className="flex items-center gap-2">
+              <Film size={14} className="text-amber-400 shrink-0" />
+              <span className="text-sm text-amber-300 truncate">
+                {parameters._preview_trailer_name as string}
+              </span>
+              <span className="text-xs text-dark-muted shrink-0">
+                {language === 'fr' ? '(à télécharger)' : '(pending download)'}
+              </span>
+            </div>
+          ) : isSearching ? (
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-blue-400 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="text-sm text-blue-300">
+                {language === 'fr' ? 'Recherche en cours…' : 'Searching…'}
+              </span>
+            </div>
+          ) : (
+            <p className="text-sm text-dark-muted">
+              {language === 'fr'
+                ? 'Aucune bande-annonce sélectionnée.'
+                : 'No trailer selected.'}
+            </p>
+          )}
+          <p className="text-xs text-dark-muted">
+            {language === 'fr'
+              ? 'Sélection automatique parmi les films populaires et à venir.'
+              : 'Automatic selection from popular and upcoming movies.'}
+          </p>
+          <button
+            type="button"
+            disabled={isSearching}
+            onClick={async () => {
+              setIsSearching(true);
+              try {
+                const queryParams = new URLSearchParams({ count: '1' });
+                // Exclude other actions' trailers + current action's trailer
+                const allExclude = [...(excludeTmdbIds || [])];
+                const currentPreview = parameters._preview_tmdb_id as string | undefined;
+                if (currentPreview) allExclude.push(currentPreview);
+                if (allExclude.length > 0) {
+                  queryParams.set('exclude_tmdb_ids', allExclude.join(','));
+                }
+                if (movieId) {
+                  queryParams.set('movie_id', movieId);
+                } else if (movieGenres && movieGenres.length > 0) {
+                  // Pass genres directly — works before save (no movie_id yet)
+                  queryParams.set('genres', movieGenres.join(','));
+                }
+                const results = await apiClient.post<Array<{ tmdb_id: string; movie_title: string; trailer_title: string }>>(`/trailers/auto-preview?${queryParams}`, {});
+                if (results && results.length > 0) {
+                  const pick = results[0];
+                  onChange({
+                    _preview_tmdb_id: pick.tmdb_id,
+                    _preview_trailer_name: `${pick.movie_title} — ${pick.trailer_title}`,
+                    _resolved_trailer_id: undefined,
+                    _resolved_trailer_name: undefined,
+                    _resolved_duration_ms: undefined,
+                  });
+                }
+              } catch (e) {
+                console.error('Failed to preview trailer:', e);
+              } finally {
+                setIsSearching(false);
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-500/5 text-blue-300 text-xs hover:bg-blue-500/15 transition-colors disabled:opacity-50"
+          >
+            {isSearching ? (
+              <>
+                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                {language === 'fr' ? 'Recherche…' : 'Searching…'}
+              </>
+            ) : (
+              <>
+                <Search size={12} />
+                {parameters._resolved_trailer_id || parameters._preview_trailer_name
+                  ? (language === 'fr' ? 'Changer de bande-annonce' : 'Change trailer')
+                  : (language === 'fr' ? 'Rechercher une bande-annonce' : 'Search for a trailer')}
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Rule: rule dropdown */}
+      {trailerMode === 'rule' && (
+        <div>
+          <label className="block text-sm font-medium text-dark-text mb-1">
+            {language === 'fr' ? 'Règle' : 'Rule'}
+          </label>
+          <select
+            value={(parameters.trailer_rule_id as string) || ''}
+            onChange={(e) => onChange({ trailer_rule_id: e.target.value || undefined })}
+            className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+          >
+            <option value="">{language === 'fr' ? 'Sélectionner...' : 'Select...'}</option>
+            {rulesData?.items?.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name} ({r.trailer_count} {language === 'fr' ? 'bandes-annonces' : 'trailers'})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// PREROLL SOURCE FORM
+// ============================================================================
+
+function PreRollSourceForm({
+  parameters,
+  onChange,
+  language,
+}: {
+  parameters: Record<string, unknown>;
+  onChange: (updates: Record<string, unknown>) => void;
+  language: string;
+}) {
+  const { data: prerollsData } = useQuery<{ items: Array<{ id: string; name: string; duration_seconds?: number | null; format: string; is_ready: boolean }> }>({
+    queryKey: ['prerolls-ready'],
+    queryFn: () => apiClient.get('/prerolls?status_filter=ready'),
+  });
+
+  const formatDuration = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-dark-text mb-1">
+        {language === 'fr' ? 'Pré-roll' : 'Pre-roll'}
+      </label>
+      <select
+        value={(parameters.preroll_id as string) || ''}
+        onChange={(e) => onChange({ preroll_id: e.target.value || undefined })}
+        className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
+      >
+        <option value="">{language === 'fr' ? 'Sélectionner...' : 'Select...'}</option>
+        {prerollsData?.items?.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+            {p.duration_seconds ? ` (${formatDuration(p.duration_seconds)})` : ''}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

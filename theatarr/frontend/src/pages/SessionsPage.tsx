@@ -92,6 +92,14 @@ export function SessionsPage() {
     fetchSessions();
   }, [fetchSessions]);
 
+  // Auto-refresh when sessions have trailers being prepared
+  const hasPreparingTrailers = sessions.some(s => (s.preparing_trailers ?? 0) > 0);
+  useEffect(() => {
+    if (!hasPreparingTrailers) return;
+    const interval = setInterval(() => fetchSessions(), 5000);
+    return () => clearInterval(interval);
+  }, [hasPreparingTrailers, fetchSessions]);
+
   const [controllingId, setControllingId] = useState<string | null>(null);
   const [controlError, setControlError] = useState<string | null>(null);
 
@@ -335,6 +343,15 @@ export function SessionsPage() {
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${statusBadge.color}`}>
               {statusBadge.label}
             </span>
+            {(session.preparing_trailers ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-orange-500/15 text-orange-400 border border-orange-500/25">
+                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                {language === 'fr' ? 'Préparation BA' : 'Preparing trailers'}
+              </span>
+            )}
           </div>
 
           {/* Movie info */}

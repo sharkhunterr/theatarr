@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, Input, Card, CardContent, CardHeader } from '../common';
 import type { Service } from './ServiceCard';
 
@@ -37,19 +37,17 @@ const categoryLabels: Record<string, string> = {
   metadata: 'Metadata',
 };
 
-const MASKED_VALUE = '********';
-
 function isSensitiveKey(key: string): boolean {
   const sensitive = ['api_key', 'token', 'password', 'secret', 'key'];
   return sensitive.some((s) => key.toLowerCase().includes(s));
 }
 
 export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFormProps) {
-  // Pre-fill config from existing service, replacing masked values with empty string
+  // Pre-fill config from existing service — show all values including sensitive ones
   const initialConfig: Record<string, unknown> = {};
   if (service?.config) {
     for (const [key, value] of Object.entries(service.config)) {
-      initialConfig[key] = value === MASKED_VALUE ? '' : value;
+      initialConfig[key] = value;
     }
   }
 
@@ -67,8 +65,14 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
   const selectedAdapter = adapters.find((a) => a.type === formData.adapter_type);
   const filteredAdapters = adapters.filter((a) => a.category === formData.category);
 
+  // Track if user manually changed category (not the initial mount)
+  const isInitialMount = useRef(true);
   useEffect(() => {
-    // Reset adapter type if category changes and current adapter doesn't match
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    // Reset adapter type only when user actively changes category
     if (formData.adapter_type && selectedAdapter?.category !== formData.category) {
       setFormData((prev) => ({ ...prev, adapter_type: '', config: {} }));
     }
@@ -261,8 +265,6 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
             {Object.entries(selectedAdapter.config_schema.properties).map(([key, schema]) => {
               const isRequired = selectedAdapter.config_schema.required?.includes(key);
               const error = errors[`config.${key}`];
-              const sensitive = isSensitiveKey(key);
-              const wasMasked = !!service && sensitive;
 
               return (
                 <Input
@@ -271,8 +273,8 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
                   value={(formData.config[key] as string) || ''}
                   onChange={(e) => handleConfigChange(key, e.target.value)}
                   error={error}
-                  placeholder={wasMasked ? 'Leave empty to keep current value' : (schema.description || `Enter ${key}`)}
-                  type={sensitive ? 'password' : 'text'}
+                  placeholder={schema.description || `Enter ${key}`}
+                  type="text"
                 />
               );
             })}

@@ -314,6 +314,8 @@ class SessionResponse(SessionBase, IDTimestampSchema):
     # Feedback
     feedback_count: int = 0
     feedback_average: float | None = None
+    # Trailer preparation (0 = all resolved or none, >0 = background task running)
+    preparing_trailers: int = 0
 
 
 class SessionDetailResponse(SessionResponse):
