@@ -107,6 +107,7 @@ class PortalVoteSessionSummary(BaseSchema):
     has_voted: bool
     closes_at: datetime | None
     status: str
+    created_at: datetime | None = None
 
 
 class PortalVoteSessionDetail(BaseSchema):
@@ -169,6 +170,8 @@ class PortalStatsResponse(BaseSchema):
     upcoming_sessions: int
     total_sessions_attended: int
     total_votes_cast: int
+    closed_votes: int = 0
+    completed_quiz: int = 0
 
 
 class PortalQuizSessionSummary(BaseSchema):

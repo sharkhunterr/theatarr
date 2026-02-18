@@ -91,8 +91,8 @@ export function PortalHome() {
   });
 
   const { data: sessions } = useQuery({
-    queryKey: ['portal', 'sessions'],
-    queryFn: () => apiClient.get<{ items: PortalSession[]; total: number }>('/portal/sessions?limit=5'),
+    queryKey: ['portal', 'sessions', 'upcoming'],
+    queryFn: () => apiClient.get<{ items: PortalSession[]; total: number }>('/portal/sessions?status_filter=scheduled&limit=5'),
     refetchInterval: 15000,
   });
 

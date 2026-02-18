@@ -316,7 +316,19 @@ export function VoteSessionManager() {
                       {session.closes_at && (
                         <span className="flex items-center gap-1">
                           <Calendar size={14} />
-                          {t.closesAt} {new Date(session.closes_at).toLocaleDateString()}
+                          {(() => {
+                            const diff = new Date(session.closes_at).getTime() - Date.now();
+                            if (diff <= 0 || session.status !== 'open') {
+                              return `${t.closesAt} ${new Date(session.closes_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}`;
+                            }
+                            const h = Math.floor(diff / 3600000);
+                            const m = Math.floor((diff % 3600000) / 60000);
+                            if (h > 24) {
+                              const d = Math.floor(h / 24);
+                              return `Fermeture dans ${d}j`;
+                            }
+                            return h > 0 ? `Fermeture dans ${h}h${m}m` : `Fermeture dans ${m}m`;
+                          })()}
                         </span>
                       )}
                     </div>

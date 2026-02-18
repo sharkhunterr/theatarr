@@ -5,6 +5,7 @@
 import { Film, LogOut, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { NotificationBell } from './NotificationBell';
 
 export function PortalHeader() {
   const { user, logout } = useAuthStore();
@@ -24,10 +25,13 @@ export function PortalHeader() {
         </Link>
 
         {/* User info */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-dark-muted hidden sm:block">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm text-dark-muted hidden sm:block mr-1">
             {displayName}
           </span>
+
+          {/* Notification bell */}
+          <NotificationBell />
 
           {/* Admin button */}
           {isAdmin && (

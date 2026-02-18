@@ -6,7 +6,7 @@ and auto-resume after system restart.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -182,6 +182,7 @@ class SessionScheduler:
         from theatarr.models.vote import VoteSession, VoteSessionStatus
         from theatarr.services.vote import close_voting
 
+        # closes_at is stored as naive LOCAL time (frontend sends datetime-local value directly)
         now = datetime.now()
 
         async with async_session_maker() as db:
@@ -210,7 +211,11 @@ class SessionScheduler:
                         )
                         linked_session = linked.scalar_one_or_none()
                         if linked_session and linked_session.vote_reveal_at:
-                            if linked_session.vote_reveal_at > now:
+                            # vote_reveal_at is stored as UTC (frontend converts with toISOString())
+                            # Compare with UTC time (strip tzinfo for safe naive comparison)
+                            now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+                            reveal_at = linked_session.vote_reveal_at.replace(tzinfo=None) if hasattr(linked_session.vote_reveal_at, 'replace') and linked_session.vote_reveal_at.tzinfo else linked_session.vote_reveal_at
+                            if reveal_at > now_utc:
                                 auto_resolve = False
                                 logger.info(
                                     "Vote session %s: delayed reveal until %s",
@@ -236,7 +241,8 @@ class SessionScheduler:
             MovieResolutionError,
         )
 
-        now = datetime.now()
+        # Use UTC-aware time: vote_reveal_at is DateTime(timezone=True)
+        now = datetime.now(timezone.utc)
 
         async with async_session_maker() as db:
             result = await db.execute(

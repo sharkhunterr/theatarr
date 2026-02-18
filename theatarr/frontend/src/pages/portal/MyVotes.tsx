@@ -8,6 +8,7 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { apiClient } from '../../api/client';
 import { VoteCard } from '../../components/portal/VoteCard';
+import { usePortalNotifications } from '../../hooks/usePortalNotifications';
 
 interface PortalVote {
   id: string;
@@ -23,6 +24,8 @@ type TabType = 'pending' | 'all';
 
 export function MyVotes() {
   const [activeTab, setActiveTab] = useState<TabType>('pending');
+  const { items } = usePortalNotifications();
+  const pendingVoteCount = items.find((i) => i.id === 'votes')?.count || 0;
 
   const { data: pendingVotes, isLoading: isPendingLoading } = useQuery({
     queryKey: ['portal', 'votes', 'pending'],
@@ -41,6 +44,8 @@ export function MyVotes() {
   const isLoading = activeTab === 'pending' ? isPendingLoading : isAllLoading;
   const data = activeTab === 'pending' ? pendingVotes : allVotes;
 
+  const closedVotesCount = items.find((i) => i.id === 'votes_closed')?.count || 0;
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -53,29 +58,34 @@ export function MyVotes() {
         <button
           onClick={() => setActiveTab('pending')}
           className={clsx(
-            'flex-1 py-3 text-sm font-medium border-b-2 transition-colors',
+            'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2',
             activeTab === 'pending'
               ? 'border-theatarr-500 text-theatarr-500'
               : 'border-transparent text-dark-muted hover:text-dark-text'
           )}
         >
           A voter
-          {pendingVotes && pendingVotes.items.length > 0 && (
-            <span className="ml-2 px-2 py-0.5 rounded-full bg-theatarr-500 text-white text-xs">
-              {pendingVotes.items.length}
+          {pendingVoteCount > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+              {pendingVoteCount}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('all')}
           className={clsx(
-            'flex-1 py-3 text-sm font-medium border-b-2 transition-colors',
+            'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2',
             activeTab === 'all'
               ? 'border-theatarr-500 text-theatarr-500'
               : 'border-transparent text-dark-muted hover:text-dark-text'
           )}
         >
           Tous les votes
+          {closedVotesCount > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-dark-muted/50 text-dark-text text-[10px] font-bold leading-none">
+              {closedVotesCount}
+            </span>
+          )}
         </button>
       </div>
 

@@ -2,7 +2,7 @@
  * Vote session card component for portal.
  */
 
-import { Vote, Check, Clock } from 'lucide-react';
+import { Vote, Check, Clock, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -105,27 +105,41 @@ export function VoteCard({
             )}
           </div>
 
-          {/* Status badge */}
-          {hasVoted ? (
-            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
-              <Check size={12} />
-              Vot&eacute;
-            </span>
-          ) : isOpen ? (
-            <span className={clsx(
-              'flex items-center gap-1 text-xs px-2 py-1 rounded-full',
-              showUrgent
-                ? 'bg-theatarr-500/20 text-theatarr-400 animate-pulse'
-                : 'bg-blue-500/20 text-blue-400'
-            )}>
-              <Clock size={12} />
-              A voter
-            </span>
-          ) : (
-            <span className="text-xs px-2 py-1 rounded-full bg-dark-muted/20 text-dark-muted">
-              {status}
-            </span>
-          )}
+          {/* Status badges */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Session status badge */}
+            {isOpen ? (
+              <span className={clsx(
+                'flex items-center gap-1 text-xs px-2 py-1 rounded-full',
+                showUrgent
+                  ? 'bg-theatarr-500/20 text-theatarr-400 animate-pulse'
+                  : 'bg-blue-500/20 text-blue-400'
+              )}>
+                <Clock size={12} />
+                Ouvert
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-dark-muted/20 text-dark-muted">
+                <Lock size={12} />
+                Cloture
+              </span>
+            )}
+
+            {/* Vote status badge */}
+            {hasVoted ? (
+              <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
+                <Check size={12} />
+                Vote
+              </span>
+            ) : isOpen ? (
+              <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400">
+                A voter
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-red-500/20 text-red-400">
+                Non vote
+              </span>
+            )}</div>
         </div>
 
         {/* Time remaining */}

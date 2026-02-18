@@ -279,6 +279,45 @@ async def get_my_stats(
         submitted_ids = {row[0] for row in submitted_result.all()}
         pending_feedback = len(completed_session_ids) - len(submitted_ids)
 
+    # Count closed vote sessions where user was a direct participant
+    closed_votes_direct_query = (
+        select(func.count(func.distinct(VoteSessionParticipant.vote_session_id)))
+        .join(VoteSession)
+        .where(
+            VoteSessionParticipant.user_id == user.id,
+            VoteSession.status == VoteSessionStatus.CLOSED,
+        )
+    )
+    closed_votes_direct_result = await db.execute(closed_votes_direct_query)
+    closed_votes = closed_votes_direct_result.scalar() or 0
+
+    # Also count closed votes from session-linked vote sessions
+    session_linked_closed_query = (
+        select(func.count(func.distinct(VoteSession.id)))
+        .join(Session, VoteSession.linked_session_id == Session.id)
+        .join(SessionParticipant)
+        .where(
+            SessionParticipant.user_id == user.id,
+            SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value,
+            VoteSession.linked_session_id.isnot(None),
+            VoteSession.status == VoteSessionStatus.CLOSED,
+        )
+    )
+    session_linked_closed_result = await db.execute(session_linked_closed_query)
+    closed_votes += session_linked_closed_result.scalar() or 0
+
+    # Count completed quiz sessions where user has a token
+    completed_quiz_query = (
+        select(func.count(QuizToken.id))
+        .join(QuizSession)
+        .where(
+            QuizToken.user_id == user.id,
+            QuizSession.status == QuizSessionStatus.COMPLETED.value,
+        )
+    )
+    completed_quiz_result = await db.execute(completed_quiz_query)
+    completed_quiz = completed_quiz_result.scalar() or 0
+
     return PortalStatsResponse(
         pending_votes=pending_votes,
         pending_quiz=pending_quiz,
@@ -287,6 +326,8 @@ async def get_my_stats(
         upcoming_sessions=upcoming_sessions,
         total_sessions_attended=total_sessions_attended,
         total_votes_cast=total_votes_cast,
+        closed_votes=closed_votes,
+        completed_quiz=completed_quiz,
     )
 
 
@@ -742,6 +783,7 @@ async def get_my_votes(
                 has_voted=p.has_voted,
                 closes_at=vs.closes_at,
                 status=vs.status.value if isinstance(vs.status, VoteSessionStatus) else vs.status,
+                created_at=vs.created_at,
             )
         )
 
@@ -772,10 +814,12 @@ async def get_my_votes(
                 has_voted=has_voted,
                 closes_at=vs.closes_at,
                 status=vs.status.value if isinstance(vs.status, VoteSessionStatus) else vs.status,
+                created_at=vs.created_at,
             )
         )
 
-    # Sort by created_at desc and paginate
+    # Sort by most recent first and paginate
+    items.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
     total = len(items)
     items = items[skip : skip + limit]
 

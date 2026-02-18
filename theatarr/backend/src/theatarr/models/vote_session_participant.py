@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
 from theatarr.database import Base
 from theatarr.models.base import TimestampMixin, UUIDMixin
@@ -39,7 +39,10 @@ class VoteSessionParticipant(UUIDMixin, TimestampMixin, Base):
     )
 
     # Relationships
-    vote_session = relationship("VoteSession", backref="participants")
+    vote_session = relationship(
+        "VoteSession",
+        backref=backref("participants", cascade="all, delete-orphan"),
+    )
     user = relationship("User", backref="vote_session_participations")
 
     __table_args__ = (

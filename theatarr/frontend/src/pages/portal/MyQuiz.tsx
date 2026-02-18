@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../../api/client';
+import { usePortalNotifications } from '../../hooks/usePortalNotifications';
 
 interface PortalQuiz {
   id: string;
@@ -23,6 +24,8 @@ type TabType = 'pending' | 'all';
 
 export function MyQuiz() {
   const [activeTab, setActiveTab] = useState<TabType>('pending');
+  const { items } = usePortalNotifications();
+  const pendingQuizCount = items.find((i) => i.id === 'quiz')?.count || 0;
 
   const { data: pendingQuiz, isLoading: isPendingLoading } = useQuery({
     queryKey: ['portal', 'quiz', 'pending'],
@@ -40,6 +43,8 @@ export function MyQuiz() {
 
   const isLoading = activeTab === 'pending' ? isPendingLoading : isAllLoading;
   const data = activeTab === 'pending' ? pendingQuiz : allQuiz;
+
+  const completedQuizCount = items.find((i) => i.id === 'quiz_completed')?.count || 0;
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, { bg: string; label: string }> = {
@@ -63,29 +68,34 @@ export function MyQuiz() {
         <button
           onClick={() => setActiveTab('pending')}
           className={clsx(
-            'flex-1 py-3 text-sm font-medium border-b-2 transition-colors',
+            'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2',
             activeTab === 'pending'
               ? 'border-theatarr-500 text-theatarr-500'
               : 'border-transparent text-dark-muted hover:text-dark-text'
           )}
         >
           En cours
-          {pendingQuiz && pendingQuiz.items.length > 0 && (
-            <span className="ml-2 px-2 py-0.5 rounded-full bg-theatarr-500 text-white text-xs">
-              {pendingQuiz.items.length}
+          {pendingQuizCount > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-purple-500 text-white text-[10px] font-bold leading-none">
+              {pendingQuizCount}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('all')}
           className={clsx(
-            'flex-1 py-3 text-sm font-medium border-b-2 transition-colors',
+            'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2',
             activeTab === 'all'
               ? 'border-theatarr-500 text-theatarr-500'
               : 'border-transparent text-dark-muted hover:text-dark-text'
           )}
         >
           Tous les quiz
+          {completedQuizCount > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-dark-muted/50 text-dark-text text-[10px] font-bold leading-none">
+              {completedQuizCount}
+            </span>
+          )}
         </button>
       </div>
 
