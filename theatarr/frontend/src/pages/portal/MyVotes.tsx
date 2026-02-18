@@ -28,12 +28,14 @@ export function MyVotes() {
     queryKey: ['portal', 'votes', 'pending'],
     queryFn: () => apiClient.get<{ items: PortalVote[]; total: number }>('/portal/votes/pending'),
     enabled: activeTab === 'pending',
+    refetchInterval: 15000,
   });
 
   const { data: allVotes, isLoading: isAllLoading } = useQuery({
     queryKey: ['portal', 'votes', 'all'],
     queryFn: () => apiClient.get<{ items: PortalVote[]; total: number }>('/portal/votes?limit=50'),
     enabled: activeTab === 'all',
+    refetchInterval: 15000,
   });
 
   const isLoading = activeTab === 'pending' ? isPendingLoading : isAllLoading;

@@ -69,26 +69,31 @@ export function PortalHome() {
   const { data: stats } = useQuery({
     queryKey: ['portal', 'stats'],
     queryFn: () => apiClient.get<PortalStats>('/portal/stats'),
+    refetchInterval: 15000,
   });
 
   const { data: pendingVotes } = useQuery({
     queryKey: ['portal', 'votes', 'pending'],
     queryFn: () => apiClient.get<{ items: PortalVote[]; total: number }>('/portal/votes/pending'),
+    refetchInterval: 15000,
   });
 
   const { data: pendingInvitations } = useQuery({
     queryKey: ['portal', 'sessions', 'pending'],
     queryFn: () => apiClient.get<{ items: PortalSession[]; total: number }>('/portal/sessions/pending'),
+    refetchInterval: 15000,
   });
 
   const { data: pendingQuiz } = useQuery({
     queryKey: ['portal', 'quiz', 'pending'],
     queryFn: () => apiClient.get<{ items: PortalQuiz[]; total: number }>('/portal/quiz/pending'),
+    refetchInterval: 15000,
   });
 
   const { data: sessions } = useQuery({
     queryKey: ['portal', 'sessions'],
     queryFn: () => apiClient.get<{ items: PortalSession[]; total: number }>('/portal/sessions?limit=5'),
+    refetchInterval: 15000,
   });
 
   return (

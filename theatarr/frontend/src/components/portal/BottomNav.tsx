@@ -2,7 +2,7 @@
  * Bottom navigation for portal (mobile-first).
  */
 
-import { Home, Play, Vote, HelpCircle, History, User } from 'lucide-react';
+import { Home, Play, Vote, HelpCircle, User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -17,7 +17,6 @@ const navItems: NavItem[] = [
   { icon: Play, label: 'Sessions', path: '/portal/sessions' },
   { icon: Vote, label: 'Votes', path: '/portal/votes' },
   { icon: HelpCircle, label: 'Quiz', path: '/portal/quiz' },
-  { icon: History, label: 'Historique', path: '/portal/history' },
   { icon: User, label: 'Profil', path: '/portal/profile' },
 ];
 

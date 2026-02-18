@@ -52,6 +52,7 @@ export function MySessions() {
         `/portal/sessions?${params.toString()}`
       );
     },
+    refetchInterval: 15000,
   });
 
   return (

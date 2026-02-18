@@ -1079,13 +1079,25 @@ async def get_session(
             template_type=template_type,
         )
 
-    # Fetch movie runtime if a movie is linked
+    # Fetch movie details if a movie is linked
     movie_runtime_minutes = None
+    movie_details = None
     if session.movie_id:
         movie_result = await db.execute(select(Movie).where(Movie.id == session.movie_id))
         movie = movie_result.scalar_one_or_none()
         if movie:
             movie_runtime_minutes = movie.runtime_minutes
+            from theatarr.schemas.session import MovieDetails
+            movie_details = MovieDetails(
+                year=movie.year,
+                runtime_minutes=movie.runtime_minutes,
+                genres=movie.genres or [],
+                overview=movie.overview,
+                backdrop_url=movie.backdrop_url,
+                logos=movie.logos or [],
+                enrichment_sources=movie.enrichment_sources or [],
+                tmdb_id=movie.tmdb_id,
+            )
 
     return SessionDetailResponse(
         id=session.id,
@@ -1128,6 +1140,8 @@ async def get_session(
         display_code=session.display_code,
         # Movie runtime for timeline proportioning
         movie_runtime_minutes=movie_runtime_minutes,
+        # Movie details (enrichment data)
+        movie_details=movie_details,
     )
 
 

@@ -28,12 +28,14 @@ export function MyQuiz() {
     queryKey: ['portal', 'quiz', 'pending'],
     queryFn: () => apiClient.get<{ items: PortalQuiz[]; total: number }>('/portal/quiz/pending'),
     enabled: activeTab === 'pending',
+    refetchInterval: 15000,
   });
 
   const { data: allQuiz, isLoading: isAllLoading } = useQuery({
     queryKey: ['portal', 'quiz', 'all'],
     queryFn: () => apiClient.get<{ items: PortalQuiz[]; total: number }>('/portal/quiz?limit=50'),
     enabled: activeTab === 'all',
+    refetchInterval: 15000,
   });
 
   const isLoading = activeTab === 'pending' ? isPendingLoading : isAllLoading;

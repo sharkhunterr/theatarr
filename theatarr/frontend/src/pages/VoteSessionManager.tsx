@@ -102,6 +102,7 @@ export function VoteSessionManager() {
       const params = filter !== 'all' ? `?status_filter=${filter}` : '';
       return await apiClient.get<VoteSessionListResponse>(`/vote-sessions${params}`);
     },
+    refetchInterval: 15000,
   });
 
   const openMutation = useMutation({
@@ -513,6 +514,7 @@ function VoteResultsAdmin({ session, language }: { session: VoteSession; languag
     queryFn: async () => {
       return await apiClient.get<{ total_votes: number; vote_counts: Record<string, number>; winner_index?: number }>(`/vote-sessions/${session.id}/results`);
     },
+    refetchInterval: 15000,
   });
 
   if (isLoading) {

@@ -42,6 +42,7 @@ export function VoteDetail() {
     queryKey: ['portal', 'votes', id],
     queryFn: () => apiClient.get<VoteSessionDetail>(`/portal/votes/${id}`),
     enabled: !!id,
+    refetchInterval: 15000,
   });
 
   const castVoteMutation = useMutation({

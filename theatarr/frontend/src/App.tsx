@@ -31,7 +31,6 @@ import {
   VoteDetail,
   QuizDetail,
   SessionDetail,
-  History,
   Profile,
 } from './pages/portal';
 
@@ -313,14 +312,6 @@ function AppRoutes() {
         element={
           <RequireUser>
             <QuizDetail />
-          </RequireUser>
-        }
-      />
-      <Route
-        path="/portal/history"
-        element={
-          <RequireUser>
-            <History />
           </RequireUser>
         }
       />

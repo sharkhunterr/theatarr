@@ -2,7 +2,7 @@
  * Desktop horizontal navigation for portal.
  */
 
-import { Home, Play, Vote, History, User } from 'lucide-react';
+import { Home, Play, Vote, User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -16,7 +16,6 @@ const navItems: NavItem[] = [
   { icon: Home, label: 'Accueil', path: '/portal' },
   { icon: Play, label: 'Sessions', path: '/portal/sessions' },
   { icon: Vote, label: 'Votes', path: '/portal/votes' },
-  { icon: History, label: 'Historique', path: '/portal/history' },
   { icon: User, label: 'Profil', path: '/portal/profile' },
 ];
 

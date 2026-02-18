@@ -5,5 +5,4 @@ export { MyQuiz } from './MyQuiz';
 export { VoteDetail } from './VoteDetail';
 export { QuizDetail } from './QuizDetail';
 export { SessionDetail } from './SessionDetail';
-export { History } from './History';
 export { Profile } from './Profile';

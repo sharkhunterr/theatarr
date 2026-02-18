@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { Zap, Eye, EyeOff, UserCheck, Lock, Users, Vote, Clock, Calendar } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import {
+  Zap, Eye, EyeOff, UserCheck, Lock, Users, Vote, Clock, Calendar,
+  Search, Check, Link2, UserPlus,
+} from 'lucide-react';
 import clsx from 'clsx';
 import { Button, Input } from '../common';
 import { MovieSelector, MovieOption } from './MovieSelector';
@@ -9,6 +12,15 @@ import { apiClient } from '../../api/client';
 interface VoteSessionFormProps {
   onSave: () => void;
   onCancel: () => void;
+}
+
+interface UserItem {
+  id: string;
+  username: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  role: string;
 }
 
 export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
@@ -25,9 +37,70 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
   const [closesAt, setClosesAt] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Participants
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [userSearch, setUserSearch] = useState('');
+  const [generateTokenCount, setGenerateTokenCount] = useState(0);
+
+  // Fetch registered users
+  const { data: usersData } = useQuery({
+    queryKey: ['users-list'],
+    queryFn: () => apiClient.get<{ items: UserItem[]; total: number }>('/users?limit=200&is_active=true'),
+  });
+
+  const allUsers = usersData?.items || [];
+  const filteredUsers = userSearch
+    ? allUsers.filter((u) => {
+        const q = userSearch.toLowerCase();
+        return (
+          u.username.toLowerCase().includes(q) ||
+          (u.first_name && u.first_name.toLowerCase().includes(q)) ||
+          (u.last_name && u.last_name.toLowerCase().includes(q)) ||
+          (u.email && u.email.toLowerCase().includes(q))
+        );
+      })
+    : allUsers;
+
+  const toggleUser = (userId: string) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllFiltered = () => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      filteredUsers.forEach((u) => next.add(u.id));
+      return next;
+    });
+  };
+
+  const deselectAll = () => {
+    setSelectedUserIds(new Set());
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiClient.post('/vote-sessions', data);
+      // Create vote session
+      const session = await apiClient.post<{ id: string }>('/vote-sessions', data);
+
+      // Add participants if any selected
+      if (selectedUserIds.size > 0) {
+        await apiClient.post(`/vote-sessions/${session.id}/participants`, Array.from(selectedUserIds));
+      }
+
+      // Generate tokens if requested
+      if (generateTokenCount > 0) {
+        await apiClient.post(`/vote-sessions/${session.id}/tokens`, { count: generateTokenCount });
+      }
+
+      return session;
     },
     onSuccess: () => {
       onSave();
@@ -122,6 +195,135 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
           onRemove={handleRemoveMovie}
           maxSelections={10}
         />
+      </div>
+
+      {/* Participants */}
+      <div className="border-t border-dark-border pt-6">
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-dark-text mb-4">
+          <Users size={16} />
+          Participants
+        </h3>
+
+        {/* Registered Users */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <UserPlus size={14} className="text-dark-muted" />
+            <span className="text-sm font-medium text-dark-text">Utilisateurs enregistres</span>
+            {selectedUserIds.size > 0 && (
+              <span className="text-xs bg-theatarr-500/20 text-theatarr-400 px-2 py-0.5 rounded-full">
+                {selectedUserIds.size} selectionne{selectedUserIds.size > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {/* Search */}
+          <div className="relative mb-2">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
+            <input
+              type="text"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Rechercher un utilisateur..."
+              className="w-full pl-9 pr-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm text-dark-text placeholder-dark-muted focus:outline-none focus:ring-2 focus:ring-theatarr-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Select all / deselect */}
+          <div className="flex gap-2 mb-2">
+            <button
+              type="button"
+              onClick={selectAllFiltered}
+              className="text-xs text-theatarr-400 hover:text-theatarr-300 transition-colors"
+            >
+              Tout selectionner
+            </button>
+            {selectedUserIds.size > 0 && (
+              <>
+                <span className="text-dark-border">|</span>
+                <button
+                  type="button"
+                  onClick={deselectAll}
+                  className="text-xs text-dark-muted hover:text-dark-text transition-colors"
+                >
+                  Tout deselectionner
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* User List */}
+          <div className="max-h-48 overflow-y-auto border border-dark-border rounded-lg divide-y divide-dark-border/50">
+            {filteredUsers.length > 0 ? (
+              filteredUsers.map((user) => {
+                const isSelected = selectedUserIds.has(user.id);
+                const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+                return (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => toggleUser(user.id)}
+                    className={clsx(
+                      'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors',
+                      isSelected
+                        ? 'bg-theatarr-500/10'
+                        : 'hover:bg-dark-surface/50'
+                    )}
+                  >
+                    <div className={clsx(
+                      'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors',
+                      isSelected
+                        ? 'bg-theatarr-500 border-theatarr-500'
+                        : 'border-dark-border'
+                    )}>
+                      {isSelected && <Check size={12} className="text-white" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-dark-text truncate">
+                        {displayName || user.username}
+                      </div>
+                      {displayName && (
+                        <div className="text-xs text-dark-muted truncate">@{user.username}</div>
+                      )}
+                    </div>
+                    {user.role === 'admin' && (
+                      <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded flex-shrink-0">
+                        admin
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-3 py-4 text-sm text-dark-muted text-center">
+                {userSearch ? 'Aucun utilisateur trouve' : 'Aucun utilisateur enregistre'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Token-based links */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Link2 size={14} className="text-dark-muted" />
+            <span className="text-sm font-medium text-dark-text">Liens de vote (tokens)</span>
+          </div>
+          <p className="text-[10px] text-dark-muted mb-2">
+            Generez des liens partageables pour inviter des votants sans compte
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={generateTokenCount}
+              onChange={(e) => setGenerateTokenCount(Math.max(0, parseInt(e.target.value) || 0))}
+              className="w-20 bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text text-center focus:outline-none focus:ring-2 focus:ring-theatarr-500 focus:border-transparent"
+            />
+            <span className="text-sm text-dark-muted">
+              {generateTokenCount === 0 ? 'Aucun lien' : `${generateTokenCount} lien${generateTokenCount > 1 ? 's' : ''} a generer`}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Voting Options */}

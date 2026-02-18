@@ -21,6 +21,7 @@ import {
   Check,
   CopyPlus,
   Star,
+  Pencil,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { getMysteryRevealCountdown, getVoteRevealCountdown } from '../utils/countdown';
@@ -30,8 +31,9 @@ import { MysteryPoster } from '../components/common/MysteryPoster';
 import { VotePoster } from '../components/common/VotePoster';
 import { VotePosterCollage } from '../components/common/VotePosterCollage';
 import { Button, Card, Spinner, Modal } from '../components/common';
-import { useSessionStore, Session, VoteSessionSummary } from '../stores/sessionStore';
+import { useSessionStore, Session, SessionState, VoteSessionSummary } from '../stores/sessionStore';
 import { useSession } from '../hooks/useSession';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { useLayoutStore } from '../stores/layoutStore';
 import { apiClient } from '../api/client';
 
@@ -87,6 +89,26 @@ export function SessionsPage() {
     all: language === 'fr' ? 'Toutes' : 'All',
     duplicate: language === 'fr' ? 'Dupliquer' : 'Duplicate',
   };
+
+  // WebSocket for real-time session state updates
+  const token = localStorage.getItem('theatarr_token');
+  const { updateSessionState } = useSessionStore();
+  const { subscribe, unsubscribe, isConnected } = useWebSocket({
+    token,
+    autoConnect: true,
+    onMessage: (message) => {
+      if (message.type === 'session_state' && message.payload) {
+        updateSessionState(message.payload as SessionState);
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (isConnected) {
+      subscribe('session');
+      return () => unsubscribe('session');
+    }
+  }, [isConnected, subscribe, unsubscribe]);
 
   useEffect(() => {
     fetchSessions();
@@ -471,22 +493,6 @@ export function SessionsPage() {
             </button>
           )}
 
-          {/* Color palette preview */}
-          {session.color_palette && (
-            <div className="flex items-center gap-0.5">
-              {[session.color_palette.primary, session.color_palette.accent, session.color_palette.vibrant]
-                .filter(Boolean)
-                .slice(0, 3)
-                .map((color, i) => (
-                  <div
-                    key={i}
-                    className="w-3 h-3 rounded-sm border border-dark-border"
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-            </div>
-          )}
-
           {/* Feedback badge */}
           {(session.feedback_count ?? 0) > 0 && (
             <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">
@@ -499,86 +505,100 @@ export function SessionsPage() {
       </div>
 
       {/* Actions */}
-      <div className="flex flex-col justify-center gap-1 p-2 border-l border-dark-border">
-        {/* Display button */}
-        {session.display_code && (
-          <a
-            href={`/display/${session.display_code}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={`${t.display} (${session.display_code})`}
-            className="inline-flex items-center justify-center p-1.5 rounded-lg text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-          >
-            <ScreenShare size={16} />
-          </a>
-        )}
-        {/* Wallmount button */}
-        {(session.movie_id || session.movie_title || session.scheduled_at) && (
-          <a
-            href={`/wallmount/${session.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={t.wallmount}
-            className="inline-flex items-center justify-center p-1.5 rounded-lg text-dark-muted hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
-          >
-            <Monitor size={16} />
-          </a>
-        )}
-        {/* Play/Resume button */}
-        {(session.status === 'draft' || session.status === 'scheduled' || session.status === 'interrupted' || session.status === 'paused') && (
+      <div className="flex border-l border-dark-border">
+        {/* Session controls + links */}
+        <div className="flex flex-col justify-center gap-1 p-1.5 border-r border-dark-border/50">
+          {/* Play/Resume button */}
+          {(session.status === 'draft' || session.status === 'scheduled' || session.status === 'interrupted' || session.status === 'paused') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handlePlayPause(session)}
+              title={session.status === 'paused' ? t.resume : t.play}
+              disabled={controllingId === session.id || (session.actions_count ?? 0) === 0}
+            >
+              <Play size={15} className={session.status === 'paused' ? 'text-yellow-400' : ''} />
+            </Button>
+          )}
+          {/* Pause button */}
+          {session.status === 'running' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handlePlayPause(session)}
+              title={t.pause}
+              disabled={controllingId === session.id}
+            >
+              <Pause size={15} />
+            </Button>
+          )}
+          {/* Stop button */}
+          {(session.status === 'running' || session.status === 'paused') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleStop(session)}
+              title={t.stop}
+              disabled={controllingId === session.id}
+              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              <Square size={15} />
+            </Button>
+          )}
+          {/* Display button */}
+          {session.display_code && (
+            <a
+              href={`/display/${session.display_code}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`${t.display} (${session.display_code})`}
+              className="inline-flex items-center justify-center p-1.5 rounded-lg text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+            >
+              <ScreenShare size={15} />
+            </a>
+          )}
+          {/* Wallmount button */}
+          {(session.movie_id || session.movie_title || session.scheduled_at) && (
+            <a
+              href={`/wallmount/${session.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={t.wallmount}
+              className="inline-flex items-center justify-center p-1.5 rounded-lg text-dark-muted hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
+            >
+              <Monitor size={15} />
+            </a>
+          )}
+        </div>
+        {/* Management actions (edit, duplicate, delete) */}
+        <div className="flex flex-col justify-center gap-1 p-1.5">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handlePlayPause(session)}
-            title={session.status === 'paused' ? t.resume : t.play}
-            disabled={controllingId === session.id || (session.actions_count ?? 0) === 0}
+            onClick={() => navigate(`/sessions/${session.id}`)}
+            title={language === 'fr' ? 'Modifier' : 'Edit'}
           >
-            <Play size={16} className={session.status === 'paused' ? 'text-yellow-400' : ''} />
+            <Pencil size={15} />
           </Button>
-        )}
-        {/* Pause button */}
-        {session.status === 'running' && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handlePlayPause(session)}
-            title={t.pause}
-            disabled={controllingId === session.id}
+            onClick={() => handleDuplicate(session)}
+            title={t.duplicate}
+            disabled={duplicatingId === session.id}
           >
-            <Pause size={16} />
+            <CopyPlus size={15} />
           </Button>
-        )}
-        {/* Stop button */}
-        {(session.status === 'running' || session.status === 'paused') && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleStop(session)}
-            title={t.stop}
-            disabled={controllingId === session.id}
+            onClick={() => setDeleteSession(session)}
+            title={t.delete}
             className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
           >
-            <Square size={16} />
+            <Trash2 size={15} />
           </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleDuplicate(session)}
-          title={t.duplicate}
-          disabled={duplicatingId === session.id}
-        >
-          <CopyPlus size={16} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setDeleteSession(session)}
-          title={t.delete}
-          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-        >
-          <Trash2 size={16} />
-        </Button>
+        </div>
       </div>
     </div>
   );

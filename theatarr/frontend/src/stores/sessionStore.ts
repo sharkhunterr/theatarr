@@ -114,6 +114,17 @@ export interface Session {
   pause_on_display_disconnect?: boolean;
   // Movie runtime (from detail response)
   movie_runtime_minutes?: number;
+  // Movie details (from detail response)
+  movie_details?: {
+    year?: number;
+    runtime_minutes?: number;
+    genres?: string[];
+    overview?: string;
+    backdrop_url?: string;
+    logos?: string[];
+    enrichment_sources?: string[];
+    tmdb_id?: string;
+  };
   // Enriched fields from list
   participants_accepted?: number;
   participants_total?: number;

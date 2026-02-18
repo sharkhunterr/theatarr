@@ -318,6 +318,19 @@ class SessionResponse(SessionBase, IDTimestampSchema):
     preparing_trailers: int = 0
 
 
+class MovieDetails(BaseSchema):
+    """Movie details for session detail view."""
+
+    year: int | None = None
+    runtime_minutes: int | None = None
+    genres: list[str] = []
+    overview: str | None = None
+    backdrop_url: str | None = None
+    logos: list[str] = []
+    enrichment_sources: list[str] = []
+    tmdb_id: str | None = None
+
+
 class SessionDetailResponse(SessionResponse):
     """Session response with sequences included."""
 
@@ -326,6 +339,7 @@ class SessionDetailResponse(SessionResponse):
     workflow: dict | None = None
     linked_vote_session: VoteSessionSummary | None = None
     movie_runtime_minutes: int | None = None
+    movie_details: MovieDetails | None = None
 
 
 class SessionListResponse(BaseSchema):

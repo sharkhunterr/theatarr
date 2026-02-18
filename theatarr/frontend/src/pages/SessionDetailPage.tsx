@@ -2,7 +2,7 @@
  * Admin session detail page with real-time timeline.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -30,10 +30,18 @@ import {
   X,
   Zap,
   Star,
+  ChevronDown,
+  ChevronRight,
+  Activity,
+  Tag,
+  Timer,
+  Image,
+  Globe,
 } from 'lucide-react';
 
-import { Button, Modal, MysteryPoster, VotePoster, VotePosterCollage } from '../components/common';
+import { Button, Modal, Spinner, MysteryPoster, VotePoster, VotePosterCollage } from '../components/common';
 import { TimelineDetailModal } from '../components/sessions/TimelineDetailModal';
+import { EventTimeline } from '../components/history/EventTimeline';
 import { apiClient } from '../api/client';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCountdown } from '../hooks/useCountdown';
@@ -43,6 +51,7 @@ import {
   type Session,
   type SessionState,
   type Sequence,
+  type VoteSessionSummary,
 } from '../stores/sessionStore';
 import {
   getMysteryRevealCountdown,
@@ -470,22 +479,23 @@ export function SessionDetailPage() {
 
   // Real-time state via WebSocket
   const [liveState, setLiveState] = useState<SessionState | null>(null);
+  const prevStatusRef = useRef<string | null>(null);
   const token = localStorage.getItem('theatarr_token');
 
-  const { isConnected } = useWebSocket({
+  const { isConnected, subscribe, unsubscribe } = useWebSocket({
     token,
     autoConnect: true,
     onMessage: (message) => {
       if (message.type === 'session_state' && message.payload?.session_id === id) {
-        setLiveState(message.payload as unknown as SessionState);
+        const newState = message.payload as unknown as SessionState;
+        setLiveState(newState);
+        // Refetch full session data when status changes (e.g. running → paused → completed)
+        if (prevStatusRef.current && prevStatusRef.current !== newState.status) {
+          refetchSession();
+        }
+        prevStatusRef.current = newState.status;
       }
     },
-  });
-
-  // Subscribe to session channel
-  const { subscribe, unsubscribe } = useWebSocket({
-    token,
-    autoConnect: true,
   });
 
   useEffect(() => {
@@ -949,10 +959,206 @@ export function SessionDetailPage() {
       />
 
       {/* Details */}
-      <div className="bg-dark-surface rounded-xl border border-dark-border p-4 space-y-4">
-        <h3 className="text-sm font-medium text-dark-text">{t.details}</h3>
+      <SessionDetailsSection session={session} voteSession={voteSession} language={language} />
 
-        {session.description && (
+      {/* Activity / Events */}
+      <SessionActivitySection sessionId={id!} startedAt={session.started_at} language={language} />
+    </div>
+  );
+}
+
+
+// ============================================================================
+// Session Details Section
+// ============================================================================
+
+interface WorkflowAction {
+  nodeType: string;
+  action_type: string;
+  command: string;
+  parameters: Record<string, unknown>;
+  label?: string;
+  sequence_name?: string;
+}
+
+function extractActionsFromWorkflow(workflow: Record<string, unknown> | undefined): WorkflowAction[] {
+  if (!workflow) return [];
+  const nodes = (workflow.nodes as Array<{ id: string; data: WorkflowAction }>) || [];
+  const actionNodes = nodes.filter(n => n.data?.nodeType === 'action');
+
+  // Follow edges for execution order
+  const edges = (workflow.edges as Array<{ source: string; target: string }>) || [];
+  const edgeMap: Record<string, string> = {};
+  for (const e of edges) edgeMap[e.source] = e.target;
+
+  const nodeMap: Record<string, WorkflowAction> = {};
+  for (const n of actionNodes) nodeMap[n.id] = n.data;
+
+  const ordered: WorkflowAction[] = [];
+  const visited = new Set<string>();
+  let current = 'start';
+  while (edgeMap[current] && !visited.has(current)) {
+    visited.add(current);
+    const target = edgeMap[current];
+    if (nodeMap[target]) ordered.push(nodeMap[target]);
+    current = target;
+  }
+
+  return ordered.length > 0 ? ordered : actionNodes.map(n => n.data);
+}
+
+function formatRuntimeMin(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? `${h}h${m > 0 ? ` ${m}min` : ''}` : `${m}min`;
+}
+
+function SessionDetailsSection({
+  session,
+  voteSession,
+  language,
+}: {
+  session: Session;
+  voteSession: VoteSessionSummary | undefined;
+  language: string;
+}) {
+  const [actionsExpanded, setActionsExpanded] = useState(false);
+  const [overviewExpanded, setOverviewExpanded] = useState(false);
+  const md = session.movie_details;
+  const actions = useMemo(() => extractActionsFromWorkflow(session.workflow), [session.workflow]);
+
+  const t = {
+    details: language === 'fr' ? 'Details' : 'Details',
+    movieInfo: language === 'fr' ? 'Film' : 'Movie',
+    sessionInfo: language === 'fr' ? 'Session' : 'Session',
+    scheduled: language === 'fr' ? 'Programmee le' : 'Scheduled',
+    started: language === 'fr' ? 'Demarree le' : 'Started',
+    ended: language === 'fr' ? 'Terminee le' : 'Ended',
+    created: language === 'fr' ? 'Creee le' : 'Created',
+    linked: language === 'fr' ? 'Vote lie' : 'Linked vote',
+    voteOpen: language === 'fr' ? 'Vote en cours' : 'Vote in progress',
+    voteClosed: language === 'fr' ? 'Vote clos' : 'Vote closed',
+    actions: language === 'fr' ? 'Actions' : 'Actions',
+    noActions: language === 'fr' ? 'Aucune action configuree' : 'No actions configured',
+    enrichment: language === 'fr' ? 'Enrichissement' : 'Enrichment',
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Movie Details */}
+      {md && (session.movie_title || md.genres?.length) && (
+        <div className="bg-dark-surface rounded-xl border border-dark-border p-4 space-y-3">
+          <h3 className="text-sm font-medium text-dark-text flex items-center gap-2">
+            <Film size={14} className="text-theatarr-500" />
+            {t.movieInfo}
+          </h3>
+
+          {session.description && (
+            <p className="text-sm text-dark-muted">{session.description}</p>
+          )}
+
+          {/* Movie meta grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {md.year && (
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar size={13} className="text-dark-muted flex-shrink-0" />
+                <span className="text-dark-text">{md.year}</span>
+              </div>
+            )}
+            {md.runtime_minutes && (
+              <div className="flex items-center gap-2 text-sm">
+                <Timer size={13} className="text-dark-muted flex-shrink-0" />
+                <span className="text-dark-text">{formatRuntimeMin(md.runtime_minutes)}</span>
+              </div>
+            )}
+            {md.tmdb_id && (
+              <div className="flex items-center gap-2 text-sm">
+                <Globe size={13} className="text-dark-muted flex-shrink-0" />
+                <span className="text-dark-muted">TMDB {md.tmdb_id}</span>
+              </div>
+            )}
+            {md.enrichment_sources && md.enrichment_sources.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <Image size={13} className="text-dark-muted flex-shrink-0" />
+                <div className="flex items-center gap-1.5">
+                  {md.enrichment_sources.map((src) => (
+                    <span key={src} className="px-1.5 py-0.5 rounded text-[10px] bg-green-500/15 text-green-400 border border-green-500/20">
+                      {src.toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Genres */}
+          {md.genres && md.genres.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Tag size={12} className="text-dark-muted flex-shrink-0" />
+              {md.genres.map((g) => (
+                <span key={g} className="px-2 py-0.5 rounded-full text-xs bg-dark-border text-dark-text">
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Overview */}
+          {md.overview && (
+            <div>
+              <p className={clsx(
+                'text-sm text-dark-muted leading-relaxed',
+                !overviewExpanded && 'line-clamp-3',
+              )}>
+                {md.overview}
+              </p>
+              {md.overview.length > 200 && (
+                <button
+                  onClick={() => setOverviewExpanded(!overviewExpanded)}
+                  className="text-xs text-theatarr-500 hover:text-theatarr-400 mt-1 transition-colors"
+                >
+                  {overviewExpanded
+                    ? (language === 'fr' ? 'Voir moins' : 'See less')
+                    : (language === 'fr' ? 'Voir plus' : 'See more')}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Color palette */}
+          {session.color_palette && (
+            <div className="flex items-center gap-1.5">
+              {[
+                session.color_palette.primary,
+                session.color_palette.secondary,
+                session.color_palette.accent,
+                session.color_palette.vibrant,
+                session.color_palette.vibrant_light,
+                session.color_palette.vibrant_dark,
+                session.color_palette.muted,
+              ]
+                .filter(Boolean)
+                .map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-5 h-5 rounded border border-dark-border"
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  />
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Session Info */}
+      <div className="bg-dark-surface rounded-xl border border-dark-border p-4 space-y-3">
+        <h3 className="text-sm font-medium text-dark-text flex items-center gap-2">
+          <Clock size={14} className="text-dark-muted" />
+          {t.sessionInfo}
+        </h3>
+
+        {!md && session.description && (
           <p className="text-sm text-dark-muted">{session.description}</p>
         )}
 
@@ -1023,27 +1229,61 @@ export function SessionDetailPage() {
           </div>
         </div>
 
-        {/* Color palette */}
-        {session.color_palette && (
-          <div className="flex items-center gap-1.5">
-            {[
-              session.color_palette.primary,
-              session.color_palette.secondary,
-              session.color_palette.accent,
-              session.color_palette.vibrant,
-              session.color_palette.vibrant_light,
-              session.color_palette.vibrant_dark,
-              session.color_palette.muted,
-            ]
-              .filter(Boolean)
-              .map((color, i) => (
-                <div
-                  key={i}
-                  className="w-6 h-6 rounded border border-dark-border"
-                  style={{ backgroundColor: color }}
-                  title={color}
-                />
-              ))}
+        {/* Actions list */}
+        {actions.length > 0 && (
+          <div>
+            <button
+              onClick={() => setActionsExpanded(!actionsExpanded)}
+              className="flex items-center gap-2 text-sm font-medium text-dark-text hover:text-theatarr-500 transition-colors"
+            >
+              {actionsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <Zap size={14} className="text-purple-400" />
+              {t.actions} ({actions.length})
+            </button>
+            {actionsExpanded && (
+              <div className="mt-2 space-y-1.5">
+                {actions.map((action, idx) => {
+                  const Icon = ACTION_TYPE_ICONS[action.action_type] || Zap;
+                  const color = ACTION_TYPE_COLORS[action.action_type] || '#6b7280';
+                  const params = action.parameters || {};
+                  // Filter out internal/preview params
+                  const displayParams = Object.entries(params).filter(
+                    ([k]) => !k.startsWith('_')
+                  );
+                  return (
+                    <div key={idx} className="flex items-start gap-2 p-2 rounded-lg bg-dark-bg border border-dark-border/50">
+                      <div className="mt-0.5 shrink-0">
+                        <Icon size={14} style={{ color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-dark-text">
+                            {action.label || action.command}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-dark-border text-dark-muted">
+                            {action.action_type}:{action.command}
+                          </span>
+                          {action.sequence_name && (
+                            <span className="text-[10px] text-dark-muted">
+                              [{action.sequence_name}]
+                            </span>
+                          )}
+                        </div>
+                        {displayParams.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {displayParams.map(([k, v]) => (
+                              <span key={k} className="text-[10px] px-1.5 py-0.5 rounded bg-dark-border/50 text-dark-muted">
+                                {k}: {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1051,6 +1291,74 @@ export function SessionDetailPage() {
   );
 }
 
+// ============================================================================
+// Session Activity Section (Events Timeline)
+// ============================================================================
+
+interface SessionEvent {
+  id: string;
+  session_id: string;
+  session_name: string;
+  event_type: string;
+  event_data: Record<string, unknown> | null;
+  timestamp: string;
+}
+
+function SessionActivitySection({
+  sessionId,
+  startedAt,
+  language,
+}: {
+  sessionId: string;
+  startedAt?: string | null;
+  language: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const { data: events, isLoading } = useQuery<SessionEvent[]>({
+    queryKey: ['session-events', sessionId],
+    queryFn: () => apiClient.get<SessionEvent[]>(`/logs/sessions/${sessionId}/events`),
+    enabled: expanded,
+  });
+
+  const t = {
+    title: language === 'fr' ? 'Activite' : 'Activity',
+    noEvents: language === 'fr' ? 'Aucun evenement enregistre' : 'No events recorded',
+    loading: language === 'fr' ? 'Chargement...' : 'Loading...',
+  };
+
+  return (
+    <div className="bg-dark-surface rounded-xl border border-dark-border">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-2 p-4 text-left hover:bg-dark-border/20 transition-colors rounded-xl"
+      >
+        {expanded ? <ChevronDown size={14} className="text-dark-muted" /> : <ChevronRight size={14} className="text-dark-muted" />}
+        <Activity size={14} className="text-green-400" />
+        <h3 className="text-sm font-medium text-dark-text">{t.title}</h3>
+        {events && (
+          <span className="text-xs text-dark-muted ml-1">({events.length})</span>
+        )}
+      </button>
+      {expanded && (
+        <div className="border-t border-dark-border px-4 py-3">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Spinner size="sm" />
+              <span className="ml-2 text-sm text-dark-muted">{t.loading}</span>
+            </div>
+          ) : events && events.length > 0 ? (
+            <EventTimeline events={events} sessionStartedAt={startedAt} />
+          ) : (
+            <div className="text-center py-4 text-sm text-dark-muted">
+              {t.noEvents}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ============================================================================
 // FeedbackModal
