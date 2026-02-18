@@ -28,6 +28,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/movies", tags=["movies"])
 
 
+_MOVIE_LIB_TYPES = {"movie", "movies"}  # Plex uses "movie", Jellyfin uses "movies"
+
+
+def _get_selected_libraries(
+    libraries: list[dict], selected_ids: list[str] | None
+) -> list[dict]:
+    """Filter libraries based on user selection, or fall back to all movie-type libraries."""
+    if selected_ids:
+        return [lib for lib in libraries if str(lib.get("id")) in selected_ids]
+    return [lib for lib in libraries if lib.get("type") in _MOVIE_LIB_TYPES]
+
+
 # ============================================================================
 # Schemas
 # ============================================================================
@@ -175,42 +187,34 @@ async def search_movies(
 
         try:
             adapter = get_adapter(service.adapter_type, service.config)
-            # Use the execute method with a search command
-            command = Command(action="search", parameters={"query": query, "type": "movie"})
+            selected_libs = service.config.get("selected_libraries")
+
+            # Search — pass library IDs so adapter can filter natively
+            search_params: dict = {"query": query, "type": "movie"}
+            if selected_libs:
+                search_params["library_ids"] = selected_libs
+
+            command = Command(action="search", parameters=search_params)
             result = await adapter.execute(command)
 
             if result.success and result.data:
                 adapter_results = result.data.get("results", [])
-                server_url = service.config.get("server_url", "").rstrip("/")
-                token = service.config.get("token", "")
 
                 for item in adapter_results[:limit - len(results)]:
-                    # Build full URLs for Plex
-                    thumb = item.get("thumb")
-                    art = item.get("art")
-                    poster_url = None
-                    backdrop_url = None
-                    if thumb and server_url and token:
-                        poster_url = f"{server_url}{thumb}?X-Plex-Token={token}"
-                    if art and server_url and token:
-                        backdrop_url = f"{server_url}{art}?X-Plex-Token={token}"
-
-                    # Extract runtime in minutes
+                    # Both adapters now return normalized fields
                     duration = item.get("duration")
                     runtime_minutes = duration // 60000 if duration else None
-
-                    # Extract directors and cast
-                    directors = [d.get("tag") for d in item.get("Director", []) if d.get("tag")]
-                    cast = [r.get("tag") for r in item.get("Role", [])[:5] if r.get("tag")]
-                    genres = [g.get("tag") for g in item.get("Genre", []) if g.get("tag")]
+                    genres = item.get("genres", [])
+                    directors = item.get("directors", [])
+                    cast = item.get("cast", [])[:5]
 
                     results.append(MovieSearchResult(
                         id=str(item.get("id", "")),
                         title=item.get("title", ""),
                         year=item.get("year"),
-                        poster_url=poster_url,
-                        backdrop_url=backdrop_url,
-                        overview=item.get("summary"),
+                        poster_url=item.get("poster_url"),
+                        backdrop_url=item.get("backdrop_url"),
+                        overview=item.get("overview") or item.get("summary"),
                         rating=item.get("rating"),
                         runtime_minutes=runtime_minutes,
                         genres=genres if genres else None,
@@ -251,7 +255,7 @@ async def get_movies_from_service(
     try:
         adapter = get_adapter(service.adapter_type, service.config)
 
-        # First list libraries to find a movie library
+        # List libraries and filter by user selection
         list_libs_cmd = Command(action="list_libraries", parameters={})
         libs_result = await adapter.execute(list_libs_cmd)
 
@@ -259,47 +263,41 @@ async def get_movies_from_service(
             return MovieListResponse(movies=[], total=0, source=service.adapter_type)
 
         libraries = libs_result.data.get("libraries", [])
-        movie_library = next((lib for lib in libraries if lib.get("type") == "movie"), None)
+        selected_ids = service.config.get("selected_libraries") or None
+        movie_libraries = _get_selected_libraries(libraries, selected_ids)
 
-        if not movie_library:
+        if not movie_libraries:
             return MovieListResponse(movies=[], total=0, source=service.adapter_type)
 
-        # List movies from the library
-        list_movies_cmd = Command(
-            action="list_movies",
-            parameters={"library_id": movie_library.get("id")}
-        )
-        movies_result = await adapter.execute(list_movies_cmd)
+        # Fetch movies from all selected libraries
+        all_movies_raw: list[dict] = []
 
-        if not movies_result.success or not movies_result.data:
-            return MovieListResponse(movies=[], total=0, source=service.adapter_type)
+        for lib in movie_libraries:
+            list_movies_cmd = Command(
+                action="list_movies",
+                parameters={"library_id": lib.get("id")}
+            )
+            movies_result = await adapter.execute(list_movies_cmd)
+            if movies_result.success and movies_result.data:
+                all_movies_raw.extend(movies_result.data.get("movies", []))
 
-        server_url = service.config.get("server_url", "").rstrip("/")
-        token = service.config.get("token", "")
-
-        movies_raw = movies_result.data.get("movies", [])
         # Manual pagination
-        total = len(movies_raw)
+        total = len(all_movies_raw)
         offset = (page - 1) * page_size
-        paginated = movies_raw[offset:offset + page_size]
+        paginated = all_movies_raw[offset:offset + page_size]
 
         movies = []
         for m in paginated:
-            thumb = m.get("thumb")
-            art = m.get("art")
-            poster_url = f"{server_url}{thumb}?X-Plex-Token={token}" if thumb else None
-            backdrop_url = f"{server_url}{art}?X-Plex-Token={token}" if art else None
-
             movies.append(MovieSchema(
                 id=str(m.get("id", "")),
                 title=m.get("title", ""),
                 year=m.get("year"),
-                overview=m.get("summary"),
-                poster_url=poster_url,
-                backdrop_url=backdrop_url,
+                overview=m.get("overview"),
+                poster_url=m.get("poster_url"),
+                backdrop_url=m.get("backdrop_url"),
                 rating=m.get("rating"),
                 runtime_minutes=m.get("duration") // 60000 if m.get("duration") else None,
-                genres=[],  # Not in list response
+                genres=m.get("genres", []),
                 source=service.adapter_type,
                 source_id=str(m.get("id", "")),
                 has_trailer=False,
@@ -344,19 +342,20 @@ async def get_movie_details_from_source(
             raise HTTPException(status_code=404, detail="Movie not found")
 
         movie_data = result.data
+        duration = movie_data.get("duration")
         return MovieSearchResult(
             id=str(movie_data.get("id", source_id)),
             title=movie_data.get("title", ""),
             year=movie_data.get("year"),
-            poster_url=movie_data.get("thumb"),
-            backdrop_url=movie_data.get("art"),
-            overview=movie_data.get("summary"),
+            poster_url=movie_data.get("poster_url"),
+            backdrop_url=movie_data.get("backdrop_url"),
+            overview=movie_data.get("overview"),
             rating=movie_data.get("rating"),
-            runtime_minutes=movie_data.get("duration") // 60000 if movie_data.get("duration") else None,
+            runtime_minutes=duration // 60000 if duration else None,
             genres=movie_data.get("genres"),
             directors=movie_data.get("directors"),
-            cast=movie_data.get("actors", [])[:5] if movie_data.get("actors") else None,
-            tagline=None,
+            cast=movie_data.get("cast", movie_data.get("actors", []))[:5] or None,
+            tagline=movie_data.get("tagline"),
             source=source,
             source_id=source_id,
         )
@@ -486,7 +485,7 @@ async def sync_movies_from_service(
     try:
         adapter = get_adapter(service.adapter_type, service.config)
 
-        # First list libraries to find a movie library
+        # List libraries and filter by user selection
         list_libs_cmd = Command(action="list_libraries", parameters={})
         libs_result = await adapter.execute(list_libs_cmd)
 
@@ -494,28 +493,27 @@ async def sync_movies_from_service(
             return {"synced": 0, "errors": 0}
 
         libraries = libs_result.data.get("libraries", [])
-        movie_library = next((lib for lib in libraries if lib.get("type") == "movie"), None)
+        selected_ids = service.config.get("selected_libraries") or None
+        movie_libraries = _get_selected_libraries(libraries, selected_ids)
 
-        if not movie_library:
+        if not movie_libraries:
             return {"synced": 0, "errors": 0}
 
-        # List movies from the library
-        list_movies_cmd = Command(
-            action="list_movies",
-            parameters={"library_id": movie_library.get("id")}
-        )
-        movies_result = await adapter.execute(list_movies_cmd)
-
-        if not movies_result.success or not movies_result.data:
-            return {"synced": 0, "errors": 0}
+        # Fetch movies from all selected libraries
+        all_movies_raw: list[dict] = []
+        for lib in movie_libraries:
+            list_movies_cmd = Command(
+                action="list_movies",
+                parameters={"library_id": lib.get("id")}
+            )
+            movies_result = await adapter.execute(list_movies_cmd)
+            if movies_result.success and movies_result.data:
+                all_movies_raw.extend(movies_result.data.get("movies", []))
 
         synced = 0
         errors = 0
 
-        server_url = service.config.get("server_url", "").rstrip("/")
-        token = service.config.get("token", "")
-
-        for movie_data in movies_result.data.get("movies", []):
+        for movie_data in all_movies_raw:
             try:
                 title = movie_data.get("title")
                 year = movie_data.get("year")
@@ -529,17 +527,16 @@ async def sync_movies_from_service(
                 )
                 movie = existing.scalar_one_or_none()
 
-                thumb = movie_data.get("thumb")
-                art = movie_data.get("art")
-                poster_url = f"{server_url}{thumb}?X-Plex-Token={token}" if thumb else None
-                backdrop_url = f"{server_url}{art}?X-Plex-Token={token}" if art else None
+                # Both adapters now return normalized poster_url/backdrop_url
+                m_poster = movie_data.get("poster_url")
+                m_backdrop = movie_data.get("backdrop_url")
                 runtime = movie_data.get("duration") // 60000 if movie_data.get("duration") else None
 
                 if movie:
                     # Update existing
-                    movie.overview = movie_data.get("summary") or movie.overview
-                    movie.poster_url = poster_url or movie.poster_url
-                    movie.backdrop_url = backdrop_url or movie.backdrop_url
+                    movie.overview = movie_data.get("overview") or movie.overview
+                    movie.poster_url = m_poster or movie.poster_url
+                    movie.backdrop_url = m_backdrop or movie.backdrop_url
                     movie.rating = movie_data.get("rating") or movie.rating
                     movie.runtime_minutes = runtime or movie.runtime_minutes
                 else:
@@ -547,12 +544,12 @@ async def sync_movies_from_service(
                     movie = Movie(
                         title=title or "Unknown",
                         year=year,
-                        overview=movie_data.get("summary"),
-                        poster_url=poster_url,
-                        backdrop_url=backdrop_url,
+                        overview=movie_data.get("overview"),
+                        poster_url=m_poster,
+                        backdrop_url=m_backdrop,
                         rating=movie_data.get("rating"),
                         runtime_minutes=runtime,
-                        genres=[],
+                        genres=movie_data.get("genres", []),
                     )
                     db.add(movie)
 
@@ -588,24 +585,27 @@ async def list_genres(
         try:
             adapter = get_adapter(service.adapter_type, service.config)
 
-            # Find the movie library
+            # Find selected or movie libraries
             libs_result = await adapter.execute(
                 Command(action="list_libraries", parameters={})
             )
             if libs_result.success and libs_result.data:
                 libraries = libs_result.data.get("libraries", [])
-                movie_library = next(
-                    (lib for lib in libraries if lib.get("type") == "movie"), None
-                )
-                if movie_library:
+                selected_ids = service.config.get("selected_libraries") or None
+                movie_libraries = _get_selected_libraries(libraries, selected_ids)
+
+                all_genres: set[str] = set()
+                for lib in movie_libraries:
                     genres_result = await adapter.execute(
                         Command(
                             action="list_genres",
-                            parameters={"library_id": movie_library.get("id")},
+                            parameters={"library_id": lib.get("id")},
                         )
                     )
                     if genres_result.success and genres_result.data:
-                        return genres_result.data.get("genres", [])
+                        all_genres.update(genres_result.data.get("genres", []))
+                if all_genres:
+                    return sorted(all_genres)
         except Exception:
             logger.warning("Failed to fetch genres from media service, falling back to local DB")
 

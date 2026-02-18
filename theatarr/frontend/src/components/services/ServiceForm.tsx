@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { Button, Input, Card, CardContent, CardHeader } from '../common';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { RefreshCw, Library, Check } from 'lucide-react';
+import { Button, Input, Card, CardContent, CardHeader, Spinner } from '../common';
+import { apiClient } from '../../api/client';
 import type { Service } from './ServiceCard';
 
 interface AdapterInfo {
@@ -64,6 +66,46 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
 
   const selectedAdapter = adapters.find((a) => a.type === formData.adapter_type);
   const filteredAdapters = adapters.filter((a) => a.category === formData.category);
+
+  // Library selection for media_source services
+  const isMediaSource = formData.category === 'media_source';
+  const [libraries, setLibraries] = useState<Array<{ id: string; title?: string; name?: string; type: string; count?: number }>>([]);
+  const [librariesLoading, setLibrariesLoading] = useState(false);
+  const [librariesError, setLibrariesError] = useState<string | null>(null);
+
+  const fetchLibraries = useCallback(async () => {
+    if (!service?.id) return;
+    setLibrariesLoading(true);
+    setLibrariesError(null);
+    try {
+      const res = await apiClient.get<{ libraries?: typeof libraries }>(`/services/${service.id}/resources`);
+      setLibraries(res.libraries || []);
+    } catch (err) {
+      setLibrariesError('Impossible de charger les bibliothèques. Vérifiez la connexion.');
+    } finally {
+      setLibrariesLoading(false);
+    }
+  }, [service?.id]);
+
+  // Auto-fetch libraries when editing a media_source service
+  useEffect(() => {
+    if (service?.id && isMediaSource) {
+      fetchLibraries();
+    }
+  }, [service?.id, isMediaSource, fetchLibraries]);
+
+  const selectedLibraries = (formData.config.selected_libraries as string[]) || [];
+
+  const toggleLibrary = (libId: string) => {
+    const current = [...selectedLibraries];
+    const idx = current.indexOf(String(libId));
+    if (idx >= 0) {
+      current.splice(idx, 1);
+    } else {
+      current.push(String(libId));
+    }
+    handleConfigChange('selected_libraries', current);
+  };
 
   // Track if user manually changed category (not the initial mount)
   const isInitialMount = useRef(true);
@@ -278,6 +320,83 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
                 />
               );
             })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Library Selection — only for media_source when editing */}
+      {isMediaSource && service?.id && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Library size={18} className="text-theatarr-500" />
+                <h3 className="font-medium text-dark-text">Bibliothèques</h3>
+              </div>
+              <button
+                type="button"
+                onClick={fetchLibraries}
+                disabled={librariesLoading}
+                className="p-1.5 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border/50 transition-colors"
+                title="Rafraîchir"
+              >
+                <RefreshCw size={16} className={librariesLoading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {librariesLoading && libraries.length === 0 ? (
+              <div className="flex items-center justify-center py-4">
+                <Spinner size="sm" />
+                <span className="ml-2 text-sm text-dark-muted">Chargement des bibliothèques...</span>
+              </div>
+            ) : librariesError ? (
+              <div className="text-sm text-red-400 py-2">{librariesError}</div>
+            ) : libraries.length === 0 ? (
+              <p className="text-sm text-dark-muted py-2">
+                Aucune bibliothèque trouvée. Testez la connexion du service d'abord.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-xs text-dark-muted mb-3">
+                  Sélectionnez les bibliothèques à utiliser. Si aucune n'est sélectionnée, toutes les bibliothèques de films seront utilisées.
+                </p>
+                {libraries.map((lib) => {
+                  const libId = String(lib.id);
+                  const libName = lib.title || lib.name || libId;
+                  const isSelected = selectedLibraries.includes(libId);
+                  return (
+                    <button
+                      key={libId}
+                      type="button"
+                      onClick={() => toggleLibrary(libId)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors text-left ${
+                        isSelected
+                          ? 'border-theatarr-500 bg-theatarr-500/10'
+                          : 'border-dark-border hover:border-dark-border/80 hover:bg-dark-bg/50'
+                      }`}
+                    >
+                      <div
+                        className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
+                          isSelected
+                            ? 'bg-theatarr-500 border-theatarr-500'
+                            : 'border-dark-border'
+                        }`}
+                      >
+                        {isSelected && <Check size={14} className="text-white" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-dark-text truncate">{libName}</div>
+                        <div className="text-xs text-dark-muted">
+                          {lib.type || 'unknown'}
+                          {lib.count != null && lib.count > 0 && ` · ${lib.count} éléments`}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

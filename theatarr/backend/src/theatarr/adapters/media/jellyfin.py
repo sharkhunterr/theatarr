@@ -165,6 +165,11 @@ class JellyfinAdapter(ServiceAdapter):
                 parameters=["session_id", "media_id"],
                 description="Play media on an active session",
             ),
+            Capability(
+                name="get_chapters",
+                parameters=["media_id"],
+                description="Get chapter markers for a media item",
+            ),
         ]
 
     async def execute(self, command: Command) -> CommandResult:
@@ -187,6 +192,8 @@ class JellyfinAdapter(ServiceAdapter):
                 return await self._list_sessions()
             elif command.action == "play_on_session":
                 return await self._play_on_session(command.parameters)
+            elif command.action == "get_chapters":
+                return await self._get_chapters(command.parameters)
             else:
                 return CommandResult(
                     success=False,
@@ -247,12 +254,15 @@ class JellyfinAdapter(ServiceAdapter):
 
         movies = []
         for movie in data.get("Items", []):
+            item_id = movie.get("Id")
             movies.append({
-                "id": movie.get("Id"),
+                "id": item_id,
                 "title": movie.get("Name"),
                 "year": movie.get("ProductionYear"),
-                "duration": movie.get("RunTimeTicks", 0) // 10000000,  # ticks to seconds
+                "duration": (movie.get("RunTimeTicks") or 0) // 10000,  # ticks to ms
                 "overview": movie.get("Overview"),
+                "poster_url": f"{self.server_url}/Items/{item_id}/Images/Primary?api_key={self.api_key}" if item_id else None,
+                "backdrop_url": f"{self.server_url}/Items/{item_id}/Images/Backdrop?api_key={self.api_key}" if item_id else None,
                 "genres": movie.get("Genres", []),
                 "rating": movie.get("CommunityRating"),
             })
@@ -278,20 +288,29 @@ class JellyfinAdapter(ServiceAdapter):
         )
         movie = response.json()
 
+        poster_url = f"{self.server_url}/Items/{movie_id}/Images/Primary?api_key={self.api_key}"
+        backdrop_url = f"{self.server_url}/Items/{movie_id}/Images/Backdrop?api_key={self.api_key}"
         return CommandResult(
             success=True,
             data={
                 "id": movie.get("Id"),
                 "title": movie.get("Name"),
                 "year": movie.get("ProductionYear"),
-                "duration": movie.get("RunTimeTicks", 0) // 10000000,
+                "duration": (movie.get("RunTimeTicks") or 0) // 10000,  # ticks to ms
                 "overview": movie.get("Overview"),
+                "tagline": movie.get("Taglines", [None])[0] if movie.get("Taglines") else None,
                 "genres": movie.get("Genres", []),
                 "rating": movie.get("CommunityRating"),
-                "poster": f"{self.server_url}/Items/{movie_id}/Images/Primary?api_key={self.api_key}",
-                "backdrop": f"{self.server_url}/Items/{movie_id}/Images/Backdrop?api_key={self.api_key}",
+                "poster_url": poster_url,
+                "backdrop_url": backdrop_url,
                 "directors": [p.get("Name") for p in movie.get("People", []) if p.get("Type") == "Director"],
                 "actors": [p.get("Name") for p in movie.get("People", []) if p.get("Type") == "Actor"][:5],
+                # Keep legacy names for backward compat
+                "poster": poster_url,
+                "backdrop": backdrop_url,
+                "thumb": poster_url,
+                "art": backdrop_url,
+                "summary": movie.get("Overview"),
             },
         )
 
@@ -302,26 +321,74 @@ class JellyfinAdapter(ServiceAdapter):
 
         query = parameters.get("query", "")
         media_type = parameters.get("type", "Movie")
+        library_ids = parameters.get("library_ids")
+        # Normalize type — Jellyfin is case-sensitive
+        type_map = {"movie": "Movie", "show": "Series", "episode": "Episode"}
+        jellyfin_type = type_map.get(media_type.lower(), media_type)
+
         user_id = self.user_id or await self._get_first_user_id()
 
-        response = await self._client.get(
-            f"{self.server_url}/Users/{user_id}/Items",
-            params={
-                "SearchTerm": query,
-                "IncludeItemTypes": media_type,
-                "Recursive": "true",
-                "Limit": 20,
-            },
-        )
-        data = response.json()
+        # Jellyfin ParentId in search results doesn't match library IDs,
+        # so we must search per library when filtering is needed
+        if library_ids:
+            all_items: list[dict] = []
+            seen_ids: set[str] = set()
+            for lib_id in library_ids:
+                response = await self._client.get(
+                    f"{self.server_url}/Users/{user_id}/Items",
+                    params={
+                        "SearchTerm": query,
+                        "IncludeItemTypes": jellyfin_type,
+                        "Recursive": "true",
+                        "Fields": "Overview,Genres,People",
+                        "Limit": 20,
+                        "ParentId": lib_id,
+                    },
+                )
+                for item in response.json().get("Items", []):
+                    if item.get("Id") not in seen_ids:
+                        seen_ids.add(item.get("Id"))
+                        all_items.append(item)
+        else:
+            response = await self._client.get(
+                f"{self.server_url}/Users/{user_id}/Items",
+                params={
+                    "SearchTerm": query,
+                    "IncludeItemTypes": jellyfin_type,
+                    "Recursive": "true",
+                    "Fields": "Overview,Genres,People",
+                    "Limit": 20,
+                },
+            )
+            all_items = response.json().get("Items", [])
 
         results = []
-        for item in data.get("Items", []):
+        for item in all_items:
+            item_id = item.get("Id")
+
+            # Build image URLs
+            poster_url = f"{self.server_url}/Items/{item_id}/Images/Primary?api_key={self.api_key}" if item_id else None
+            backdrop_url = f"{self.server_url}/Items/{item_id}/Images/Backdrop?api_key={self.api_key}" if item_id else None
+
+            # Extract people
+            people = item.get("People") or []
+            directors = [p.get("Name") for p in people if p.get("Type") == "Director"]
+            actors = [p.get("Name") for p in people if p.get("Type") == "Actor"][:5]
+
             results.append({
-                "id": item.get("Id"),
+                "id": item_id,
                 "title": item.get("Name"),
                 "type": item.get("Type"),
                 "year": item.get("ProductionYear"),
+                "poster_url": poster_url,
+                "backdrop_url": backdrop_url,
+                "overview": item.get("Overview"),
+                "rating": item.get("CommunityRating"),
+                "duration": (item.get("RunTimeTicks") or 0) // 10000,  # ticks → ms
+                "genres": item.get("Genres", []),
+                "directors": directors,
+                "cast": actors,
+                "library_id": item.get("ParentId", ""),
             })
 
         return CommandResult(
@@ -395,6 +462,53 @@ class JellyfinAdapter(ServiceAdapter):
                 success=False,
                 message=f"Failed to start playback: {response.status_code}",
             )
+
+    async def _get_chapters(self, parameters: dict[str, Any]) -> CommandResult:
+        """Get chapter markers for a media item."""
+        if not self._client:
+            return CommandResult(success=False, message="Not connected")
+
+        media_id = parameters.get("media_id")
+        if not media_id:
+            return CommandResult(success=False, message="media_id is required")
+
+        user_id = self.user_id or await self._get_first_user_id()
+
+        response = await self._client.get(
+            f"{self.server_url}/Users/{user_id}/Items/{media_id}"
+        )
+        if response.status_code != 200:
+            return CommandResult(success=False, message="Media not found")
+
+        data = response.json()
+        duration_ticks = data.get("RunTimeTicks", 0)
+        duration_ms = duration_ticks // 10000
+
+        raw_chapters = data.get("Chapters", [])
+        chapters = []
+        for i, ch in enumerate(raw_chapters):
+            start_ticks = ch.get("StartPositionTicks", 0)
+            start_ms = start_ticks // 10000
+            # End = next chapter start, or movie duration for last chapter
+            if i + 1 < len(raw_chapters):
+                end_ms = raw_chapters[i + 1].get("StartPositionTicks", 0) // 10000
+            else:
+                end_ms = duration_ms
+
+            chapters.append({
+                "index": i,
+                "title": ch.get("Name", f"Chapter {i + 1}"),
+                "start_ms": start_ms,
+                "end_ms": end_ms,
+            })
+
+        return CommandResult(
+            success=True,
+            data={
+                "chapters": chapters,
+                "duration_ms": duration_ms,
+            },
+        )
 
     async def _get_first_user_id(self) -> str | None:
         """Get the first available user ID."""

@@ -93,22 +93,21 @@ async def sync_movie_from_source(
     duration_ms = movie_data.get("duration")
     runtime_minutes = int(duration_ms / 60000) if duration_ms else None
 
-    # Get poster and backdrop URLs
-    thumb_url = movie_data.get("thumb") or poster_url
-    art_url = movie_data.get("art")
+    # Both adapters now return normalized poster_url/backdrop_url (full URLs)
+    sync_poster = movie_data.get("poster_url") or poster_url
+    sync_backdrop = movie_data.get("backdrop_url")
 
-    # Fetch alternative images from Plex
+    # Fetch alternative images (Plex has get_movie_images, Jellyfin doesn't yet)
     extra_posters = []
     extra_backdrops = []
-    if source == "plex":
-        try:
-            images_command = Command(action="get_movie_images", parameters={"movie_id": source_id})
-            images_result = await adapter.execute(images_command)
-            if images_result.success and images_result.data:
-                extra_posters = images_result.data.get("extra_posters", [])
-                extra_backdrops = images_result.data.get("extra_backdrops", [])
-        except Exception as e:
-            logger.warning(f"Failed to fetch alternative images from Plex: {e}")
+    try:
+        images_command = Command(action="get_movie_images", parameters={"movie_id": source_id})
+        images_result = await adapter.execute(images_command)
+        if images_result.success and images_result.data:
+            extra_posters = images_result.data.get("extra_posters", [])
+            extra_backdrops = images_result.data.get("extra_backdrops", [])
+    except Exception as e:
+        logger.debug(f"No alternative images from {source}: {e}")
 
     # Create movie object
     movie = Movie(
@@ -116,16 +115,16 @@ async def sync_movie_from_source(
         original_title=movie_data.get("title"),
         year=movie_data.get("year"),
         runtime_minutes=runtime_minutes,
-        overview=movie_data.get("summary"),
+        overview=movie_data.get("overview"),
         tagline=movie_data.get("tagline"),
-        poster_url=thumb_url,
-        backdrop_url=art_url or thumb_url,
+        poster_url=sync_poster,
+        backdrop_url=sync_backdrop or sync_poster,
         extra_backdrops=extra_backdrops,
         extra_posters=extra_posters,
         rating=movie_data.get("rating"),
         genres=movie_data.get("genres", []),
         directors=movie_data.get("directors", []),
-        cast=movie_data.get("actors", []),
+        cast=movie_data.get("cast", movie_data.get("actors", [])),
         source=source,
         plex_key=source_id if source == "plex" else None,
         jellyfin_id=source_id if source == "jellyfin" else None,
@@ -137,13 +136,13 @@ async def sync_movie_from_source(
     logger.info(f"Created movie: {movie.title} (ID: {movie.id})")
 
     # Extract color palette from poster
-    if thumb_url:
+    if sync_poster:
         try:
-            palette_data = await extract_palette_from_url(thumb_url)
+            palette_data = await extract_palette_from_url(sync_poster)
 
             palette = ColorPalette(
                 movie_id=movie.id,
-                source_url=thumb_url,
+                source_url=sync_poster,
                 source_type="poster",
                 primary=palette_data.get("primary"),
                 secondary=palette_data.get("secondary"),

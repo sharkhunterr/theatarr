@@ -279,16 +279,22 @@ class PlexAdapter(ServiceAdapter):
         for movie in data.get("MediaContainer", {}).get("Metadata", []):
             # Extract genres from Plex Genre array
             genres = [g.get("tag") for g in movie.get("Genre", []) if g.get("tag")]
+            thumb = movie.get("thumb")
+            art = movie.get("art")
             movies.append({
                 "id": movie.get("ratingKey"),
                 "title": movie.get("title"),
                 "year": movie.get("year"),
                 "duration": movie.get("duration"),
-                "summary": movie.get("summary"),
-                "thumb": movie.get("thumb"),
-                "art": movie.get("art"),
+                "overview": movie.get("summary"),
+                "poster_url": f"{self.server_url}{thumb}?X-Plex-Token={self.token}" if thumb else None,
+                "backdrop_url": f"{self.server_url}{art}?X-Plex-Token={self.token}" if art else None,
                 "rating": movie.get("audienceRating"),
                 "genres": genres,
+                # Keep raw paths for backward compat
+                "thumb": thumb,
+                "art": art,
+                "summary": movie.get("summary"),
             })
 
         return CommandResult(
@@ -340,6 +346,8 @@ class PlexAdapter(ServiceAdapter):
             return CommandResult(success=False, message="Movie not found")
 
         movie = metadata[0]
+        thumb_url = f"{self.server_url}{movie.get('thumb')}?X-Plex-Token={self.token}" if movie.get("thumb") else None
+        art_url = f"{self.server_url}{movie.get('art')}?X-Plex-Token={self.token}" if movie.get("art") else None
         return CommandResult(
             success=True,
             data={
@@ -347,13 +355,18 @@ class PlexAdapter(ServiceAdapter):
                 "title": movie.get("title"),
                 "year": movie.get("year"),
                 "duration": movie.get("duration"),
-                "summary": movie.get("summary"),
-                "thumb": f"{self.server_url}{movie.get('thumb')}?X-Plex-Token={self.token}",
-                "art": f"{self.server_url}{movie.get('art')}?X-Plex-Token={self.token}",
+                "overview": movie.get("summary"),
+                "poster_url": thumb_url,
+                "backdrop_url": art_url,
                 "rating": movie.get("audienceRating"),
                 "genres": [g.get("tag") for g in movie.get("Genre", [])],
                 "directors": [d.get("tag") for d in movie.get("Director", [])],
                 "actors": [a.get("tag") for a in movie.get("Role", [])[:5]],
+                "tagline": movie.get("tagline"),
+                # Keep legacy names for backward compat
+                "summary": movie.get("summary"),
+                "thumb": thumb_url,
+                "art": art_url,
             },
         )
 
@@ -416,6 +429,7 @@ class PlexAdapter(ServiceAdapter):
 
         query = parameters.get("query", "")
         media_type = parameters.get("type", "movie")
+        library_ids = parameters.get("library_ids")
 
         type_map = {"movie": 1, "show": 2, "episode": 4, "music": 10}
         type_code = type_map.get(media_type, 1)
@@ -426,22 +440,36 @@ class PlexAdapter(ServiceAdapter):
         )
         data = response.json()
 
+        # Build set for library filtering (Plex returns librarySectionID)
+        lib_filter = set(str(lid) for lid in library_ids) if library_ids else None
+
         results = []
         for item in data.get("MediaContainer", {}).get("Metadata", []):
+            lib_id = str(item.get("librarySectionID", ""))
+            if lib_filter and lib_id not in lib_filter:
+                continue
+
+            thumb = item.get("thumb")
+            art = item.get("art")
+            # Extract metadata as flat lists
+            genres = [g.get("tag") for g in item.get("Genre", []) if g.get("tag")]
+            directors = [d.get("tag") for d in item.get("Director", []) if d.get("tag")]
+            cast = [r.get("tag") for r in item.get("Role", [])[:5] if r.get("tag")]
             results.append({
                 "id": item.get("ratingKey"),
                 "title": item.get("title"),
                 "type": item.get("type"),
                 "year": item.get("year"),
-                "thumb": item.get("thumb"),
-                "art": item.get("art"),
-                "summary": item.get("summary"),
+                "overview": item.get("summary"),
+                "poster_url": f"{self.server_url}{thumb}?X-Plex-Token={self.token}" if thumb else None,
+                "backdrop_url": f"{self.server_url}{art}?X-Plex-Token={self.token}" if art else None,
                 "tagline": item.get("tagline"),
                 "rating": item.get("audienceRating") or item.get("rating"),
                 "duration": item.get("duration"),
-                "Genre": item.get("Genre", []),
-                "Director": item.get("Director", []),
-                "Role": item.get("Role", []),
+                "genres": genres,
+                "directors": directors,
+                "cast": cast,
+                "library_id": lib_id,
             })
 
         return CommandResult(
