@@ -2,10 +2,11 @@
  * Compact header for portal interface.
  */
 
-import { Film, LogOut, Settings } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { NotificationBell } from './NotificationBell';
+import { TheatarrLogo } from '../common';
 
 export function PortalHeader() {
   const { user, logout } = useAuthStore();
@@ -18,9 +19,7 @@ export function PortalHeader() {
       <div className="h-full px-4 flex items-center justify-between max-w-3xl mx-auto">
         {/* Logo */}
         <Link to="/portal" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-theatarr-500 flex items-center justify-center">
-            <Film size={18} className="text-white" />
-          </div>
+          <TheatarrLogo size={32} />
           <span className="text-lg font-bold text-dark-text">Theatarr</span>
         </Link>
 

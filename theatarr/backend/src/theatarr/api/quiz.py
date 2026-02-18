@@ -683,6 +683,16 @@ async def end_quiz_session(
         },
     )
 
+    # Fire-and-forget email notifications for quiz completed
+    import asyncio
+    from theatarr.services.email import notify_quiz_completed
+    for token in quiz_session.tokens:
+        if token.user_id:
+            u_result = await db.execute(select(User).where(User.id == token.user_id))
+            u = u_result.scalar_one_or_none()
+            if u and u.email:
+                asyncio.create_task(notify_quiz_completed(u, quiz_session.name, session_id))
+
     return _quiz_session_to_response(quiz_session)
 
 
@@ -974,6 +984,18 @@ async def invite_users_to_quiz(
         added.append(uid)
 
     await db.commit()
+
+    # Fire-and-forget email notifications for quiz invitations
+    if added:
+        import asyncio
+        from theatarr.services.email import notify_quiz_invitation
+        for uid in added:
+            u_result = await db.execute(select(User).where(User.id == uid))
+            u = u_result.scalar_one_or_none()
+            if u and u.email:
+                asyncio.create_task(notify_quiz_invitation(
+                    u, quiz_session.name, quiz_session.id,
+                ))
 
     return {"added": added, "count": len(added)}
 

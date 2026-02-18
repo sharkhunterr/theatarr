@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Button, Card, CardContent, Input } from '../components/common';
+import { Button, Card, CardContent, Input, TheatarrLogo } from '../components/common';
 import { useAuthStore } from '../stores/authStore';
 
 export function Login() {
@@ -39,6 +39,9 @@ export function Login() {
       <Card className="w-full max-w-md">
         <CardContent>
           <div className="text-center mb-8">
+            <div className="flex justify-center mb-3">
+              <TheatarrLogo size={64} />
+            </div>
             <h1 className="text-3xl font-bold text-theatarr-500 mb-2">Theatarr</h1>
             <p className="text-dark-muted">Home Cinema Orchestration</p>
           </div>

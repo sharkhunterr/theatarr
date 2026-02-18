@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from theatarr.database import Base
@@ -65,6 +66,27 @@ class User(UUIDMixin, TimestampMixin, Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    email_notifications: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+        default=None,
+    )
+
+    DEFAULT_EMAIL_NOTIFICATIONS = {
+        "session_invitation": True,
+        "session_started": True,
+        "vote_invitation": True,
+        "vote_closed": True,
+        "quiz_invitation": True,
+        "quiz_completed": True,
+    }
+
+    def wants_email(self, notification_type: str) -> bool:
+        """Check if user wants a given email notification type."""
+        if not self.email:
+            return False
+        prefs = self.email_notifications or self.DEFAULT_EMAIL_NOTIFICATIONS
+        return prefs.get(notification_type, True)
 
     @property
     def is_admin(self) -> bool:

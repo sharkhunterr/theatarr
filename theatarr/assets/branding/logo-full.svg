@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 80">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ed8778"/>
+      <stop offset="100%" stop-color="#cc4030"/>
+    </linearGradient>
+  </defs>
+  <!-- Clapperboard icon -->
+  <g transform="translate(40,40)">
+    <!-- Body -->
+    <rect x="-28" y="-16" width="56" height="44" rx="5" fill="url(#g)"/>
+    <!-- Arm -->
+    <rect x="-28" y="-36" width="56" height="18" rx="3" fill="url(#g)" transform="rotate(-5, 0, -16)"/>
+    <!-- Stripes -->
+    <g transform="rotate(-5, 0, -16)" opacity="0.3">
+      <rect x="-22" y="-40" width="8" height="28" fill="#0f0f0f" transform="skewX(-18)"/>
+      <rect x="-6" y="-40" width="8" height="28" fill="#0f0f0f" transform="skewX(-18)"/>
+      <rect x="10" y="-40" width="8" height="28" fill="#0f0f0f" transform="skewX(-18)"/>
+      <rect x="26" y="-40" width="8" height="28" fill="#0f0f0f" transform="skewX(-18)"/>
+    </g>
+    <!-- Hinge -->
+    <rect x="-28" y="-18" width="56" height="3" rx="1.5" fill="#ab3325"/>
+    <!-- Screen -->
+    <rect x="-22" y="-9" width="44" height="32" rx="3" fill="#0f0f0f"/>
+    <!-- Play -->
+    <polygon points="-6,-1 -6,13 8,6" fill="#e5e5e5" opacity="0.9"/>
+  </g>
+  <!-- Theatarr text -->
+  <text x="84" y="52" font-family="'Segoe UI',system-ui,sans-serif" font-size="38" font-weight="700" fill="#e5e5e5" letter-spacing="-1">Theatarr</text>
+</svg>

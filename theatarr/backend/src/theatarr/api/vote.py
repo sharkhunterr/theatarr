@@ -312,6 +312,38 @@ async def open_vote_session(
             detail=str(e),
         )
 
+    # Fire-and-forget email notifications for vote participants
+    import asyncio
+    from theatarr.models.vote_session_participant import VoteSessionParticipant
+    from theatarr.models.user import User
+    from theatarr.services.email import notify_vote_invitation
+
+    # Collect all participant user IDs (direct + session-linked)
+    notify_user_ids: set[str] = set()
+    part_result = await db.execute(
+        select(VoteSessionParticipant.user_id)
+        .where(VoteSessionParticipant.vote_session_id == session_id)
+    )
+    for row in part_result.all():
+        notify_user_ids.add(row[0])
+
+    if vote_session.linked_session_id:
+        from theatarr.models.session_participant import SessionParticipant
+        sp_result = await db.execute(
+            select(SessionParticipant.user_id)
+            .where(SessionParticipant.session_id == vote_session.linked_session_id)
+        )
+        for row in sp_result.all():
+            notify_user_ids.add(row[0])
+
+    for uid in notify_user_ids:
+        u_result = await db.execute(select(User).where(User.id == uid))
+        u = u_result.scalar_one_or_none()
+        if u and u.email:
+            asyncio.create_task(notify_vote_invitation(
+                u, vote_session.name, vote_session.id, vote_session.closes_at,
+            ))
+
     return _vote_session_to_response(vote_session)
 
 
@@ -673,6 +705,18 @@ async def add_vote_participants(
         added.append(uid)
 
     await db.commit()
+
+    # Fire-and-forget email notifications for vote participants
+    if added and vote_session.status == VoteSessionStatus.OPEN:
+        import asyncio
+        from theatarr.services.email import notify_vote_invitation
+        for uid in added:
+            u_result = await db.execute(select(User).where(User.id == uid))
+            u = u_result.scalar_one_or_none()
+            if u and u.email:
+                asyncio.create_task(notify_vote_invitation(
+                    u, vote_session.name, vote_session.id, vote_session.closes_at,
+                ))
 
     return {"added": added, "count": len(added)}
 

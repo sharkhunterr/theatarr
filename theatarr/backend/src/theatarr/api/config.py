@@ -263,6 +263,39 @@ async def import_config_json(
 
 
 # ============================================================================
+# Email Test Endpoint
+# ============================================================================
+
+
+class TestEmailRequest(BaseModel):
+    """Optional target email for test."""
+
+    to_email: str | None = None
+
+
+@router.post("/email/test")
+async def test_email(
+    body: TestEmailRequest | None = None,
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Send a test email. Uses provided email or falls back to admin's email."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    target_email = (body.to_email if body and body.to_email else None) or current_user.email
+    if not target_email:
+        raise HTTPException(
+            status_code=400,
+            detail="Aucune adresse email cible. Renseignez une adresse ou configurez votre email de compte.",
+        )
+
+    from theatarr.services.email import send_test_email
+
+    result = await send_test_email(target_email)
+    return result
+
+
+# ============================================================================
 # Settings Endpoints
 # ============================================================================
 

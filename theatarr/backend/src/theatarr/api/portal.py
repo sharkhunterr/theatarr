@@ -77,6 +77,7 @@ async def get_my_profile(
         email=user.email,
         role=user.role,
         auto_accept_invitations=user.auto_accept_invitations,
+        email_notifications=user.email_notifications,
         created_at=user.created_at,
     )
 
@@ -119,6 +120,7 @@ async def update_my_profile(
         email=user.email,
         role=user.role,
         auto_accept_invitations=user.auto_accept_invitations,
+        email_notifications=user.email_notifications,
         created_at=user.created_at,
     )
 

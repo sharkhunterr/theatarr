@@ -1936,6 +1936,18 @@ async def add_session_participants(
 
     await db.commit()
 
+    # Fire-and-forget email notifications for invited participants
+    import asyncio
+    from theatarr.services.email import notify_session_invitation
+    for uid in added:
+        # Re-query user for email
+        u_result = await db.execute(select(User).where(User.id == uid))
+        u = u_result.scalar_one_or_none()
+        if u and u.email:
+            asyncio.create_task(notify_session_invitation(
+                u, session.name, session_id, session.scheduled_at,
+            ))
+
     return {"added": added, "auto_accepted": auto_accepted, "count": len(added)}
 
 

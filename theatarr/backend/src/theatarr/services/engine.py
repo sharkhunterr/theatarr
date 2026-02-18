@@ -512,6 +512,29 @@ class SequenceEngine:
             }
         await ws_manager.broadcast_session_state(session.id, state)
 
+    async def _notify_session_started(
+        self, session_id: str, session_name: str, movie_title: str | None,
+    ) -> None:
+        """Send email notifications when a session starts (background)."""
+        try:
+            from theatarr.database import async_session_maker
+            from theatarr.services.email import notify_session_started
+            from theatarr.models.session_participant import SessionParticipant
+            from theatarr.models.user import User
+
+            async with async_session_maker() as db:
+                result = await db.execute(
+                    select(SessionParticipant.user_id)
+                    .where(SessionParticipant.session_id == session_id)
+                )
+                for row in result.all():
+                    ur = await db.execute(select(User).where(User.id == row[0]))
+                    u = ur.scalar_one_or_none()
+                    if u and u.email:
+                        await notify_session_started(u, session_name, movie_title)
+        except Exception:
+            logger.warning("Failed to send session_started emails for %s", session_id, exc_info=True)
+
     # ------------------------------------------------------------------
     # Public lifecycle methods (called from request handlers)
     # ------------------------------------------------------------------
@@ -543,6 +566,11 @@ class SequenceEngine:
                 "movie_title": session.movie_title,
                 "total_sequences": session.total_sequences,
             })
+
+            # Fire-and-forget email notifications for session started
+            asyncio.create_task(self._notify_session_started(
+                session_id, session.name, session.movie_title,
+            ))
 
             task = asyncio.create_task(self._run_session(session_id))
             self._running_sessions[session_id] = task

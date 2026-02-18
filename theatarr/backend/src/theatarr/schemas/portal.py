@@ -157,6 +157,7 @@ class PortalProfileResponse(BaseSchema):
     email: str | None
     role: str
     auto_accept_invitations: bool
+    email_notifications: dict | None = None
     created_at: datetime
 
 

@@ -45,6 +45,7 @@ class UserResponse(BaseSchema):
     role: str
     is_active: bool
     last_login_at: datetime | None
+    email_notifications: dict | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -72,6 +73,7 @@ class UserSelfUpdate(BaseSchema):
     last_name: str | None = Field(default=None, max_length=100)
     email: EmailStr | None = None
     auto_accept_invitations: bool | None = None
+    email_notifications: dict | None = None
 
 
 class PasswordChangeRequest(BaseSchema):

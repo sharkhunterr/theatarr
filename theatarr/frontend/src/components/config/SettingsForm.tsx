@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Save, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { Save, RefreshCw, Plus, Trash2, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button, Input, Card } from '../common';
+import { apiClient } from '../../api/client';
 
 interface SettingsFormProps {
   settings: Record<string, unknown>;
@@ -14,7 +15,7 @@ interface SettingDefinition {
   key: string;
   label: string;
   description: string;
-  type: 'string' | 'number' | 'boolean' | 'json' | 'select';
+  type: 'string' | 'number' | 'boolean' | 'json' | 'select' | 'password';
   defaultValue?: unknown;
   category: string;
   options?: { value: string; label: string }[];
@@ -156,6 +157,77 @@ const SETTINGS_SCHEMA: SettingDefinition[] = [
     ],
   },
 
+  // Email
+  {
+    key: 'email.enabled',
+    label: 'Activer les emails',
+    description: 'Activer l\'envoi d\'emails de notification',
+    type: 'boolean',
+    defaultValue: false,
+    category: 'Email',
+  },
+  {
+    key: 'email.smtp_host',
+    label: 'Serveur SMTP',
+    description: 'Adresse du serveur SMTP (ex: smtp.gmail.com)',
+    type: 'string',
+    defaultValue: '',
+    category: 'Email',
+  },
+  {
+    key: 'email.smtp_port',
+    label: 'Port SMTP',
+    description: 'Port du serveur SMTP (587 pour TLS, 465 pour SSL)',
+    type: 'number',
+    defaultValue: 587,
+    category: 'Email',
+  },
+  {
+    key: 'email.smtp_username',
+    label: 'Identifiant SMTP',
+    description: 'Nom d\'utilisateur pour l\'authentification SMTP',
+    type: 'string',
+    defaultValue: '',
+    category: 'Email',
+  },
+  {
+    key: 'email.smtp_password',
+    label: 'Mot de passe SMTP',
+    description: 'Mot de passe ou mot de passe d\'application (Gmail)',
+    type: 'password',
+    defaultValue: '',
+    category: 'Email',
+  },
+  {
+    key: 'email.smtp_from_email',
+    label: 'Email expéditeur',
+    description: 'Adresse email de l\'expéditeur',
+    type: 'string',
+    defaultValue: '',
+    category: 'Email',
+  },
+  {
+    key: 'email.smtp_from_name',
+    label: 'Nom expéditeur',
+    description: 'Nom affiché de l\'expéditeur',
+    type: 'string',
+    defaultValue: 'Theatarr',
+    category: 'Email',
+  },
+  {
+    key: 'email.smtp_security',
+    label: 'Securite',
+    description: 'Mode de chiffrement de la connexion SMTP',
+    type: 'select',
+    defaultValue: 'starttls',
+    category: 'Email',
+    options: [
+      { value: 'starttls', label: 'STARTTLS (port 587)' },
+      { value: 'ssl', label: 'SSL/TLS (port 465)' },
+      { value: 'none', label: 'Aucun' },
+    ],
+  },
+
   // API
   {
     key: 'api.rate_limit_per_minute',
@@ -179,6 +251,8 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
   const [localSettings, setLocalSettings] = useState<Record<string, unknown>>({});
   const [customSettings, setCustomSettings] = useState<Array<{ key: string; value: string }>>([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [testEmailStatus, setTestEmailStatus] = useState<{ loading: boolean; success?: boolean; error?: string }>({ loading: false });
+  const [testEmailAddress, setTestEmailAddress] = useState('');
 
   useEffect(() => {
     // Initialize local settings with defaults and current values
@@ -325,6 +399,15 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
             rows={4}
           />
         );
+      case 'password':
+        return (
+          <Input
+            type="password"
+            value={String(value ?? '')}
+            onChange={(e) => updateSetting(def.key, e.target.value)}
+            placeholder="••••••••"
+          />
+        );
       default:
         return (
           <Input
@@ -353,6 +436,62 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
                 </div>
               ))}
             </div>
+            {category === 'Email' && (
+              <div className="mt-6 pt-4 border-t border-dark-border">
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="email"
+                    value={testEmailAddress}
+                    onChange={(e) => setTestEmailAddress(e.target.value)}
+                    placeholder="Adresse email de test"
+                    className="max-w-xs"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      setTestEmailStatus({ loading: true });
+                      try {
+                        const res = await apiClient.post<{ success: boolean; error?: string | null }>(
+                          '/config/email/test',
+                          testEmailAddress ? { to_email: testEmailAddress } : {},
+                        );
+                        if (res.success) {
+                          setTestEmailStatus({ loading: false, success: true });
+                        } else {
+                          setTestEmailStatus({ loading: false, success: false, error: res.error || 'Erreur inconnue' });
+                        }
+                      } catch (err: unknown) {
+                        const msg = err instanceof Error ? err.message : 'Erreur réseau';
+                        setTestEmailStatus({ loading: false, success: false, error: msg });
+                      }
+                      setTimeout(() => setTestEmailStatus({ loading: false }), 8000);
+                    }}
+                    disabled={testEmailStatus.loading}
+                  >
+                    <Send size={14} />
+                    <span className="ml-1.5">
+                      {testEmailStatus.loading ? 'Envoi...' : 'Tester'}
+                    </span>
+                  </Button>
+                </div>
+                <div className="mt-2">
+                  {testEmailStatus.success === true && (
+                    <span className="flex items-center gap-1 text-sm text-green-400">
+                      <CheckCircle size={14} /> Email envoye avec succes
+                    </span>
+                  )}
+                  {testEmailStatus.success === false && testEmailStatus.error && (
+                    <span className="flex items-center gap-1 text-sm text-red-400">
+                      <AlertCircle size={14} /> {testEmailStatus.error}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-dark-muted mt-1">
+                  Enregistrez d'abord vos parametres SMTP, puis saisissez une adresse et cliquez sur Tester.
+                </p>
+              </div>
+            )}
           </div>
         </Card>
       ))}

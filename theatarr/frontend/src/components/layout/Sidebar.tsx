@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useLayoutStore } from '../../stores/layoutStore';
+import { TheatarrLogo } from '../common';
 
 interface NavItem {
   label: string;
@@ -145,9 +146,7 @@ export function Sidebar() {
             sidebarCollapsed ? 'justify-center' : 'gap-3'
           )}
         >
-          <div className="w-8 h-8 rounded-lg bg-theatarr-500 flex items-center justify-center">
-            <Film size={18} className="text-white" />
-          </div>
+          <TheatarrLogo size={32} />
           {!sidebarCollapsed && (
             <span className="text-lg font-bold text-dark-text">Theatarr</span>
           )}
@@ -192,9 +191,7 @@ export function Sidebar() {
       >
         {/* Logo */}
         <div className="h-16 flex items-center gap-3 border-b border-dark-border px-4">
-          <div className="w-8 h-8 rounded-lg bg-theatarr-500 flex items-center justify-center">
-            <Film size={18} className="text-white" />
-          </div>
+          <TheatarrLogo size={32} />
           <span className="text-lg font-bold text-dark-text">Theatarr</span>
         </div>
 

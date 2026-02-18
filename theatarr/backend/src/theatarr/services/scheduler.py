@@ -229,6 +229,44 @@ class SessionScheduler:
                         "type": "vote_closed",
                         "payload": {"vote_session_id": vs.id, "name": vs.name},
                     })
+
+                    # Fire-and-forget email notifications for vote results
+                    try:
+                        import asyncio
+                        from theatarr.services.email import notify_vote_closed
+                        from theatarr.models.vote_session_participant import VoteSessionParticipant
+                        from theatarr.models.user import User
+
+                        winner_title = None
+                        if vs.winning_movie_index is not None and vs.movie_options:
+                            opts = vs.movie_options
+                            if vs.winning_movie_index < len(opts):
+                                winner_title = opts[vs.winning_movie_index].get("title")
+
+                        notify_uids: set[str] = set()
+                        pr = await db.execute(
+                            select(VoteSessionParticipant.user_id)
+                            .where(VoteSessionParticipant.vote_session_id == vs.id)
+                        )
+                        for row in pr.all():
+                            notify_uids.add(row[0])
+                        if vs.linked_session_id:
+                            from theatarr.models.session_participant import SessionParticipant
+                            spr = await db.execute(
+                                select(SessionParticipant.user_id)
+                                .where(SessionParticipant.session_id == vs.linked_session_id)
+                            )
+                            for row in spr.all():
+                                notify_uids.add(row[0])
+
+                        for uid in notify_uids:
+                            ur = await db.execute(select(User).where(User.id == uid))
+                            u = ur.scalar_one_or_none()
+                            if u and u.email:
+                                asyncio.create_task(notify_vote_closed(u, vs.name, winner_title))
+                    except Exception:
+                        logger.warning("Failed to send vote_closed emails for %s", vs.id, exc_info=True)
+
                 except Exception as e:
                     logger.exception("Failed to auto-close vote session %s: %s", vs.id, e)
 

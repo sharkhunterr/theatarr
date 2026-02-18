@@ -3,7 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Lock, Save, Eye, EyeOff, Shield, Bell } from 'lucide-react';
+import { Lock, Save, Eye, EyeOff, Shield, Bell, Mail } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../api/client';
@@ -17,8 +17,18 @@ interface ProfileData {
   email: string | null;
   role: string;
   auto_accept_invitations: boolean;
+  email_notifications: Record<string, boolean> | null;
   created_at: string;
 }
+
+const EMAIL_NOTIFICATION_TYPES = [
+  { key: 'session_invitation', label: 'Invitation a une seance' },
+  { key: 'session_started', label: 'Demarrage de seance' },
+  { key: 'vote_invitation', label: 'Invitation a un vote' },
+  { key: 'vote_closed', label: 'Resultats du vote' },
+  { key: 'quiz_invitation', label: 'Invitation a un quiz' },
+  { key: 'quiz_completed', label: 'Resultats du quiz' },
+] as const;
 
 export function Profile() {
   const navigate = useNavigate();
@@ -69,6 +79,14 @@ export function Profile() {
   const toggleAutoAcceptMutation = useMutation({
     mutationFn: (value: boolean) =>
       apiClient.patch('/portal/me', { auto_accept_invitations: value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['portal', 'me'] });
+    },
+  });
+
+  const toggleEmailNotifMutation = useMutation({
+    mutationFn: (prefs: Record<string, boolean>) =>
+      apiClient.patch('/portal/me', { email_notifications: prefs }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portal', 'me'] });
     },
@@ -292,6 +310,56 @@ export function Profile() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Email Notification Preferences */}
+      <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
+        <h3 className="font-medium text-dark-text flex items-center gap-2 mb-4">
+          <Mail size={18} />
+          Notifications par email
+        </h3>
+
+        {!profile?.email ? (
+          <p className="text-sm text-dark-muted">
+            Configurez une adresse email dans vos informations pour recevoir des notifications.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {EMAIL_NOTIFICATION_TYPES.map(({ key, label }) => {
+              const prefs = profile?.email_notifications;
+              // Default to true when prefs is null (all enabled by default)
+              const isEnabled = prefs ? (prefs[key] ?? true) : true;
+
+              return (
+                <div key={key} className="flex items-center justify-between">
+                  <p className="text-dark-text text-sm">{label}</p>
+                  <button
+                    onClick={() => {
+                      const current = profile?.email_notifications || {};
+                      // Build full prefs object with defaults
+                      const newPrefs: Record<string, boolean> = {};
+                      EMAIL_NOTIFICATION_TYPES.forEach(({ key: k }) => {
+                        newPrefs[k] = current[k] ?? true;
+                      });
+                      newPrefs[key] = !isEnabled;
+                      toggleEmailNotifMutation.mutate(newPrefs);
+                    }}
+                    disabled={toggleEmailNotifMutation.isPending}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                      isEnabled ? 'bg-theatarr-500' : 'bg-dark-border'
+                    } ${toggleEmailNotifMutation.isPending ? 'opacity-50' : ''}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                        isEnabled ? 'left-[22px]' : 'left-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Password change */}
