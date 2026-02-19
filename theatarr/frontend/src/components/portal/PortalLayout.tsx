@@ -20,7 +20,7 @@ export function PortalLayout({ children }: PortalLayoutProps) {
       <DesktopNav />
 
       {/* Main content */}
-      <main className="pt-14 md:pt-24 pb-20 md:pb-6 px-4 max-w-3xl mx-auto">
+      <main className="pt-16 md:pt-28 pb-20 md:pb-6 px-4 max-w-3xl mx-auto">
         {children}
       </main>
 

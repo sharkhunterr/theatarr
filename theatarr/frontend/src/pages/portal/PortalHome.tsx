@@ -96,38 +96,71 @@ export function PortalHome() {
     refetchInterval: 15000,
   });
 
+  const statItems = [
+    {
+      icon: Calendar,
+      value: stats?.upcoming_sessions ?? '-',
+      label: 'A venir',
+      color: 'blue',
+      gradient: 'from-blue-500/15 to-blue-500/5',
+      iconBg: 'bg-blue-500/20',
+      iconColor: 'text-blue-400',
+    },
+    {
+      icon: Vote,
+      value: stats?.pending_votes ?? '-',
+      label: 'Votes',
+      color: 'theatarr',
+      gradient: 'from-theatarr-500/15 to-theatarr-500/5',
+      iconBg: 'bg-theatarr-500/20',
+      iconColor: 'text-theatarr-400',
+    },
+    {
+      icon: Film,
+      value: stats?.total_sessions_attended ?? '-',
+      label: 'Vues',
+      color: 'green',
+      gradient: 'from-green-500/15 to-green-500/5',
+      iconBg: 'bg-green-500/20',
+      iconColor: 'text-green-400',
+    },
+    {
+      icon: CheckCircle,
+      value: stats?.total_votes_cast ?? '-',
+      label: 'Votés',
+      color: 'purple',
+      gradient: 'from-purple-500/15 to-purple-500/5',
+      iconBg: 'bg-purple-500/20',
+      iconColor: 'text-purple-400',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Welcome */}
-      <div className="text-center py-4">
-        <h1 className="text-2xl font-bold text-dark-text">
-          Bonjour, {displayName}
+      <div className="text-center py-2">
+        <p className="text-sm text-dark-muted mb-1">Bonjour,</p>
+        <h1 className="text-xl font-bold text-dark-text">
+          {displayName}
         </h1>
-        <p className="text-dark-muted mt-1">Bienvenue sur votre portail cinema</p>
       </div>
 
       {/* Quick stats */}
-      <div className="grid grid-cols-4 gap-2">
-        <div className="bg-dark-surface rounded-lg border border-dark-border p-2 text-center">
-          <Calendar className="text-blue-400 mx-auto mb-1" size={16} />
-          <p className="text-lg font-bold text-dark-text">{stats?.upcoming_sessions ?? '-'}</p>
-          <p className="text-[10px] text-dark-muted">A venir</p>
-        </div>
-        <div className="bg-dark-surface rounded-lg border border-dark-border p-2 text-center">
-          <Vote className="text-theatarr-400 mx-auto mb-1" size={16} />
-          <p className="text-lg font-bold text-dark-text">{stats?.pending_votes ?? '-'}</p>
-          <p className="text-[10px] text-dark-muted">Votes</p>
-        </div>
-        <div className="bg-dark-surface rounded-lg border border-dark-border p-2 text-center">
-          <Film className="text-green-400 mx-auto mb-1" size={16} />
-          <p className="text-lg font-bold text-dark-text">{stats?.total_sessions_attended ?? '-'}</p>
-          <p className="text-[10px] text-dark-muted">Vues</p>
-        </div>
-        <div className="bg-dark-surface rounded-lg border border-dark-border p-2 text-center">
-          <CheckCircle className="text-purple-400 mx-auto mb-1" size={16} />
-          <p className="text-lg font-bold text-dark-text">{stats?.total_votes_cast ?? '-'}</p>
-          <p className="text-[10px] text-dark-muted">Votes</p>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {statItems.map((stat) => (
+          <div
+            key={stat.label}
+            className={`bg-gradient-to-br ${stat.gradient} rounded-xl p-3 flex items-center gap-3`}
+          >
+            <div className={`w-9 h-9 rounded-lg ${stat.iconBg} flex items-center justify-center flex-shrink-0`}>
+              <stat.icon size={18} className={stat.iconColor} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl font-bold text-dark-text leading-none">{stat.value}</p>
+              <p className="text-[11px] text-dark-muted mt-0.5">{stat.label}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Pending invitations */}
