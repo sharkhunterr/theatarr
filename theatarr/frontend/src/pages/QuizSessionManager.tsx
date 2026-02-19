@@ -17,6 +17,10 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  Sparkles,
+  Loader2,
+  RefreshCw,
+  Shuffle,
 } from 'lucide-react';
 import { Button, Card, Modal, Spinner, ButtonGroup } from '../components/common';
 import { apiClient } from '../api/client';
@@ -115,9 +119,11 @@ const emptyQuestion: QuizQuestion = {
 interface QuizSessionManagerProps {
   createOpen?: boolean;
   onCreateOpenChange?: (open: boolean) => void;
+  aiQuizOpen?: boolean;
+  onAiQuizOpenChange?: (open: boolean) => void;
 }
 
-export function QuizSessionManager({ createOpen, onCreateOpenChange }: QuizSessionManagerProps = {}) {
+export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen, onAiQuizOpenChange }: QuizSessionManagerProps = {}) {
   const queryClient = useQueryClient();
   const { language } = useLayoutStore();
   const [selectedSession, setSelectedSession] = useState<QuizSession | null>(null);
@@ -566,6 +572,23 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange }: QuizSessi
             }}
           />
         )}
+      </Modal>
+
+      {/* AI Quiz Generator Modal */}
+      <Modal
+        isOpen={aiQuizOpen ?? false}
+        onClose={() => onAiQuizOpenChange?.(false)}
+        title={language === 'fr' ? 'Générer un quiz par IA' : 'AI Quiz Generator'}
+        size="lg"
+      >
+        <AIQuizGenerator
+          language={language}
+          onCreated={() => {
+            onAiQuizOpenChange?.(false);
+            queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
+          }}
+          onCancel={() => onAiQuizOpenChange?.(false)}
+        />
       </Modal>
     </div>
   );
@@ -1113,6 +1136,370 @@ interface InviteUser {
   first_name?: string;
   last_name?: string;
 }
+
+// ============================================================================
+// AI Quiz Generator (The Trivia API)
+// ============================================================================
+
+const TRIVIA_CATEGORIES = [
+  { slug: 'film_and_tv', label: { fr: 'Film & TV', en: 'Film & TV' } },
+  { slug: 'music', label: { fr: 'Musique', en: 'Music' } },
+  { slug: 'general_knowledge', label: { fr: 'Culture générale', en: 'General Knowledge' } },
+  { slug: 'arts_and_literature', label: { fr: 'Arts & Littérature', en: 'Arts & Literature' } },
+  { slug: 'science', label: { fr: 'Science', en: 'Science' } },
+  { slug: 'history', label: { fr: 'Histoire', en: 'History' } },
+  { slug: 'geography', label: { fr: 'Géographie', en: 'Geography' } },
+  { slug: 'sport_and_leisure', label: { fr: 'Sport & Loisirs', en: 'Sport & Leisure' } },
+  { slug: 'society_and_culture', label: { fr: 'Société & Culture', en: 'Society & Culture' } },
+  { slug: 'food_and_drink', label: { fr: 'Gastronomie', en: 'Food & Drink' } },
+];
+
+const TRIVIA_DIFFICULTIES = [
+  { key: 'mixed', label: { fr: 'Mélangé', en: 'Mixed' } },
+  { key: 'easy', label: { fr: 'Facile', en: 'Easy' } },
+  { key: 'medium', label: { fr: 'Moyen', en: 'Medium' } },
+  { key: 'hard', label: { fr: 'Difficile', en: 'Hard' } },
+];
+
+interface TriviaApiQuestion {
+  id: string;
+  category: string;
+  correctAnswer: string;
+  incorrectAnswers: string[];
+  question: { text: string };
+  tags: string[];
+  type: string;
+  difficulty: string;
+}
+
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+function convertTriviaToQuiz(triviaQuestions: TriviaApiQuestion[]): QuizQuestion[] {
+  return triviaQuestions.map((tq) => {
+    const allChoices = shuffleArray([tq.correctAnswer, ...tq.incorrectAnswers]);
+    const correctIndex = allChoices.indexOf(tq.correctAnswer);
+    return {
+      text: tq.question.text,
+      choices: allChoices,
+      correct_indices: [correctIndex],
+      allow_multiple: false,
+      time_limit_seconds: null,
+      hint: null,
+      image_url: null,
+    };
+  });
+}
+
+function AIQuizGenerator({
+  language,
+  onCreated,
+  onCancel,
+}: {
+  language: 'en' | 'fr';
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
+  const [step, setStep] = useState<'config' | 'preview'>('config');
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('film_and_tv');
+  const [difficulty, setDifficulty] = useState('mixed');
+  const [questionCount, setQuestionCount] = useState(10);
+  const [tags, setTags] = useState('');
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [generatedQuestions, setGeneratedQuestions] = useState<QuizQuestion[]>([]);
+  const [triviaRaw, setTriviaRaw] = useState<TriviaApiQuestion[]>([]);
+  const [creating, setCreating] = useState(false);
+
+  const t = {
+    quizName: language === 'fr' ? 'Nom du quiz' : 'Quiz name',
+    category: language === 'fr' ? 'Catégorie' : 'Category',
+    difficulty: language === 'fr' ? 'Difficulté' : 'Difficulty',
+    questionCount: language === 'fr' ? 'Nombre de questions' : 'Number of questions',
+    tags: language === 'fr' ? 'Tags (optionnel)' : 'Tags (optional)',
+    tagsHelp: language === 'fr' ? 'Séparer par des virgules (ex: james_bond, marvel)' : 'Comma separated (e.g. james_bond, marvel)',
+    generate: language === 'fr' ? 'Générer' : 'Generate',
+    regenerate: language === 'fr' ? 'Regénérer' : 'Regenerate',
+    create: language === 'fr' ? 'Créer le quiz' : 'Create quiz',
+    cancel: language === 'fr' ? 'Annuler' : 'Cancel',
+    back: language === 'fr' ? 'Retour' : 'Back',
+    preview: language === 'fr' ? 'Aperçu des questions' : 'Questions preview',
+    generating: language === 'fr' ? 'Génération en cours...' : 'Generating...',
+    noQuestions: language === 'fr' ? 'Aucune question trouvée pour ces critères.' : 'No questions found for these criteria.',
+    englishNote: language === 'fr' ? 'Les questions sont en anglais (API gratuite).' : 'Questions are in English (free API).',
+    correct: language === 'fr' ? 'Correcte' : 'Correct',
+    source: language === 'fr' ? 'Source : The Trivia API' : 'Source: The Trivia API',
+    shuffleChoices: language === 'fr' ? 'Mélanger les choix' : 'Shuffle choices',
+  };
+
+  const fetchQuestions = async () => {
+    setFetching(true);
+    setFetchError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', String(questionCount));
+      params.set('categories', category);
+      params.set('types', 'text_choice');
+      if (difficulty !== 'mixed') {
+        params.set('difficulties', difficulty);
+      }
+      if (tags.trim()) {
+        params.set('tags', tags.trim().replace(/\s*,\s*/g, ','));
+      }
+
+      const response = await fetch(`https://the-trivia-api.com/v2/questions?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      const data: TriviaApiQuestion[] = await response.json();
+
+      if (data.length === 0) {
+        setFetchError(t.noQuestions);
+        setFetching(false);
+        return;
+      }
+
+      setTriviaRaw(data);
+      setGeneratedQuestions(convertTriviaToQuiz(data));
+
+      // Auto-generate name if empty
+      if (!name.trim()) {
+        const catLabel = TRIVIA_CATEGORIES.find((c) => c.slug === category)?.label[language] || category;
+        const diffLabel = difficulty !== 'mixed'
+          ? ` - ${TRIVIA_DIFFICULTIES.find((d) => d.key === difficulty)?.label[language]}`
+          : '';
+        setName(`Quiz ${catLabel}${diffLabel}`);
+      }
+
+      setStep('preview');
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const reshuffleAll = () => {
+    setGeneratedQuestions(convertTriviaToQuiz(triviaRaw));
+  };
+
+  const createQuiz = async () => {
+    setCreating(true);
+    try {
+      await apiClient.post('/quiz-sessions', {
+        name: name.trim() || 'AI Quiz',
+        description: `${t.source} (${TRIVIA_CATEGORIES.find((c) => c.slug === category)?.label[language]})`,
+        questions: generatedQuestions,
+        config: { ...defaultConfig },
+      });
+      onCreated();
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to create quiz');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (step === 'preview') {
+    return (
+      <div className="space-y-4">
+        {/* Header info */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-dark-text">{name}</h3>
+            <p className="text-xs text-dark-muted">{generatedQuestions.length} questions &middot; {t.englishNote}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={reshuffleAll} title={t.shuffleChoices}>
+              <Shuffle size={14} />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => { setStep('config'); setFetchError(null); }}>
+              <RefreshCw size={14} className="mr-1" />
+              {t.regenerate}
+            </Button>
+          </div>
+        </div>
+
+        {/* Questions preview */}
+        <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+          {generatedQuestions.map((q, idx) => (
+            <div key={idx} className="p-3 bg-dark-bg rounded-lg border border-dark-border">
+              <div className="flex items-start gap-2 mb-2">
+                <span className="text-xs font-mono text-dark-muted bg-dark-surface px-1.5 py-0.5 rounded flex-shrink-0">
+                  {idx + 1}
+                </span>
+                <p className="text-sm text-dark-text">{q.text}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-7">
+                {q.choices.map((choice, cIdx) => (
+                  <div
+                    key={cIdx}
+                    className={`text-xs px-2 py-1 rounded ${
+                      q.correct_indices.includes(cIdx)
+                        ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                        : 'bg-dark-surface text-dark-muted border border-dark-border'
+                    }`}
+                  >
+                    {q.correct_indices.includes(cIdx) && <Check size={10} className="inline mr-1" />}
+                    {choice}
+                  </div>
+                ))}
+              </div>
+              {triviaRaw[idx] && (
+                <div className="flex items-center gap-2 mt-1.5 ml-7">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
+                    triviaRaw[idx].difficulty === 'easy'
+                      ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                      : triviaRaw[idx].difficulty === 'medium'
+                      ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
+                      : 'bg-red-500/10 text-red-400 border-red-500/30'
+                  }`}>
+                    {triviaRaw[idx].difficulty}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Name input */}
+        <div>
+          <label className="text-xs text-dark-muted mb-1 block">{t.quizName}</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:border-theatarr-500 text-sm"
+          />
+        </div>
+
+        {fetchError && (
+          <p className="text-red-400 text-sm">{fetchError}</p>
+        )}
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3 pt-3 border-t border-dark-border">
+          <Button variant="ghost" onClick={onCancel}>
+            {t.cancel}
+          </Button>
+          <Button onClick={createQuiz} disabled={creating || generatedQuestions.length === 0}>
+            {creating ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Sparkles size={14} className="mr-1" />}
+            {t.create}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step: config
+  return (
+    <div className="space-y-5">
+      {/* Quiz name */}
+      <div>
+        <label className="text-xs text-dark-muted mb-1 block">{t.quizName}</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={language === 'fr' ? 'Auto-généré si vide' : 'Auto-generated if empty'}
+          className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:border-theatarr-500 text-sm"
+        />
+      </div>
+
+      {/* Category */}
+      <div>
+        <label className="text-xs text-dark-muted mb-1 block">{t.category}</label>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:outline-none focus:border-theatarr-500 text-sm"
+        >
+          {TRIVIA_CATEGORIES.map((cat) => (
+            <option key={cat.slug} value={cat.slug}>{cat.label[language]}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Difficulty */}
+      <div>
+        <label className="text-xs text-dark-muted mb-1 block">{t.difficulty}</label>
+        <div className="flex gap-2 flex-wrap">
+          {TRIVIA_DIFFICULTIES.map((diff) => (
+            <button
+              key={diff.key}
+              onClick={() => setDifficulty(diff.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                difficulty === diff.key
+                  ? 'bg-theatarr-500 text-white border-theatarr-500'
+                  : 'bg-dark-surface text-dark-muted border-dark-border hover:border-dark-muted'
+              }`}
+            >
+              {diff.label[language]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Question count */}
+      <div>
+        <label className="text-xs text-dark-muted mb-1 block">{t.questionCount}: {questionCount}</label>
+        <input
+          type="range"
+          min={5}
+          max={20}
+          step={5}
+          value={questionCount}
+          onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+          className="w-full accent-theatarr-500"
+        />
+        <div className="flex justify-between text-[10px] text-dark-muted mt-1">
+          <span>5</span><span>10</span><span>15</span><span>20</span>
+        </div>
+      </div>
+
+      {/* Tags */}
+      <div>
+        <label className="text-xs text-dark-muted mb-1 block">{t.tags}</label>
+        <input
+          type="text"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder={t.tagsHelp}
+          className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:border-theatarr-500 text-sm"
+        />
+      </div>
+
+      {/* English note */}
+      <p className="text-xs text-dark-muted italic">{t.englishNote}</p>
+
+      {fetchError && (
+        <p className="text-red-400 text-sm">{fetchError}</p>
+      )}
+
+      {/* Actions */}
+      <div className="flex justify-end gap-3 pt-3 border-t border-dark-border">
+        <Button variant="ghost" onClick={onCancel}>
+          {t.cancel}
+        </Button>
+        <Button onClick={fetchQuestions} disabled={fetching}>
+          {fetching ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Sparkles size={14} className="mr-1" />}
+          {fetching ? t.generating : t.generate}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Quiz Invite Users
+// ============================================================================
 
 function QuizInviteUsers({
   sessionId,

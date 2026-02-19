@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { PageHeader, ButtonGroup, Button } from '../components/common';
 import { VoteSessionManager } from './VoteSessionManager';
 import { QuizSessionManager } from './QuizSessionManager';
@@ -14,6 +14,7 @@ export function VotesAndQuizPage() {
   const initialTab = (searchParams.get('tab') as Tab) || 'votes';
   const [tab, setTab] = useState<Tab>(initialTab);
   const [createOpen, setCreateOpen] = useState(false);
+  const [aiQuizOpen, setAiQuizOpen] = useState(false);
 
   useEffect(() => {
     if (tab !== 'votes') {
@@ -23,9 +24,10 @@ export function VotesAndQuizPage() {
     }
   }, [tab, setSearchParams]);
 
-  // Reset create modal when switching tabs
+  // Reset modals when switching tabs
   useEffect(() => {
     setCreateOpen(false);
+    setAiQuizOpen(false);
   }, [tab]);
 
   const t = {
@@ -53,16 +55,24 @@ export function VotesAndQuizPage() {
           value={tab}
           onChange={setTab}
         />
-        <Button size="sm" onClick={() => setCreateOpen(true)} className="h-9">
-          <Plus className="h-4 w-4" />
-          <span className="ml-1.5">{tab === 'votes' ? t.newVote : t.newQuiz}</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {tab === 'quiz' && (
+            <Button size="sm" variant="secondary" onClick={() => setAiQuizOpen(true)} className="h-9">
+              <Sparkles className="h-4 w-4" />
+              <span className="ml-1.5">IA</span>
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setCreateOpen(true)} className="h-9">
+            <Plus className="h-4 w-4" />
+            <span className="ml-1.5">{tab === 'votes' ? t.newVote : t.newQuiz}</span>
+          </Button>
+        </div>
       </div>
 
       {tab === 'votes' ? (
         <VoteSessionManager createOpen={createOpen} onCreateOpenChange={setCreateOpen} />
       ) : (
-        <QuizSessionManager createOpen={createOpen} onCreateOpenChange={setCreateOpen} />
+        <QuizSessionManager createOpen={createOpen} onCreateOpenChange={setCreateOpen} aiQuizOpen={aiQuizOpen} onAiQuizOpenChange={setAiQuizOpen} />
       )}
     </div>
   );
