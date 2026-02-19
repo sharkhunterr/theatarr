@@ -1,9 +1,7 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Download,
   Upload,
-  Settings as SettingsIcon,
   Save,
   RefreshCw,
   Shield,
@@ -12,7 +10,7 @@ import {
   Palette,
   FileText,
 } from 'lucide-react';
-import { Button, Card, Modal, Input, Spinner } from '../components/common';
+import { Button, Card, Spinner, PageHeader, ButtonGroup } from '../components/common';
 import { ExportButton } from '../components/config/ExportButton';
 import { ImportWizard } from '../components/config/ImportWizard';
 import { SettingsForm } from '../components/config/SettingsForm';
@@ -51,75 +49,49 @@ export function ConfigPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-text">Parametres</h1>
-          <p className="text-dark-muted text-sm mt-1">
-            Gerez les parametres de l'application et sauvegardez/restaurez la configuration
-          </p>
-        </div>
-        {activeTab === 'settings' && settingsHasChanges && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => settingsActionsRef.current?.onReset()}
-            >
-              <RefreshCw size={16} className="mr-1" />
-              <span className="hidden sm:inline">Reinitialiser</span>
-            </Button>
-            <Button
-              onClick={() => settingsActionsRef.current?.onSave()}
-              disabled={saveSettingsMutation.isPending}
-            >
-              {saveSettingsMutation.isPending ? (
-                'Enregistrement...'
-              ) : (
-                <>
-                  <Save size={16} className="mr-1" />
-                  <span className="hidden sm:inline">Enregistrer</span>
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Parametres"
+        subtitle="Configuration générale de l'application"
+        actions={
+          activeTab === 'settings' && settingsHasChanges ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => settingsActionsRef.current?.onReset()}
+                className="h-9 px-3 rounded-md border border-dark-border text-sm font-medium text-dark-text hover:bg-dark-border/50 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4 sm:mr-1.5 inline" />
+                <span className="hidden sm:inline">Reinitialiser</span>
+              </button>
+              <button
+                onClick={() => settingsActionsRef.current?.onSave()}
+                disabled={saveSettingsMutation.isPending}
+                className="h-9 px-3 rounded-md bg-theatarr-600 text-white text-sm font-medium hover:bg-theatarr-700 transition-colors disabled:opacity-50"
+              >
+                {saveSettingsMutation.isPending ? (
+                  '...'
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 sm:mr-1.5 inline" />
+                    <span className="hidden sm:inline">Enregistrer</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : undefined
+        }
+      />
 
       {/* Tabs */}
-      <div className="flex gap-4 mb-6 border-b border-dark-border">
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`pb-3 px-1 font-medium transition-colors ${
-            activeTab === 'settings'
-              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
-              : 'text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <SettingsIcon size={16} className="inline mr-2" />
-          Parametres
-        </button>
-        <button
-          onClick={() => setActiveTab('export')}
-          className={`pb-3 px-1 font-medium transition-colors ${
-            activeTab === 'export'
-              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
-              : 'text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <Download size={16} className="inline mr-2" />
-          Export
-        </button>
-        <button
-          onClick={() => setActiveTab('import')}
-          className={`pb-3 px-1 font-medium transition-colors ${
-            activeTab === 'import'
-              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
-              : 'text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <Upload size={16} className="inline mr-2" />
-          Import
-        </button>
+      <div className="mb-6">
+        <ButtonGroup
+          options={[
+            { key: 'settings' as const, label: 'Parametres' },
+            { key: 'export' as const, label: 'Export' },
+            { key: 'import' as const, label: 'Import' },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
       </div>
 
       {/* Settings Tab */}
@@ -150,38 +122,32 @@ export function ConfigPage() {
       {activeTab === 'export' && (
         <div className="space-y-6">
           <Card>
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4 text-dark-text">Exporter la configuration</h2>
-              <p className="text-dark-muted mb-6">
-                Exportez votre configuration Theatarr incluant les sessions, services, templates et
-                parametres. Les donnees sensibles comme les cles API peuvent etre chiffrees.
+            <div className="p-4 sm:p-6">
+              <h2 className="text-base font-semibold mb-1 text-dark-text">Exporter la configuration</h2>
+              <p className="text-sm text-dark-muted mb-4">
+                Exportez votre configuration incluant sessions, services, templates et parametres.
               </p>
-
               <ExportButton />
             </div>
           </Card>
 
           {/* Export Info */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
-              <Database size={20} className="text-theatarr-400 mb-2" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-4 flex items-center gap-3">
+              <Database className="h-5 w-5 text-theatarr-400 flex-shrink-0" />
               <div className="text-sm font-medium text-dark-text">Sessions</div>
-              <div className="text-xs text-dark-muted">Configurations des sessions</div>
             </div>
-            <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
-              <Shield size={20} className="text-green-400 mb-2" />
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-4 flex items-center gap-3">
+              <Shield className="h-5 w-5 text-green-400 flex-shrink-0" />
               <div className="text-sm font-medium text-dark-text">Services</div>
-              <div className="text-xs text-dark-muted">Configurations des services</div>
             </div>
-            <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
-              <Palette size={20} className="text-purple-400 mb-2" />
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-4 flex items-center gap-3">
+              <Palette className="h-5 w-5 text-purple-400 flex-shrink-0" />
               <div className="text-sm font-medium text-dark-text">Templates</div>
-              <div className="text-xs text-dark-muted">Modeles d'affichage</div>
             </div>
-            <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
-              <Film size={20} className="text-yellow-400 mb-2" />
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-4 flex items-center gap-3">
+              <Film className="h-5 w-5 text-yellow-400 flex-shrink-0" />
               <div className="text-sm font-medium text-dark-text">Bandes-annonces</div>
-              <div className="text-xs text-dark-muted">Regles de telechargement</div>
             </div>
           </div>
         </div>
@@ -191,69 +157,45 @@ export function ConfigPage() {
       {activeTab === 'import' && (
         <div className="space-y-6">
           <Card>
-            <div className="p-6">
-              <h2 className="text-xl font-semibold mb-4 text-dark-text">Importer la configuration</h2>
-              <p className="text-dark-muted mb-6">
-                Restaurez la configuration depuis une sauvegarde precedemment exportee. Vous pouvez
-                previsualiser les changements avant de les appliquer.
+            <div className="p-4 sm:p-6">
+              <h2 className="text-base font-semibold mb-1 text-dark-text">Importer la configuration</h2>
+              <p className="text-sm text-dark-muted mb-4">
+                Restaurez la configuration depuis une sauvegarde exportee.
               </p>
-
-              <Button onClick={() => setIsImportOpen(true)}>
-                <Upload size={16} />
-                <span className="ml-2">Demarrer l'import</span>
-              </Button>
+              <button
+                onClick={() => setIsImportOpen(true)}
+                className="inline-flex items-center gap-2 h-10 px-4 bg-theatarr-600 text-white rounded-md text-sm font-medium hover:bg-theatarr-700 transition-colors"
+              >
+                <Upload className="h-4 w-4" />
+                Demarrer l'import
+              </button>
             </div>
           </Card>
 
           {/* Import Info */}
           <Card>
-            <div className="p-6">
-              <h3 className="font-medium mb-4 text-dark-text">Processus d'import</h3>
+            <div className="p-4 sm:p-6">
+              <h3 className="text-sm font-medium text-dark-text mb-4">Processus d'import</h3>
               <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-theatarr-500/20 flex items-center justify-center flex-shrink-0">
-                    <FileText size={16} className="text-theatarr-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-dark-text">1. Selectionner le fichier</div>
-                    <div className="text-sm text-dark-muted">
-                      Choisissez un fichier de configuration exporte
+                {[
+                  { icon: FileText, color: 'bg-theatarr-500/20 text-theatarr-400', title: '1. Selectionner le fichier', desc: 'Fichier de configuration exporte' },
+                  { icon: RefreshCw, color: 'bg-theatarr-500/20 text-theatarr-400', title: '2. Apercu des changements', desc: 'Examinez les modifications' },
+                  { icon: Shield, color: 'bg-theatarr-500/20 text-theatarr-400', title: '3. Resoudre les conflits', desc: 'Gestion des elements existants' },
+                  { icon: Save, color: 'bg-green-500/20 text-green-400', title: '4. Appliquer l\'import', desc: 'Configuration importee' },
+                ].map((step) => {
+                  const StepIcon = step.icon;
+                  return (
+                    <div key={step.title} className="flex items-start gap-3">
+                      <div className={`w-8 h-8 rounded-full ${step.color.split(' ')[0]} flex items-center justify-center flex-shrink-0`}>
+                        <StepIcon className={`h-4 w-4 ${step.color.split(' ')[1]}`} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-dark-text">{step.title}</div>
+                        <div className="text-xs text-dark-muted">{step.desc}</div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-theatarr-500/20 flex items-center justify-center flex-shrink-0">
-                    <RefreshCw size={16} className="text-theatarr-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-dark-text">2. Apercu des changements</div>
-                    <div className="text-sm text-dark-muted">
-                      Examinez ce qui sera cree, mis a jour ou ignore
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-theatarr-500/20 flex items-center justify-center flex-shrink-0">
-                    <Shield size={16} className="text-theatarr-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-dark-text">3. Resoudre les conflits</div>
-                    <div className="text-sm text-dark-muted">
-                      Choisissez comment gerer les elements existants
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                    <Save size={16} className="text-green-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-dark-text">4. Appliquer l'import</div>
-                    <div className="text-sm text-dark-muted">
-                      La configuration est importee avec vos parametres
-                    </div>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
             </div>
           </Card>

@@ -15,7 +15,7 @@ import {
   Film,
   Check,
 } from 'lucide-react';
-import { Button, Card, Modal, Spinner } from '../components/common';
+import { Button, Card, Modal, Spinner, ButtonGroup } from '../components/common';
 import { VoteSessionForm } from '../components/vote/VoteSessionForm';
 import { VoteResults } from '../components/vote/VoteResults';
 import { apiClient } from '../api/client';
@@ -60,11 +60,18 @@ interface VoteSessionListResponse {
   total: number;
 }
 
-export function VoteSessionManager() {
+interface VoteSessionManagerProps {
+  createOpen?: boolean;
+  onCreateOpenChange?: (open: boolean) => void;
+}
+
+export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessionManagerProps = {}) {
   const queryClient = useQueryClient();
   const { language } = useLayoutStore();
   const [selectedSession, setSelectedSession] = useState<VoteSession | null>(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [internalCreateOpen, setInternalCreateOpen] = useState(false);
+  const isCreateOpen = createOpen ?? internalCreateOpen;
+  const setIsCreateOpen = onCreateOpenChange ?? setInternalCreateOpen;
   const [isTokensOpen, setIsTokensOpen] = useState(false);
   const [isResultsOpen, setIsResultsOpen] = useState(false);
   const [tokens, setTokens] = useState<VoteToken[]>([]);
@@ -206,54 +213,33 @@ export function VoteSessionManager() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-text">{t.title}</h1>
-          <p className="text-dark-muted text-sm mt-1">{t.subtitle}</p>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus size={16} className="mr-2" />
-          {t.createButton}
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {([
-          { key: 'all', label: t.all },
-          { key: 'draft', label: t.draft },
-          { key: 'open', label: t.open },
-          { key: 'closed', label: t.closed },
-        ] as const).map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === f.key
-                ? 'bg-theatarr-500 text-white'
-                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="mb-4">
+        <ButtonGroup
+          options={[
+            { key: 'all' as const, label: t.all },
+            { key: 'draft' as const, label: t.draft },
+            { key: 'open' as const, label: t.open },
+            { key: 'closed' as const, label: t.closed },
+          ]}
+          value={filter}
+          onChange={setFilter}
+        />
       </div>
 
       {/* Sessions List */}
       {filteredSessions && filteredSessions.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {filteredSessions.map((session) => (
             <Card key={session.id} className="overflow-hidden">
-              <div className="p-4 sm:p-6">
+              <div className="p-3">
                 {/* Header Row */}
-                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                <div className="flex items-start gap-3">
                   {/* Movie Posters Preview */}
-                  <div className="flex gap-1 flex-shrink-0">
+                  <div className="flex gap-0.5 flex-shrink-0">
                     {session.movie_options.slice(0, 3).map((movie, idx) => (
                       <div
                         key={idx}
-                        className="w-12 h-18 sm:w-14 sm:h-20 rounded bg-dark-border overflow-hidden flex-shrink-0"
+                        className="w-10 h-14 rounded bg-dark-border overflow-hidden flex-shrink-0"
                       >
                         {movie.poster_url ? (
                           <img
@@ -263,13 +249,13 @@ export function VoteSessionManager() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <Film size={16} className="text-dark-muted" />
+                            <Film size={12} className="text-dark-muted" />
                           </div>
                         )}
                       </div>
                     ))}
                     {session.movie_options.length > 3 && (
-                      <div className="w-12 h-18 sm:w-14 sm:h-20 rounded bg-dark-border flex items-center justify-center text-dark-muted text-sm font-medium flex-shrink-0">
+                      <div className="w-10 h-14 rounded bg-dark-border flex items-center justify-center text-dark-muted text-xs font-medium flex-shrink-0">
                         +{session.movie_options.length - 3}
                       </div>
                     )}
@@ -277,8 +263,8 @@ export function VoteSessionManager() {
 
                   {/* Session Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold text-dark-text truncate">
+                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                      <h3 className="text-sm font-semibold text-dark-text truncate">
                         {session.name}
                       </h3>
                       <span
@@ -304,7 +290,7 @@ export function VoteSessionManager() {
                     )}
 
                     {/* Stats */}
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-dark-muted">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-dark-muted">
                       <span className="flex items-center gap-1">
                         <Users size={14} />
                         {session.total_votes} {t.votes}
@@ -336,7 +322,7 @@ export function VoteSessionManager() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-dark-border">
+                <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-dark-border">
                   {session.status === 'draft' && (
                     <Button
                       variant="secondary"
@@ -393,11 +379,11 @@ export function VoteSessionManager() {
           ))}
         </div>
       ) : (
-        <Card className="p-12 text-center">
-          <Vote size={48} className="mx-auto text-dark-muted mb-4" />
-          <p className="text-dark-muted mb-4">{t.noSessions}</p>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus size={16} className="mr-2" />
+        <Card className="p-8 text-center">
+          <Vote size={32} className="mx-auto text-dark-muted mb-3" />
+          <p className="text-sm text-dark-muted mb-3">{t.noSessions}</p>
+          <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+            <Plus size={14} className="mr-1" />
             {t.createFirst}
           </Button>
         </Card>

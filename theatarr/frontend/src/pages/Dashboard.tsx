@@ -653,16 +653,13 @@ function StatsRow({
           <Link key={card.label} to={card.path}>
             <Card variant="interactive">
               <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className={clsx('p-1.5 sm:p-2 rounded-lg', card.color)}>
-                    <Icon className={card.iconColor} size={18} />
+                <div className="flex items-center gap-3">
+                  <div className={clsx('p-2 rounded-lg flex-shrink-0', card.color)}>
+                    <Icon className={clsx(card.iconColor, 'h-4 w-4')} />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-lg sm:text-2xl font-bold text-dark-text">{card.value}</div>
-                    <div className="text-[10px] sm:text-xs text-dark-muted truncate">{card.label}</div>
-                    {card.sublabel && (
-                      <div className="text-[10px] text-dark-muted">{card.sublabel}</div>
-                    )}
+                    <div className="text-lg font-semibold text-dark-text tabular-nums">{card.value}</div>
+                    <div className="text-xs text-dark-muted truncate">{card.label}</div>
                   </div>
                 </div>
               </CardContent>
@@ -691,8 +688,8 @@ function UpcomingSessions({
     <Card>
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-dark-text flex items-center gap-2">
-            <Calendar size={14} className="text-purple-400" />
+          <h3 className="text-xs font-medium uppercase tracking-wider text-dark-muted flex items-center gap-2">
+            <Calendar size={12} className="text-purple-400" />
             {language === 'fr' ? 'Prochaines seances' : 'Upcoming Sessions'}
           </h3>
           <Link to="/sessions" className="text-xs text-theatarr-500 hover:text-theatarr-400 flex items-center gap-1">
@@ -777,8 +774,8 @@ function RecentActivity({
   return (
     <Card>
       <CardContent className="p-3 sm:p-4">
-        <h3 className="text-sm font-medium text-dark-text flex items-center gap-2 mb-3">
-          <Activity size={14} className="text-theatarr-500" />
+        <h3 className="text-xs font-medium uppercase tracking-wider text-dark-muted flex items-center gap-2 mb-3">
+          <Activity size={12} className="text-theatarr-500" />
           {language === 'fr' ? 'Activite recente' : 'Recent Activity'}
         </h3>
         {events.length === 0 ? (
@@ -839,7 +836,7 @@ function QuickActions({ language }: { language: string }) {
       label: language === 'fr' ? 'Templates' : 'Templates',
       color: 'text-purple-500',
       bg: 'bg-purple-500/10 hover:bg-purple-500/20',
-      path: '/templates',
+      path: '/media?tab=templates',
     },
     {
       icon: Lightbulb,
@@ -853,7 +850,7 @@ function QuickActions({ language }: { language: string }) {
   return (
     <Card>
       <CardContent className="p-3 sm:p-4">
-        <h3 className="text-sm font-medium text-dark-text mb-3">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-dark-muted mb-3">
           {language === 'fr' ? 'Actions rapides' : 'Quick Actions'}
         </h3>
         <div className="grid grid-cols-2 gap-2">
@@ -864,12 +861,12 @@ function QuickActions({ language }: { language: string }) {
                 key={action.path}
                 to={action.path}
                 className={clsx(
-                  'flex items-center gap-2 p-2.5 rounded-lg border border-dark-border transition-colors',
+                  'flex items-center gap-2.5 p-3 rounded-lg border border-dark-border transition-colors',
                   action.bg,
                 )}
               >
-                <Icon size={16} className={action.color} />
-                <span className="text-xs font-medium text-dark-text truncate">{action.label}</span>
+                <Icon className={clsx('h-4 w-4 flex-shrink-0', action.color)} />
+                <span className="text-sm font-medium text-dark-text truncate">{action.label}</span>
               </Link>
             );
           })}
@@ -1031,7 +1028,7 @@ export function Dashboard() {
       <UpcomingSessions sessions={upcomingSessions} language={language} />
 
       {/* Recent Activity + Quick Actions */}
-      <div className="grid md:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
           <RecentActivity events={recentActivity || []} language={language} />
         </div>

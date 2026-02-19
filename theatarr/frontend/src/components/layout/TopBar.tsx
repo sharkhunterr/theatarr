@@ -1,5 +1,6 @@
 /**
  * Top navigation bar with language, theme, and user controls.
+ * Design aligned with ghostarr: h-14, glassmorphism backdrop-blur, h-9 icon buttons.
  */
 
 import { useState, useRef, useEffect } from 'react';
@@ -20,27 +21,26 @@ export function TopBar({ onMenuClick }: TopBarProps) {
   return (
     <header
       className={clsx(
-        'fixed top-0 right-0 h-16 bg-dark-surface border-b border-dark-border z-30',
+        'sticky top-0 right-0 h-14 z-30',
+        'bg-dark-surface/95 backdrop-blur supports-[backdrop-filter]:bg-dark-surface/60',
+        'border-b border-dark-border',
         'flex items-center justify-between px-4 transition-all duration-300',
-        // Adjust left position based on sidebar
-        sidebarCollapsed ? 'md:left-16' : 'md:left-64',
-        'left-0'
       )}
     >
       {/* Left section */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {/* Mobile menu button */}
         <button
           onClick={onMenuClick}
-          className="p-2 rounded-lg hover:bg-dark-border/50 md:hidden"
+          className="flex items-center justify-center h-9 w-9 rounded-lg hover:bg-dark-border/50 transition-colors md:hidden"
           aria-label="Menu"
         >
-          <Menu size={20} />
+          <Menu className="h-5 w-5" />
         </button>
       </div>
 
       {/* Right section */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <LanguageSelector language={language} setLanguage={setLanguage} />
         <ThemeToggle theme={theme} setTheme={setTheme} />
         <UserDropdown user={user} logout={logout} language={language} />
@@ -80,11 +80,10 @@ function LanguageSelector({ language, setLanguage }: LanguageSelectorProps) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-border/50 transition-colors"
+        className="flex items-center gap-1.5 h-9 px-2.5 rounded-lg hover:bg-dark-border/50 transition-colors text-sm font-medium"
       >
-        <Globe size={18} />
-        <span className="text-sm font-medium">{current?.flag}</span>
-        <ChevronDown size={14} className={clsx('transition-transform', open && 'rotate-180')} />
+        <Globe className="h-4 w-4" />
+        <span className="hidden sm:inline">{current?.flag}</span>
       </button>
 
       {open && (
@@ -120,10 +119,10 @@ function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
   return (
     <button
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="p-2 rounded-lg hover:bg-dark-border/50 transition-colors"
+      className="flex items-center justify-center h-9 w-9 rounded-lg hover:bg-dark-border/50 transition-colors"
       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
   );
 }
@@ -157,13 +156,13 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-border/50 transition-colors"
+        className="flex items-center gap-2 h-9 px-2 rounded-lg hover:bg-dark-border/50 transition-colors"
       >
-        <div className="w-8 h-8 rounded-full bg-theatarr-500/20 flex items-center justify-center">
-          <User size={16} className="text-theatarr-500" />
+        <div className="w-7 h-7 rounded-full bg-theatarr-500/20 flex items-center justify-center">
+          <User className="h-3.5 w-3.5 text-theatarr-500" />
         </div>
         <span className="text-sm font-medium hidden sm:block">{user?.username || 'User'}</span>
-        <ChevronDown size={14} className={clsx('transition-transform hidden sm:block', open && 'rotate-180')} />
+        <ChevronDown className={clsx('h-3.5 w-3.5 transition-transform hidden sm:block', open && 'rotate-180')} />
       </button>
 
       {open && (
@@ -177,7 +176,7 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
             onClick={() => setOpen(false)}
             className="w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2 text-theatarr-500"
           >
-            <UserCircle size={16} />
+            <UserCircle className="h-4 w-4" />
             {portalLabel}
           </Link>
           <a
@@ -187,7 +186,7 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
             onClick={() => setOpen(false)}
             className="w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2 text-dark-text"
           >
-            <Monitor size={16} />
+            <Monitor className="h-4 w-4" />
             {wallmountLabel}
           </a>
           <div className="border-t border-dark-border my-1" />
@@ -198,7 +197,7 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
             }}
             className="w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2 text-red-400"
           >
-            <LogOut size={16} />
+            <LogOut className="h-4 w-4" />
             {logoutLabel}
           </button>
         </div>

@@ -1,14 +1,13 @@
 /**
  * System Logs page - displays and filters backend Python logs in real-time.
+ * Ghostarr-aligned: h-9/h-10 controls, rounded-md inputs, proper mobile spacing.
  */
 
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ScrollText,
   RefreshCw,
   Search,
-  Filter,
   AlertTriangle,
   Info,
   Bug,
@@ -19,6 +18,7 @@ import {
 import clsx from 'clsx';
 import { apiClient } from '../api/client';
 import { useLayoutStore } from '../stores/layoutStore';
+import { PageHeader, ButtonGroup } from '../components/common';
 
 interface LogEntry {
   timestamp: string;
@@ -42,21 +42,13 @@ const CATEGORIES: { value: LogCategory | ''; label: string; labelFr: string }[] 
   { value: 'system', label: 'System', labelFr: 'Systeme' },
 ];
 
-const LEVELS: { value: LogLevel | ''; label: string; color: string }[] = [
-  { value: '', label: 'All', color: '' },
-  { value: 'DEBUG', label: 'DEBUG', color: 'text-gray-400' },
-  { value: 'INFO', label: 'INFO', color: 'text-blue-400' },
-  { value: 'WARNING', label: 'WARN', color: 'text-yellow-400' },
-  { value: 'ERROR', label: 'ERROR', color: 'text-red-400' },
-];
-
 function getLevelIcon(level: string) {
   switch (level) {
-    case 'ERROR': return <AlertCircle size={14} className="text-red-400" />;
-    case 'WARNING': return <AlertTriangle size={14} className="text-yellow-400" />;
-    case 'INFO': return <Info size={14} className="text-blue-400" />;
-    case 'DEBUG': return <Bug size={14} className="text-gray-500" />;
-    default: return <Info size={14} className="text-gray-500" />;
+    case 'ERROR': return <AlertCircle className="h-3.5 w-3.5 text-red-400" />;
+    case 'WARNING': return <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />;
+    case 'INFO': return <Info className="h-3.5 w-3.5 text-blue-400" />;
+    case 'DEBUG': return <Bug className="h-3.5 w-3.5 text-gray-500" />;
+    default: return <Info className="h-3.5 w-3.5 text-gray-500" />;
   }
 }
 
@@ -154,79 +146,73 @@ export function SystemLogs() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <ScrollText size={24} className="text-theatarr-500" />
-          <h1 className="text-xl font-bold text-dark-text">{t.title}</h1>
-          <span className={clsx(
-            'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
-            autoRefresh ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
-          )}>
-            <span className={clsx('w-1.5 h-1.5 rounded-full', autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-yellow-400')} />
-            {autoRefresh ? t.live : t.paused}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={clsx(
-              'p-2 rounded-lg transition-colors',
-              autoRefresh ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-dark-border text-dark-muted hover:bg-dark-border/80'
-            )}
-            title={t.autoRefresh}
-          >
-            {autoRefresh ? <Pause size={16} /> : <Play size={16} />}
-          </button>
-          <button
-            onClick={() => refetch()}
-            className="p-2 rounded-lg bg-dark-border text-dark-muted hover:bg-dark-border/80 transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw size={16} />
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title={t.title}
+        subtitle={`${logs?.length ?? 0} entries`}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className={clsx(
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium',
+              autoRefresh ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+            )}>
+              <span className={clsx('w-1.5 h-1.5 rounded-full', autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-yellow-400')} />
+              {autoRefresh ? t.live : t.paused}
+            </span>
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={clsx(
+                'h-9 w-9 flex items-center justify-center rounded-md transition-colors',
+                autoRefresh ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'border border-dark-border text-dark-muted hover:bg-dark-border/50'
+              )}
+              title={t.autoRefresh}
+            >
+              {autoRefresh ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={() => refetch()}
+              className="h-9 w-9 flex items-center justify-center rounded-md border border-dark-border text-dark-muted hover:bg-dark-border/50 transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+        }
+      />
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 mb-3 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 flex-shrink-0">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-dark-muted" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dark-muted" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.search}
-            className="w-full pl-8 pr-3 py-1.5 bg-dark-bg border border-dark-border rounded-lg text-sm text-dark-text placeholder:text-dark-muted focus:outline-none focus:border-theatarr-500/50"
+            className="h-9 w-full pl-9 pr-3 bg-dark-bg border border-dark-border rounded-md text-sm text-dark-text placeholder:text-dark-muted focus:outline-none focus:border-theatarr-500/50 focus:ring-2 focus:ring-theatarr-500/20"
           />
         </div>
 
         {/* Level filter */}
-        <div className="flex items-center gap-1">
-          <Filter size={14} className="text-dark-muted" />
-          {LEVELS.map((l) => (
-            <button
-              key={l.value}
-              onClick={() => setLevel(l.value as LogLevel | '')}
-              className={clsx(
-                'px-2 py-1 rounded text-xs font-medium transition-colors',
-                level === l.value
-                  ? 'bg-theatarr-500/20 text-theatarr-400 border border-theatarr-500/30'
-                  : 'bg-dark-bg text-dark-muted border border-dark-border hover:border-dark-muted'
-              )}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
+        <ButtonGroup
+          options={[
+            { key: '' as const, label: 'All' },
+            { key: 'DEBUG' as const, label: 'DEBUG' },
+            { key: 'INFO' as const, label: 'INFO' },
+            { key: 'WARNING' as const, label: 'WARN' },
+            { key: 'ERROR' as const, label: 'ERROR' },
+          ]}
+          value={level}
+          onChange={(v) => setLevel(v as LogLevel | '')}
+        />
 
         {/* Category filter */}
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value as LogCategory | '')}
-          className="px-2 py-1.5 bg-dark-bg border border-dark-border rounded-lg text-xs text-dark-text focus:outline-none focus:border-theatarr-500/50"
+          className="h-9 px-3 bg-dark-bg border border-dark-border rounded-md text-sm text-dark-text focus:outline-none focus:border-theatarr-500/50"
         >
           {CATEGORIES.map((c) => (
             <option key={c.value} value={c.value}>
@@ -239,7 +225,7 @@ export function SystemLogs() {
         <select
           value={refreshInterval}
           onChange={(e) => setRefreshInterval(Number(e.target.value))}
-          className="px-2 py-1.5 bg-dark-bg border border-dark-border rounded-lg text-xs text-dark-text focus:outline-none focus:border-theatarr-500/50"
+          className="h-9 px-3 bg-dark-bg border border-dark-border rounded-md text-sm text-dark-text focus:outline-none focus:border-theatarr-500/50"
         >
           <option value={1000}>1s</option>
           <option value={3000}>3s</option>
@@ -247,26 +233,21 @@ export function SystemLogs() {
           <option value={10000}>10s</option>
           <option value={30000}>30s</option>
         </select>
-
-        {/* Log count */}
-        <span className="text-xs text-dark-muted">
-          {logs?.length ?? 0} entries
-        </span>
       </div>
 
       {/* Log entries */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto bg-dark-bg border border-dark-border rounded-lg font-mono text-xs"
+        className="flex-1 overflow-y-auto rounded-lg border border-dark-border bg-dark-bg font-mono text-xs"
       >
         {isLoading ? (
           <div className="flex items-center justify-center h-32 text-dark-muted">
-            <RefreshCw size={16} className="animate-spin mr-2" />
+            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
             Loading...
           </div>
         ) : !logs || logs.length === 0 ? (
-          <div className="flex items-center justify-center h-32 text-dark-muted">
+          <div className="flex items-center justify-center h-32 text-dark-muted text-sm">
             {t.noLogs}
           </div>
         ) : (

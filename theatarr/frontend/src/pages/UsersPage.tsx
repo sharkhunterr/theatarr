@@ -1,12 +1,14 @@
 /**
  * Admin user management page.
+ * Ghostarr-aligned: h-10 inputs, h-9 icon buttons, p-4 sm:p-6 cards, rounded-lg.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Plus, Search, Shield, Trash2, Key, Edit2, X, Check } from 'lucide-react';
+import { Users, Plus, Shield, Trash2, Key, Edit2, X, Check } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
 import { apiClient } from '../api/client';
+import { PageHeader, ButtonGroup, Modal } from '../components/common';
 
 interface UserData {
   id: string;
@@ -32,7 +34,6 @@ interface UserFormData {
 
 export function UsersPage() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
@@ -51,10 +52,9 @@ export function UsersPage() {
   const [formError, setFormError] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['users', search, roleFilter],
+    queryKey: ['users', roleFilter],
     queryFn: () => {
       const params = new URLSearchParams();
-      if (search) params.append('search', search);
       if (roleFilter) params.append('role', roleFilter);
       params.append('limit', '100');
       return apiClient.get<{ items: UserData[]; total: number }>(`/users?${params.toString()}`);
@@ -198,45 +198,29 @@ export function UsersPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-text">Utilisateurs</h1>
-          <p className="text-dark-muted text-sm mt-1">
-            {data?.total || 0} utilisateur{(data?.total || 0) !== 1 ? 's' : ''} enregistre{(data?.total || 0) !== 1 ? 's' : ''}
-          </p>
-        </div>
+      <PageHeader
+        title="Utilisateurs"
+        subtitle="Gérez les comptes et les permissions"
+      />
 
+      {/* Filters + Actions */}
+      <div className="flex items-center justify-between mb-6">
+        <ButtonGroup
+          options={[
+            { key: '', label: 'Tous' },
+            { key: 'admin', label: 'Admin' },
+            { key: 'user', label: 'User' },
+          ]}
+          value={roleFilter}
+          onChange={setRoleFilter}
+        />
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 bg-theatarr-600 text-white rounded-lg font-medium hover:bg-theatarr-700 transition-colors"
+          className="inline-flex items-center gap-2 h-9 px-3 bg-theatarr-600 text-white rounded-md text-sm font-medium hover:bg-theatarr-700 transition-colors"
         >
-          <Plus size={18} />
-          <span className="hidden sm:inline">Nouvel utilisateur</span>
+          <Plus className="h-4 w-4" />
+          <span>Nouvel utilisateur</span>
         </button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
-          <input
-            type="text"
-            placeholder="Rechercher..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:border-theatarr-500 focus:outline-none"
-          />
-        </div>
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text focus:border-theatarr-500 focus:outline-none"
-        >
-          <option value="">Tous les roles</option>
-          <option value="admin">Admin</option>
-          <option value="user">User</option>
-        </select>
       </div>
 
       {/* Users list */}
@@ -245,26 +229,26 @@ export function UsersPage() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-20 bg-dark-surface rounded-xl border border-dark-border animate-pulse"
+              className="h-20 bg-dark-surface rounded-lg border border-dark-border animate-pulse"
             />
           ))}
         </div>
       ) : (
-        <div className="bg-dark-surface rounded-xl border border-dark-border overflow-hidden">
+        <div className="rounded-lg border border-dark-border bg-dark-surface shadow-sm overflow-hidden">
           {data && data.items.length > 0 ? (
             <div className="divide-y divide-dark-border">
               {data.items.map((user) => (
                 <div
                   key={user.id}
                   className={clsx(
-                    'p-4 flex items-center gap-4',
+                    'p-4 flex items-center gap-3',
                     !user.is_active && 'opacity-50'
                   )}
                 >
                   {/* Avatar */}
                   <div
                     className={clsx(
-                      'w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold',
+                      'w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0',
                       user.role === 'admin'
                         ? 'bg-theatarr-500/20 text-theatarr-500'
                         : 'bg-blue-500/20 text-blue-400'
@@ -276,93 +260,93 @@ export function UsersPage() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-dark-text">
+                      <span className="text-sm font-medium text-dark-text truncate">
                         {user.first_name && user.last_name
                           ? `${user.first_name} ${user.last_name}`
                           : user.username}
                       </span>
                       {user.role === 'admin' && (
-                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-theatarr-500/20 text-theatarr-400">
-                          <Shield size={10} />
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-theatarr-500/20 text-theatarr-400 font-semibold">
+                          <Shield className="h-3 w-3" />
                           Admin
                         </span>
                       )}
                       {!user.is_active && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">
                           Inactif
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-dark-muted">
+                    <div className="flex items-center gap-2 text-xs text-dark-muted mt-0.5">
                       <span>@{user.username}</span>
                       {user.email && (
-                        <span className="hidden sm:inline">{user.email}</span>
+                        <span className="hidden sm:inline truncate">{user.email}</span>
                       )}
                     </div>
                   </div>
 
                   {/* Last login */}
-                  <div className="hidden md:block text-right">
-                    <p className="text-sm text-dark-muted">
+                  <div className="hidden md:block text-right flex-shrink-0">
+                    <p className="text-xs text-dark-muted">
                       {user.last_login_at
-                        ? `Derniere connexion ${formatDate(user.last_login_at)}`
+                        ? formatDate(user.last_login_at)
                         : 'Jamais connecte'}
                     </p>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => openEditModal(user)}
-                      className="p-2 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-dark-text transition-colors"
+                      className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-dark-text transition-colors"
                       title="Modifier"
                     >
-                      <Edit2 size={16} />
+                      <Edit2 className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => setShowPasswordModal(user.id)}
-                      className="p-2 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-dark-text transition-colors"
+                      className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-dark-text transition-colors"
                       title="Changer le mot de passe"
                     >
-                      <Key size={16} />
+                      <Key className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleToggleActive(user)}
                       className={clsx(
-                        'p-2 rounded-lg hover:bg-dark-border/50 transition-colors',
+                        'h-9 w-9 flex items-center justify-center rounded-lg hover:bg-dark-border/50 transition-colors',
                         user.is_active
                           ? 'text-green-400 hover:text-green-300'
                           : 'text-dark-muted hover:text-dark-text'
                       )}
                       title={user.is_active ? 'Desactiver' : 'Activer'}
                     >
-                      {user.is_active ? <Check size={16} /> : <X size={16} />}
+                      {user.is_active ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
                     </button>
                     <button
                       onClick={() => handleDelete(user)}
-                      className="p-2 rounded-lg hover:bg-red-500/20 text-dark-muted hover:text-red-400 transition-colors"
+                      className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-red-500/20 text-dark-muted hover:text-red-400 transition-colors"
                       title="Supprimer"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="p-8 text-center">
-              <Users size={48} className="mx-auto text-dark-muted mb-4" />
-              <h3 className="text-lg font-medium text-dark-text mb-2">
+            <div className="p-6 text-center">
+              <Users size={32} className="mx-auto text-dark-muted mb-3" />
+              <h3 className="text-sm font-medium text-dark-text mb-1">
                 Aucun utilisateur
               </h3>
-              <p className="text-dark-muted mb-4">
+              <p className="text-xs text-dark-muted mb-3">
                 Creez votre premier utilisateur pour commencer.
               </p>
               <button
                 onClick={openCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-theatarr-600 text-white rounded-lg font-medium hover:bg-theatarr-700 transition-colors"
+                className="inline-flex items-center gap-2 h-10 px-4 bg-theatarr-600 text-white rounded-md text-sm font-medium hover:bg-theatarr-700 transition-colors"
               >
-                <Plus size={18} />
+                <Plus className="h-4 w-4" />
                 Nouvel utilisateur
               </button>
             </div>
@@ -371,179 +355,160 @@ export function UsersPage() {
       )}
 
       {/* Create/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-surface rounded-xl border border-dark-border w-full max-w-md">
-            <div className="p-4 border-b border-dark-border flex items-center justify-between">
-              <h2 className="text-lg font-bold text-dark-text">
-                {editingUser ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="p-2 rounded-lg hover:bg-dark-border/50 text-dark-muted"
-              >
-                <X size={18} />
-              </button>
+      <Modal
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingUser ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'}
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-dark-text">
+              Nom d'utilisateur *
+            </label>
+            <input
+              type="text"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              disabled={!!editingUser}
+              className="h-10 w-full rounded-md border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text focus:border-theatarr-500 focus:outline-none focus:ring-2 focus:ring-theatarr-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          {!editingUser && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-dark-text">
+                Mot de passe *
+              </label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="h-10 w-full rounded-md border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text focus:border-theatarr-500 focus:outline-none focus:ring-2 focus:ring-theatarr-500/20"
+              />
             </div>
+          )}
 
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm text-dark-muted mb-1">
-                  Nom d'utilisateur *
-                </label>
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  disabled={!!editingUser}
-                  className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:border-theatarr-500 focus:outline-none disabled:opacity-50"
-                />
-              </div>
-
-              {!editingUser && (
-                <div>
-                  <label className="block text-sm text-dark-muted mb-1">
-                    Mot de passe *
-                  </label>
-                  <input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:border-theatarr-500 focus:outline-none"
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-dark-muted mb-1">Prenom</label>
-                  <input
-                    type="text"
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:border-theatarr-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-dark-muted mb-1">Nom</label>
-                  <input
-                    type="text"
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:border-theatarr-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm text-dark-muted mb-1">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:border-theatarr-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-dark-muted mb-1">Role</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:border-theatarr-500 focus:outline-none"
-                >
-                  <option value="user">Utilisateur</option>
-                  <option value="admin">Administrateur</option>
-                </select>
-              </div>
-
-              {formError && (
-                <p className="text-sm text-red-400">{formError}</p>
-              )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-dark-text">Prenom</label>
+              <input
+                type="text"
+                value={formData.first_name}
+                onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                className="h-10 w-full rounded-md border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text focus:border-theatarr-500 focus:outline-none focus:ring-2 focus:ring-theatarr-500/20"
+              />
             </div>
-
-            <div className="p-4 border-t border-dark-border flex gap-3">
-              <button
-                onClick={closeModal}
-                className="flex-1 py-2 bg-dark-border text-dark-text rounded-lg font-medium hover:bg-dark-muted/30 transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={createUserMutation.isPending || updateUserMutation.isPending}
-                className="flex-1 py-2 bg-theatarr-600 text-white rounded-lg font-medium hover:bg-theatarr-700 transition-colors disabled:opacity-50"
-              >
-                {createUserMutation.isPending || updateUserMutation.isPending
-                  ? 'Enregistrement...'
-                  : editingUser
-                    ? 'Modifier'
-                    : 'Creer'}
-              </button>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-dark-text">Nom</label>
+              <input
+                type="text"
+                value={formData.last_name}
+                onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                className="h-10 w-full rounded-md border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text focus:border-theatarr-500 focus:outline-none focus:ring-2 focus:ring-theatarr-500/20"
+              />
             </div>
           </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-dark-text">Email</label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="h-10 w-full rounded-md border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text focus:border-theatarr-500 focus:outline-none focus:ring-2 focus:ring-theatarr-500/20"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-dark-text">Role</label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              className="h-10 w-full rounded-md border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text focus:border-theatarr-500 focus:outline-none focus:ring-2 focus:ring-theatarr-500/20"
+            >
+              <option value="user">Utilisateur</option>
+              <option value="admin">Administrateur</option>
+            </select>
+          </div>
+
+          {formError && (
+            <p className="text-sm text-red-400">{formError}</p>
+          )}
+
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t border-dark-border">
+            <button
+              onClick={closeModal}
+              className="h-10 px-4 rounded-md border border-dark-border bg-dark-bg text-sm font-medium text-dark-text hover:bg-dark-border/50 transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={createUserMutation.isPending || updateUserMutation.isPending}
+              className="h-10 px-4 rounded-md bg-theatarr-600 text-white text-sm font-medium hover:bg-theatarr-700 transition-colors disabled:opacity-50"
+            >
+              {createUserMutation.isPending || updateUserMutation.isPending
+                ? 'Enregistrement...'
+                : editingUser
+                  ? 'Modifier'
+                  : 'Creer'}
+            </button>
+          </div>
         </div>
-      )}
+      </Modal>
 
       {/* Password Modal */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-surface rounded-xl border border-dark-border w-full max-w-sm">
-            <div className="p-4 border-b border-dark-border flex items-center justify-between">
-              <h2 className="text-lg font-bold text-dark-text">Changer le mot de passe</h2>
-              <button
-                onClick={() => {
-                  setShowPasswordModal(null);
-                  setNewPassword('');
-                }}
-                className="p-2 rounded-lg hover:bg-dark-border/50 text-dark-muted"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      <Modal
+        isOpen={!!showPasswordModal}
+        onClose={() => {
+          setShowPasswordModal(null);
+          setNewPassword('');
+        }}
+        title="Changer le mot de passe"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-dark-text">
+              Nouveau mot de passe
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="h-10 w-full rounded-md border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text focus:border-theatarr-500 focus:outline-none focus:ring-2 focus:ring-theatarr-500/20"
+            />
+            <p className="text-xs text-dark-muted">Minimum 6 caracteres</p>
+          </div>
 
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm text-dark-muted mb-1">
-                  Nouveau mot de passe
-                </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:border-theatarr-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-dark-border flex gap-3">
-              <button
-                onClick={() => {
-                  setShowPasswordModal(null);
-                  setNewPassword('');
-                }}
-                className="flex-1 py-2 bg-dark-border text-dark-text rounded-lg font-medium hover:bg-dark-muted/30 transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => {
-                  if (newPassword.length >= 6) {
-                    changePasswordMutation.mutate({
-                      id: showPasswordModal,
-                      password: newPassword,
-                    });
-                  }
-                }}
-                disabled={newPassword.length < 6 || changePasswordMutation.isPending}
-                className="flex-1 py-2 bg-theatarr-600 text-white rounded-lg font-medium hover:bg-theatarr-700 transition-colors disabled:opacity-50"
-              >
-                {changePasswordMutation.isPending ? 'Changement...' : 'Changer'}
-              </button>
-            </div>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t border-dark-border">
+            <button
+              onClick={() => {
+                setShowPasswordModal(null);
+                setNewPassword('');
+              }}
+              className="h-10 px-4 rounded-md border border-dark-border bg-dark-bg text-sm font-medium text-dark-text hover:bg-dark-border/50 transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={() => {
+                if (showPasswordModal && newPassword.length >= 6) {
+                  changePasswordMutation.mutate({
+                    id: showPasswordModal,
+                    password: newPassword,
+                  });
+                }
+              }}
+              disabled={newPassword.length < 6 || changePasswordMutation.isPending}
+              className="h-10 px-4 rounded-md bg-theatarr-600 text-white text-sm font-medium hover:bg-theatarr-700 transition-colors disabled:opacity-50"
+            >
+              {changePasswordMutation.isPending ? 'Changement...' : 'Changer'}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

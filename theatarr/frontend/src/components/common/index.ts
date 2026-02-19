@@ -20,3 +20,8 @@ export { MysteryPoster } from './MysteryPoster';
 export { VotePoster } from './VotePoster';
 export { VotePosterCollage } from './VotePosterCollage';
 export { TheatarrLogo } from './TheatarrLogo';
+
+export { PageHeader } from './PageHeader';
+export { ButtonGroup } from './ButtonGroup';
+export { DataTable } from './DataTable';
+export type { Column } from './DataTable';

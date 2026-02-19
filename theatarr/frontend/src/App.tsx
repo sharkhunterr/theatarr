@@ -10,13 +10,11 @@ import { SessionDetailPage } from './pages/SessionDetailPage';
 import { SessionEditor } from './pages/SessionEditor';
 import { ServicesConfig } from './pages/ServicesConfig';
 import { WallmountPage } from './pages/WallmountPage';
-import { TemplateManager } from './pages/TemplateManager';
 import { VotePage } from './pages/VotePage';
-import { VoteSessionManager } from './pages/VoteSessionManager';
-import { QuizSessionManager } from './pages/QuizSessionManager';
+import { VotesAndQuizPage } from './pages/VotesAndQuizPage';
 import { QuizPage } from './pages/QuizPage';
 import { DisplayCodeInput, SessionDisplay } from './pages/DisplayPage';
-import { TrailersManager } from './pages/TrailersManager';
+import { MediaAndTemplatesPage } from './pages/MediaAndTemplatesPage';
 import { ConfigPage } from './pages/ConfigPage';
 import { SessionHistory } from './pages/SessionHistory';
 import { SystemLogs } from './pages/SystemLogs';
@@ -195,17 +193,13 @@ function AppRoutes() {
       />
       <Route
         path="/templates"
-        element={
-          <RequireAuth>
-            <TemplateManager />
-          </RequireAuth>
-        }
+        element={<Navigate to="/media?tab=templates" replace />}
       />
       <Route
         path="/media"
         element={
           <RequireAuth>
-            <TrailersManager />
+            <MediaAndTemplatesPage />
           </RequireAuth>
         }
       />
@@ -213,17 +207,13 @@ function AppRoutes() {
         path="/votes"
         element={
           <RequireAuth>
-            <VoteSessionManager />
+            <VotesAndQuizPage />
           </RequireAuth>
         }
       />
       <Route
         path="/quiz"
-        element={
-          <RequireAuth>
-            <QuizSessionManager />
-          </RequireAuth>
-        }
+        element={<Navigate to="/votes?tab=quiz" replace />}
       />
       <Route
         path="/settings"

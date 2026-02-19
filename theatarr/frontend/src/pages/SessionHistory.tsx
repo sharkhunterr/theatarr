@@ -7,13 +7,10 @@ import {
   PauseCircle,
   XCircle,
   Clock,
-  Film,
-  Calendar,
-  TrendingUp,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import { Button, Card, Spinner } from '../components/common';
+import { Button, Card, Spinner, PageHeader, ButtonGroup } from '../components/common';
 import { apiClient } from '../api/client';
 import { EventTimeline } from '../components/history/EventTimeline';
 
@@ -117,39 +114,37 @@ function SessionRow({ session }: { session: SessionHistoryItem }) {
   };
 
   return (
-    <Card>
+    <div className="rounded-lg border border-dark-border bg-dark-surface shadow-sm overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="block w-full text-left p-4 hover:bg-dark-border/30 transition-colors"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-dark-muted">
-              {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </div>
-            {getStatusIcon(session.status)}
-            <div>
-              <div className="font-medium text-dark-text">{session.name}</div>
-              {session.movie_title && (
-                <div className="text-sm text-dark-muted">{session.movie_title}</div>
-              )}
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="text-dark-muted flex-shrink-0">
+            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </div>
-          <div className="flex items-center gap-6 text-sm text-dark-muted">
+          {getStatusIcon(session.status)}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-dark-text truncate">{session.name}</div>
+            {session.movie_title && (
+              <div className="text-xs text-dark-muted truncate">{session.movie_title}</div>
+            )}
+          </div>
+          <div className="flex items-center gap-3 sm:gap-6 text-xs sm:text-sm text-dark-muted flex-shrink-0">
             <div className="hidden md:block">
               <span className="text-dark-muted/60">Debut:</span>{' '}
               {formatDate(session.started_at)}
             </div>
             <div>
-              <span className="text-dark-muted/60">Duree:</span>{' '}
+              <span className="hidden sm:inline text-dark-muted/60">Duree: </span>
               {formatDuration(session.duration_seconds)}
             </div>
-            <div>
+            <div className="hidden sm:block">
               <span className="text-dark-muted/60">Seq:</span>{' '}
               {session.sequences_completed}/{session.total_sequences}
             </div>
             <span
-              className={`px-2 py-0.5 rounded text-xs font-medium ${
+              className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                 session.status === 'completed'
                   ? 'bg-green-500/20 text-green-400'
                   : session.status === 'running'
@@ -206,7 +201,7 @@ function SessionRow({ session }: { session: SessionHistoryItem }) {
           )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -239,82 +234,17 @@ export function SessionHistory() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-text">Historique</h1>
-          <p className="text-dark-muted text-sm mt-1">Historique des sessions et statistiques de lecture</p>
-        </div>
-      </div>
-
-      {/* Stats Overview */}
-      {statsData && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <div className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-theatarr-500/20 flex items-center justify-center">
-                  <Film size={20} className="text-theatarr-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">{statsData.total_sessions}</div>
-                  <div className="text-sm text-dark-muted">Sessions totales</div>
-                </div>
-              </div>
-            </div>
-          </Card>
-          <Card>
-            <div className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <Calendar size={20} className="text-green-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">{statsData.sessions_this_week}</div>
-                  <div className="text-sm text-dark-muted">Cette semaine</div>
-                </div>
-              </div>
-            </div>
-          </Card>
-          <Card>
-            <div className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                  <Clock size={20} className="text-purple-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {statsData.avg_session_duration_minutes.toFixed(0)}m
-                  </div>
-                  <div className="text-sm text-dark-muted">Duree moyenne</div>
-                </div>
-              </div>
-            </div>
-          </Card>
-          <Card>
-            <div className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-                  <TrendingUp size={20} className="text-yellow-400" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {statsData.total_playback_hours.toFixed(1)}h
-                  </div>
-                  <div className="text-sm text-dark-muted">Lecture totale</div>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
+      <PageHeader
+        title="Historique"
+        subtitle={statsData ? `${statsData.total_playback_hours.toFixed(1)}h de lecture totale` : undefined}
+      />
 
       {/* Daily Chart */}
       {statsData && statsData.daily_stats.length > 0 && (
         <Card className="mb-6">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold mb-4 text-dark-text">7 derniers jours</h2>
-            <div className="flex items-end gap-2 h-32">
+          <div className="p-4 sm:p-6">
+            <h2 className="text-xs font-medium uppercase tracking-wider text-dark-muted mb-3">7 derniers jours</h2>
+            <div className="flex items-end gap-2 h-24">
               {statsData.daily_stats.map((day) => {
                 const maxSessions = Math.max(...statsData.daily_stats.map((d) => d.sessions_started), 1);
                 const height = (day.sessions_started / maxSessions) * 100;
@@ -340,23 +270,18 @@ export function SessionHistory() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-2 mb-6">
-        {['', 'completed', 'running', 'paused', 'interrupted'].map((status) => (
-          <button
-            key={status}
-            onClick={() => {
-              setStatusFilter(status);
-              setPage(1);
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              statusFilter === status
-                ? 'bg-theatarr-500 text-white'
-                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
-            }`}
-          >
-            {status === '' ? 'Tous' : status === 'completed' ? 'Termine' : status === 'running' ? 'En cours' : status === 'paused' ? 'En pause' : 'Interrompu'}
-          </button>
-        ))}
+      <div className="mb-6">
+        <ButtonGroup
+          options={[
+            { key: '', label: 'Tous' },
+            { key: 'completed', label: 'Termine' },
+            { key: 'running', label: 'En cours' },
+            { key: 'paused', label: 'En pause' },
+            { key: 'interrupted', label: 'Interrompu' },
+          ]}
+          value={statusFilter}
+          onChange={(v) => { setStatusFilter(v); setPage(1); }}
+        />
       </div>
 
       {/* History List */}
@@ -374,33 +299,31 @@ export function SessionHistory() {
 
           {/* Pagination */}
           {historyData.total_pages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-6">
-              <Button
-                variant="ghost"
-                size="sm"
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
+                className="h-9 px-3 rounded-md border border-dark-border text-sm font-medium text-dark-text hover:bg-dark-border/50 transition-colors disabled:opacity-50"
               >
                 Precedent
-              </Button>
-              <span className="text-sm text-dark-muted">
+              </button>
+              <span className="text-sm text-dark-muted tabular-nums">
                 Page {page} sur {historyData.total_pages}
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={() => setPage((p) => Math.min(historyData.total_pages, p + 1))}
                 disabled={page === historyData.total_pages}
+                className="h-9 px-3 rounded-md border border-dark-border text-sm font-medium text-dark-text hover:bg-dark-border/50 transition-colors disabled:opacity-50"
               >
                 Suivant
-              </Button>
+              </button>
             </div>
           )}
         </>
       ) : (
-        <div className="text-center py-12">
-          <History size={48} className="mx-auto text-dark-muted mb-4" />
-          <p className="text-dark-muted">Aucun historique trouve</p>
+        <div className="text-center py-8">
+          <History size={32} className="mx-auto text-dark-muted mb-3" />
+          <p className="text-sm text-dark-muted">Aucun historique trouve</p>
         </div>
       )}
     </div>

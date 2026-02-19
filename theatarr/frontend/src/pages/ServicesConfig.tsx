@@ -8,11 +8,8 @@ import {
   Film,
   Cog,
   Database,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
 } from 'lucide-react';
-import { Button, Card, Modal, Spinner } from '../components/common';
+import { Button, Card, Modal, Spinner, PageHeader, ButtonGroup } from '../components/common';
 import {
   ServiceCard,
   ServiceForm,
@@ -173,7 +170,6 @@ export function ServicesConfig() {
 
   // Stats
   const connectedCount = services.filter((s) => s.connection_status === 'connected').length;
-  const errorCount = services.filter((s) => s.connection_status === 'error').length;
 
   if (isLoading) {
     return (
@@ -185,104 +181,52 @@ export function ServicesConfig() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-text">{t.title}</h1>
-          <p className="text-dark-muted text-sm mt-1">{t.subtitle}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={fetchData} className="flex-shrink-0">
-            <RefreshCw size={16} />
-          </Button>
-          <Button
-            onClick={() => {
-              setEditingService(null);
-              setIsFormModalOpen(true);
-            }}
-          >
-            <Plus size={16} className="mr-1" />
-            <span className="hidden sm:inline">{t.addService}</span>
-            <span className="sm:hidden">Ajouter</span>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title={t.title}
+        subtitle={t.subtitle}
+        actions={
+          <div className="flex items-center gap-2">
+            <button onClick={fetchData} className="h-9 w-9 flex items-center justify-center rounded-md border border-dark-border hover:bg-dark-border/50 text-dark-muted transition-colors">
+              <RefreshCw className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => {
+                setEditingService(null);
+                setIsFormModalOpen(true);
+              }}
+              className="inline-flex items-center gap-2 h-9 px-3 bg-theatarr-600 text-white rounded-md text-sm font-medium hover:bg-theatarr-700 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">{t.addService}</span>
+            </button>
+          </div>
+        }
+      />
 
-      {/* Stats Cards */}
-      {services.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-dark-surface border border-dark-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-theatarr-500/20 flex items-center justify-center">
-                <Plug size={18} className="text-theatarr-500" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-dark-text">{services.length}</div>
-                <div className="text-xs text-dark-muted">{t.services}</div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-dark-surface border border-dark-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                <CheckCircle size={18} className="text-green-400" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-dark-text">{connectedCount}</div>
-                <div className="text-xs text-dark-muted">{t.connected}</div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-dark-surface border border-dark-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                {errorCount > 0 ? (
-                  <XCircle size={18} className="text-red-400" />
-                ) : (
-                  <AlertCircle size={18} className="text-dark-muted" />
-                )}
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-dark-text">{errorCount}</div>
-                <div className="text-xs text-dark-muted">{t.errors}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Category Filters - Horizontal scroll on mobile */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-        {categoryFilters.map((filter) => (
-          <button
-            key={filter.value}
-            onClick={() => setCategoryFilter(filter.value)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              categoryFilter === filter.value
-                ? 'bg-theatarr-500 text-white'
-                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
-            }`}
-          >
-            {filter.icon}
-            {filter.label}
-          </button>
-        ))}
+      {/* Category Filters */}
+      <div className="mb-6">
+        <ButtonGroup
+          options={categoryFilters.map((f) => ({ key: f.value, label: f.label }))}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+        />
       </div>
 
       {/* Services List */}
       {filteredServices.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Plug size={48} className="mx-auto text-dark-muted mb-4" />
-          <p className="text-dark-muted mb-4">{t.noServices}</p>
-          <Button
+        <Card className="p-6 text-center">
+          <Plug size={32} className="mx-auto text-dark-muted mb-3" />
+          <p className="text-sm text-dark-muted mb-4">{t.noServices}</p>
+          <button
             onClick={() => {
               setEditingService(null);
               setIsFormModalOpen(true);
             }}
+            className="inline-flex items-center gap-2 h-10 px-4 bg-theatarr-600 text-white rounded-md text-sm font-medium hover:bg-theatarr-700 transition-colors"
           >
-            <Plus size={16} className="mr-1" />
+            <Plus className="h-4 w-4" />
             {t.addFirst}
-          </Button>
+          </button>
         </Card>
       ) : categoryFilter ? (
         // Flat list when filtered
@@ -304,17 +248,19 @@ export function ServicesConfig() {
         </div>
       ) : (
         // Grouped by category
-        <div className="space-y-8">
+        <div className="space-y-6">
           {Object.entries(servicesByCategory).map(([category, categoryServices]) => (
             <div key={category}>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-dark-surface border border-dark-border flex items-center justify-center text-dark-muted">
-                  {categoryIcons[category] || <Cog size={16} />}
+                  {categoryIcons[category] || <Cog size={14} />}
                 </div>
-                <h2 className="text-lg font-semibold text-dark-text">
-                  {categoryFilters.find((f) => f.value === category)?.label || category}
-                </h2>
-                <span className="text-sm text-dark-muted">({categoryServices.length})</span>
+                <div>
+                  <h2 className="text-sm font-medium text-dark-text">
+                    {categoryFilters.find((f) => f.value === category)?.label || category}
+                  </h2>
+                  <p className="text-xs text-dark-muted">{categoryServices.length} {t.services}</p>
+                </div>
               </div>
               <div className="space-y-3">
                 {categoryServices.map((service) => (

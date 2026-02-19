@@ -18,7 +18,7 @@ import {
   ChevronUp,
   X,
 } from 'lucide-react';
-import { Button, Card, Modal, Spinner } from '../components/common';
+import { Button, Card, Modal, Spinner, ButtonGroup } from '../components/common';
 import { apiClient } from '../api/client';
 import { useLayoutStore } from '../stores/layoutStore';
 
@@ -112,11 +112,18 @@ const emptyQuestion: QuizQuestion = {
   image_url: null,
 };
 
-export function QuizSessionManager() {
+interface QuizSessionManagerProps {
+  createOpen?: boolean;
+  onCreateOpenChange?: (open: boolean) => void;
+}
+
+export function QuizSessionManager({ createOpen, onCreateOpenChange }: QuizSessionManagerProps = {}) {
   const queryClient = useQueryClient();
   const { language } = useLayoutStore();
   const [selectedSession, setSelectedSession] = useState<QuizSession | null>(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [internalCreateOpen, setInternalCreateOpen] = useState(false);
+  const isCreateOpen = createOpen ?? internalCreateOpen;
+  const setIsCreateOpen = onCreateOpenChange ?? setInternalCreateOpen;
   const [isTokensOpen, setIsTokensOpen] = useState(false);
   const [isResultsOpen, setIsResultsOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -271,58 +278,37 @@ export function QuizSessionManager() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-text">{t.title}</h1>
-          <p className="text-dark-muted text-sm mt-1">{t.subtitle}</p>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus size={16} className="mr-2" />
-          {t.createButton}
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {([
-          { key: 'all', label: t.all },
-          { key: 'draft', label: t.draft },
-          { key: 'open', label: t.open },
-          { key: 'active', label: t.active },
-          { key: 'completed', label: t.completed },
-        ] as const).map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === f.key
-                ? 'bg-theatarr-500 text-white'
-                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="mb-4">
+        <ButtonGroup
+          options={[
+            { key: 'all' as const, label: t.all },
+            { key: 'draft' as const, label: t.draft },
+            { key: 'open' as const, label: t.open },
+            { key: 'active' as const, label: t.active },
+            { key: 'completed' as const, label: t.completed },
+          ]}
+          value={filter}
+          onChange={setFilter}
+        />
       </div>
 
       {/* Sessions List */}
       {data?.items && data.items.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {data.items.map((session) => (
             <Card key={session.id} className="overflow-hidden">
-              <div className="p-4 sm:p-6">
+              <div className="p-3">
                 {/* Header Row */}
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3">
                   {/* Icon */}
-                  <div className="w-12 h-12 rounded-lg bg-theatarr-500/20 flex items-center justify-center flex-shrink-0">
-                    <HelpCircle size={24} className="text-theatarr-500" />
+                  <div className="w-9 h-9 rounded-lg bg-theatarr-500/20 flex items-center justify-center flex-shrink-0">
+                    <HelpCircle size={18} className="text-theatarr-500" />
                   </div>
 
                   {/* Session Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold text-dark-text truncate">
+                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                      <h3 className="text-sm font-semibold text-dark-text truncate">
                         {session.name}
                       </h3>
                       <span
@@ -336,13 +322,13 @@ export function QuizSessionManager() {
                     )}
 
                     {/* Stats */}
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-dark-muted">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-dark-muted">
                       <span className="flex items-center gap-1">
-                        <HelpCircle size={14} />
+                        <HelpCircle size={12} />
                         {session.question_count} {t.questions}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Users size={14} />
+                        <Users size={12} />
                         {session.participant_count} {t.participants}
                       </span>
                       {session.status === 'active' && (
@@ -355,7 +341,7 @@ export function QuizSessionManager() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-dark-border">
+                <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-dark-border">
                   {session.status === 'draft' && (
                     <Button
                       variant="secondary"
@@ -450,11 +436,11 @@ export function QuizSessionManager() {
           ))}
         </div>
       ) : (
-        <Card className="p-12 text-center">
-          <HelpCircle size={48} className="mx-auto text-dark-muted mb-4" />
-          <p className="text-dark-muted mb-4">{t.noSessions}</p>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus size={16} className="mr-2" />
+        <Card className="p-8 text-center">
+          <HelpCircle size={32} className="mx-auto text-dark-muted mb-3" />
+          <p className="text-sm text-dark-muted mb-3">{t.noSessions}</p>
+          <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+            <Plus size={14} className="mr-1" />
             {t.createFirst}
           </Button>
         </Card>

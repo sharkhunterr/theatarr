@@ -589,7 +589,7 @@ export function SessionDetailPage() {
 
   if (isSessionLoading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+      <div className="space-y-4">
         <div className="h-8 w-32 bg-dark-surface rounded animate-pulse" />
         <div className="h-48 bg-dark-surface rounded-xl animate-pulse" />
         <div className="h-20 bg-dark-surface rounded-xl animate-pulse" />
@@ -600,7 +600,7 @@ export function SessionDetailPage() {
 
   if (!session) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div>
         <Link
           to="/sessions"
           className="inline-flex items-center gap-2 text-dark-muted hover:text-dark-text transition-colors mb-4"
@@ -619,7 +619,7 @@ export function SessionDetailPage() {
   const voteSession = session.linked_vote_session;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+    <div className="space-y-4">
       {/* Header: Back + Edit */}
       <div className="flex items-center justify-between">
         <Link

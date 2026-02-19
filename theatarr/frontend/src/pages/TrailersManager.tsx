@@ -21,10 +21,11 @@ import {
   CheckCircle,
   ExternalLink,
 } from 'lucide-react';
-import { Button, Card, Modal, Spinner, Input } from '../components/common';
+import { Button, Card, Modal, Spinner, Input, ButtonGroup } from '../components/common';
 import { TrailerRuleForm } from '../components/trailers/TrailerRuleForm';
 import { StorageStats } from '../components/trailers/StorageStats';
 import { apiClient, API_BASE } from '../api/client';
+import { TemplateManager } from './TemplateManager';
 
 // ============================================================================
 // Types
@@ -136,58 +137,71 @@ interface SoundInfo {
 // ============================================================================
 
 export function TrailersManager() {
-  const [mainTab, setMainTab] = useState<'trailers' | 'sounds' | 'prerolls'>('trailers');
+  const [mainTab, setMainTab] = useState<'trailers' | 'sounds' | 'prerolls' | 'templates'>('trailers');
+  const [trailersSubTab, setTrailersSubTab] = useState<'library' | 'rules'>('library');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [refreshBuiltinsTrigger, setRefreshBuiltinsTrigger] = useState(0);
+
+  useEffect(() => {
+    setCreateOpen(false);
+  }, [mainTab]);
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-dark-text">Média</h1>
-        <p className="text-dark-muted text-sm mt-1">
-          Gérez vos bandes-annonces, pré-rolls et votre bibliothèque de sons
-        </p>
+      {/* Main tabs + action buttons */}
+      <div className="flex items-center justify-between mb-6">
+        <ButtonGroup
+          options={[
+            { key: 'trailers' as const, label: 'Bandes-annonces' },
+            { key: 'prerolls' as const, label: 'Pré-rolls' },
+            { key: 'sounds' as const, label: 'Sons' },
+            { key: 'templates' as const, label: 'Modèles' },
+          ]}
+          value={mainTab}
+          onChange={setMainTab}
+        />
+        <div className="flex items-center gap-2">
+          {mainTab === 'templates' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setRefreshBuiltinsTrigger((n) => n + 1)}
+              className="h-9"
+            >
+              <RefreshCw size={14} />
+              <span className="hidden sm:inline ml-1.5">Refresh Built-in</span>
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setCreateOpen(true)} className="h-9">
+            <Plus className="h-4 w-4" />
+            <span className="ml-1.5">
+              {mainTab === 'trailers' && trailersSubTab === 'rules' ? 'Créer' : 'Ajouter'}
+            </span>
+          </Button>
+        </div>
       </div>
 
-      {/* Main Tabs */}
-      <div className="flex gap-6 mb-6 border-b border-dark-border">
-        <button
-          onClick={() => setMainTab('trailers')}
-          className={`pb-3 px-1 font-medium text-base transition-colors ${
-            mainTab === 'trailers'
-              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
-              : 'text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <Film size={18} className="inline mr-2" />
-          Bandes-annonces
-        </button>
-        <button
-          onClick={() => setMainTab('prerolls')}
-          className={`pb-3 px-1 font-medium text-base transition-colors ${
-            mainTab === 'prerolls'
-              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
-              : 'text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <Clapperboard size={18} className="inline mr-2" />
-          Pré-rolls
-        </button>
-        <button
-          onClick={() => setMainTab('sounds')}
-          className={`pb-3 px-1 font-medium text-base transition-colors ${
-            mainTab === 'sounds'
-              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
-              : 'text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <Music size={18} className="inline mr-2" />
-          Sons
-        </button>
-      </div>
-
-      {mainTab === 'trailers' && <TrailersTab />}
-      {mainTab === 'prerolls' && <PreRollsTab />}
-      {mainTab === 'sounds' && <SoundsTab />}
+      {mainTab === 'trailers' && (
+        <TrailersTab
+          createOpen={createOpen}
+          onCreateOpenChange={setCreateOpen}
+          activeSubTab={trailersSubTab}
+          onSubTabChange={setTrailersSubTab}
+        />
+      )}
+      {mainTab === 'prerolls' && (
+        <PreRollsTab createOpen={createOpen} onCreateOpenChange={setCreateOpen} />
+      )}
+      {mainTab === 'sounds' && (
+        <SoundsTab createOpen={createOpen} onCreateOpenChange={setCreateOpen} />
+      )}
+      {mainTab === 'templates' && (
+        <TemplateManager
+          createOpen={createOpen}
+          onCreateOpenChange={setCreateOpen}
+          refreshBuiltinsTrigger={refreshBuiltinsTrigger}
+        />
+      )}
     </div>
   );
 }
@@ -196,9 +210,15 @@ export function TrailersManager() {
 // Trailers Tab (existing content)
 // ============================================================================
 
-function TrailersTab() {
+interface TrailersTabProps {
+  createOpen?: boolean;
+  onCreateOpenChange?: (open: boolean) => void;
+  activeSubTab: 'library' | 'rules';
+  onSubTabChange: (tab: 'library' | 'rules') => void;
+}
+
+function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabChange }: TrailersTabProps) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'library' | 'rules'>('library');
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const [isRuleFormOpen, setIsRuleFormOpen] = useState(false);
   const [selectedRule, setSelectedRule] = useState<TrailerRule | null>(null);
@@ -206,19 +226,28 @@ function TrailersTab() {
   const [downloadTitle, setDownloadTitle] = useState('');
   const [filter, setFilter] = useState<'all' | 'ready' | 'pending' | 'error'>('all');
 
+  // Handle external create trigger
+  useEffect(() => {
+    if (createOpen) {
+      if (activeSubTab === 'library') setIsDownloadOpen(true);
+      else setIsRuleFormOpen(true);
+      onCreateOpenChange?.(false);
+    }
+  }, [createOpen]);
+
   const { data: trailersData, isLoading: trailersLoading } = useQuery({
     queryKey: ['trailers', filter],
     queryFn: async () => {
       const params = filter !== 'all' ? `?status_filter=${filter}` : '';
       return apiClient.get(`/trailers${params}`);
     },
-    enabled: activeTab === 'library',
+    enabled: activeSubTab === 'library',
   });
 
   const { data: rulesData, isLoading: rulesLoading } = useQuery({
     queryKey: ['trailer-rules'],
     queryFn: async () => apiClient.get('/trailers/rules'),
-    enabled: activeTab === 'rules',
+    enabled: activeSubTab === 'rules',
   });
 
   const { data: storageStats } = useQuery<StorageStatsData>({
@@ -283,213 +312,133 @@ function TrailersTab() {
 
   return (
     <>
-      {storageStats && (
-        <StorageStats
-          stats={storageStats}
-          className="mb-6"
-          actions={
-            <>
-              {activeTab === 'library' && (
-                <Button size="sm" onClick={() => setIsDownloadOpen(true)}>
-                  <Download size={14} className="mr-1" />
-                  Télécharger
-                </Button>
-              )}
-              {activeTab === 'rules' && (
-                <Button size="sm" onClick={() => setIsRuleFormOpen(true)}>
-                  <Plus size={14} className="mr-1" />
-                  Créer une règle
-                </Button>
-              )}
-            </>
-          }
-        />
-      )}
-
       {/* Sub-tabs */}
-      <div className="flex gap-4 mb-6 border-b border-dark-border">
-        <button
-          onClick={() => setActiveTab('library')}
-          className={`pb-3 px-1 font-medium transition-colors ${
-            activeTab === 'library'
-              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
-              : 'text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <Film size={16} className="inline mr-2" />
-          Bibliothèque
-        </button>
-        <button
-          onClick={() => setActiveTab('rules')}
-          className={`pb-3 px-1 font-medium transition-colors ${
-            activeTab === 'rules'
-              ? 'text-theatarr-400 border-b-2 border-theatarr-400'
-              : 'text-dark-muted hover:text-dark-text'
-          }`}
-        >
-          <Settings size={16} className="inline mr-2" />
-          Règles
-        </button>
+      <div className="mb-4">
+        <ButtonGroup
+          options={[
+            { key: 'library' as const, label: 'Bibliothèque' },
+            { key: 'rules' as const, label: 'Règles' },
+          ]}
+          value={activeSubTab}
+          onChange={onSubTabChange}
+        />
       </div>
 
       {/* Library */}
-      {activeTab === 'library' && (
+      {activeSubTab === 'library' && (
         <>
-          <div className="flex gap-2 mb-6">
-            {(['all', 'ready', 'pending', 'error'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filter === f
-                    ? 'bg-theatarr-500 text-white'
-                    : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
-                }`}
-              >
-                {f === 'all' ? 'Tous' : f === 'ready' ? 'Prêt' : f === 'pending' ? 'En cours' : 'Erreur'}
-              </button>
-            ))}
+          <div className="mb-4">
+            <ButtonGroup
+              options={[
+                { key: 'all' as const, label: 'Tous' },
+                { key: 'ready' as const, label: 'Prêt' },
+                { key: 'pending' as const, label: 'En cours' },
+                { key: 'error' as const, label: 'Erreur' },
+              ]}
+              value={filter}
+              onChange={setFilter}
+            />
           </div>
 
           {trailersLoading ? (
             <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
           ) : trailersData?.items?.length > 0 ? (
-            <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-dark-border text-left">
-                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-16"></th>
-                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider">Film</th>
-                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden md:table-cell">Bande-annonce</th>
-                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-center">Qualité</th>
-                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-right">Durée</th>
-                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden xl:table-cell w-20 text-right">Taille</th>
-                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-24 text-center">Status</th>
-                    <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-20 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-dark-border">
-                  {trailersData.items.map((trailer: Trailer) => {
-                    const formatDuration = (seconds: number) => {
-                      const mins = Math.floor(seconds / 60);
-                      const secs = seconds % 60;
-                      return `${mins}:${secs.toString().padStart(2, '0')}`;
-                    };
+            <div className="rounded-lg border border-dark-border bg-dark-surface overflow-hidden divide-y divide-dark-border">
+              {trailersData.items.map((trailer: Trailer) => {
+                const fmtDur = (seconds: number) => {
+                  const mins = Math.floor(seconds / 60);
+                  const secs = seconds % 60;
+                  return `${mins}:${secs.toString().padStart(2, '0')}`;
+                };
 
-                    return (
-                      <tr key={trailer.id} className="hover:bg-dark-bg/50 transition-colors group">
-                        {/* Thumbnail */}
-                        <td className="px-4 py-2.5">
-                          <div className="w-12 h-8 rounded bg-dark-bg overflow-hidden flex-shrink-0">
-                            {trailer.thumbnail_url ? (
-                              <img src={trailer.thumbnail_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Film size={14} className="text-dark-muted" />
-                              </div>
-                            )}
-                          </div>
-                        </td>
+                return (
+                  <div key={trailer.id} className="flex items-center gap-3 p-3 hover:bg-dark-border/20 transition-colors">
+                    {/* Icon */}
+                    <div className="w-9 h-9 rounded-lg bg-dark-bg flex items-center justify-center flex-shrink-0">
+                      <Film size={16} className="text-theatarr-400" />
+                    </div>
 
-                        {/* Movie title + year */}
-                        <td className="px-4 py-2.5">
-                          <div className="font-medium text-dark-text text-sm truncate max-w-[200px]">
-                            {trailer.movie_title}
-                            {trailer.movie_year && (
-                              <span className="text-dark-muted font-normal ml-1.5">({trailer.movie_year})</span>
-                            )}
-                          </div>
-                          {/* Show trailer title on mobile since the column is hidden */}
-                          <div className="text-xs text-dark-muted truncate max-w-[200px] md:hidden">{trailer.title}</div>
-                        </td>
-
-                        {/* Trailer title */}
-                        <td className="px-4 py-2.5 hidden md:table-cell">
-                          <span className="text-sm text-dark-muted truncate block max-w-[250px]">{trailer.title}</span>
-                        </td>
-
-                        {/* Quality */}
-                        <td className="px-4 py-2.5 hidden lg:table-cell text-center">
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-dark-bg border border-dark-border text-dark-text">
-                            {trailer.quality}
-                          </span>
-                        </td>
-
-                        {/* Duration */}
-                        <td className="px-4 py-2.5 hidden lg:table-cell text-right">
-                          <span className="text-sm text-dark-muted">
-                            {trailer.duration_seconds ? formatDuration(trailer.duration_seconds) : '—'}
-                          </span>
-                        </td>
-
-                        {/* Size */}
-                        <td className="px-4 py-2.5 hidden xl:table-cell text-right">
-                          <span className="text-sm text-dark-muted">
-                            {trailer.file_size_mb ? `${trailer.file_size_mb.toFixed(0)} MB` : '—'}
-                          </span>
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-2.5 text-center">
-                          {trailer.status === 'ready' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
-                              <CheckCircle size={12} />
-                              Prêt
-                            </span>
-                          ) : trailer.status === 'downloading' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
-                              <Loader2 size={12} className="animate-spin" />
-                              {((trailer.download_progress || 0) * 100).toFixed(0)}%
-                            </span>
-                          ) : trailer.status === 'pending' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/15 text-yellow-400">
-                              <Clock size={12} />
-                              En attente
-                            </span>
-                          ) : (
-                            <span
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400 cursor-help"
-                              title={trailer.error_message || 'Erreur inconnue'}
-                            >
-                              <AlertCircle size={12} />
-                              Erreur
-                            </span>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      {/* Title row */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-medium text-dark-text text-sm truncate">
+                          {trailer.movie_title}
+                          {trailer.movie_year && (
+                            <span className="text-dark-muted font-normal ml-1">({trailer.movie_year})</span>
                           )}
-                        </td>
+                        </span>
+                        {/* Status badge */}
+                        {trailer.status === 'ready' ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/15 text-green-400 flex-shrink-0">
+                            <CheckCircle size={10} />
+                            Prêt
+                          </span>
+                        ) : trailer.status === 'downloading' ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 flex-shrink-0">
+                            <Loader2 size={10} className="animate-spin" />
+                            {((trailer.download_progress || 0) * 100).toFixed(0)}%
+                          </span>
+                        ) : trailer.status === 'pending' ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/15 text-yellow-400 flex-shrink-0">
+                            <Clock size={10} />
+                            Attente
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/15 text-red-400 flex-shrink-0 cursor-help"
+                            title={trailer.error_message || 'Erreur inconnue'}
+                          >
+                            <AlertCircle size={10} />
+                            Erreur
+                          </span>
+                        )}
+                      </div>
 
-                        {/* Actions */}
-                        <td className="px-4 py-2.5 text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {trailer.source_url && (
-                              <a
-                                href={trailer.source_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border/50 transition-colors"
-                                title="Ouvrir sur YouTube"
-                              >
-                                <ExternalLink size={14} />
-                              </a>
-                            )}
-                            {trailer.play_count > 0 && (
-                              <span className="text-xs text-dark-muted flex items-center gap-0.5 mr-1" title="Nombre de lectures">
-                                <Play size={10} />{trailer.play_count}
-                              </span>
-                            )}
-                            <button
-                              onClick={() => handleDelete(trailer)}
-                              className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                              title="Supprimer"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      {/* Meta row */}
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-dark-muted">
+                        <span className="truncate max-w-[180px] sm:max-w-none">{trailer.title}</span>
+                        <span className="hidden sm:inline px-1.5 py-0.5 rounded bg-dark-bg border border-dark-border text-[10px] font-medium text-dark-text flex-shrink-0">
+                          {trailer.quality}
+                        </span>
+                        {trailer.duration_seconds && (
+                          <span className="hidden sm:inline flex-shrink-0">{fmtDur(trailer.duration_seconds)}</span>
+                        )}
+                        {trailer.file_size_mb && (
+                          <span className="hidden md:inline flex-shrink-0">{trailer.file_size_mb.toFixed(0)} MB</span>
+                        )}
+                        {trailer.play_count > 0 && (
+                          <span className="hidden sm:inline-flex items-center gap-0.5 flex-shrink-0">
+                            <Play size={10} />{trailer.play_count}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {trailer.source_url && (
+                        <a
+                          href={trailer.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border/50 transition-colors hidden sm:flex"
+                          title="Ouvrir sur YouTube"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => handleDelete(trailer)}
+                        className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Supprimer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -504,7 +453,7 @@ function TrailersTab() {
       )}
 
       {/* Rules */}
-      {activeTab === 'rules' && (
+      {activeSubTab === 'rules' && (
         <>
           {rulesLoading ? (
             <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
@@ -582,11 +531,23 @@ function TrailersTab() {
 // Pre-Rolls Tab
 // ============================================================================
 
-function PreRollsTab() {
+interface MediaTabProps {
+  createOpen?: boolean;
+  onCreateOpenChange?: (open: boolean) => void;
+}
+
+function PreRollsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'ready' | 'pending' | 'error'>('all');
+
+  useEffect(() => {
+    if (createOpen) {
+      setIsAddOpen(true);
+      onCreateOpenChange?.(false);
+    }
+  }, [createOpen]);
 
   const { data: prerollsData, isLoading } = useQuery({
     queryKey: ['prerolls', filter, searchQuery],
@@ -624,161 +585,102 @@ function PreRollsTab() {
 
   return (
     <>
-      {/* Stats bar */}
-      {prerollsData && (
-        <div className="bg-dark-surface border border-dark-border rounded-xl px-4 py-2.5 mb-6">
-          <div className="flex items-center gap-6 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Clapperboard size={15} className="text-theatarr-400" />
-              <span className="text-sm text-dark-text">{prerollsData.total} pré-roll{prerollsData.total !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="w-px h-4 bg-dark-border" />
-            <div className="flex items-center gap-2">
-              <HardDrive size={15} className="text-indigo-400" />
-              <span className="text-sm text-dark-text">{prerollsData.total_size_gb} GB</span>
-            </div>
-            <div className="ml-auto flex items-center gap-2 shrink-0">
-              <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-dark-muted" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Rechercher..."
-                  className="pl-8 pr-3 py-1.5 text-sm bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder:text-dark-muted w-40"
-                />
-              </div>
-              <Button size="sm" onClick={() => setIsAddOpen(true)}>
-                <Plus size={14} className="mr-1" />
-                Ajouter
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
-      <div className="flex gap-2 mb-6">
-        {(['all', 'ready', 'pending', 'error'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === f
-                ? 'bg-theatarr-500 text-white'
-                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
-            }`}
-          >
-            {f === 'all' ? 'Tous' : f === 'ready' ? 'Prêt' : f === 'pending' ? 'En cours' : 'Erreur'}
-          </button>
-        ))}
+      <div className="mb-4">
+        <ButtonGroup
+          options={[
+            { key: 'all' as const, label: 'Tous' },
+            { key: 'ready' as const, label: 'Prêt' },
+            { key: 'pending' as const, label: 'En cours' },
+            { key: 'error' as const, label: 'Erreur' },
+          ]}
+          value={filter}
+          onChange={setFilter}
+        />
       </div>
 
       {/* Table */}
       {isLoading ? (
         <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
       ) : prerolls.length > 0 ? (
-        <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-dark-border text-left">
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider">Nom</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden md:table-cell w-20">Source</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden md:table-cell w-20">Format</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-right">Durée</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-right">Taille</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-24 text-center">Status</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-20 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-dark-border">
-              {prerolls.map((preroll) => (
-                <tr key={preroll.id} className="hover:bg-dark-bg/50 transition-colors group">
-                  {/* Name + tags */}
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <Clapperboard size={14} className="text-theatarr-400 shrink-0" />
-                      <span className="font-medium text-dark-text text-sm truncate max-w-[250px]">{preroll.name}</span>
-                    </div>
-                    {preroll.tags && preroll.tags.length > 0 && (
-                      <div className="flex gap-1 mt-1 ml-6">
-                        {preroll.tags.map((tag) => (
-                          <span key={tag} className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded text-xs text-dark-muted">{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                  </td>
+        <div className="rounded-lg border border-dark-border bg-dark-surface overflow-hidden divide-y divide-dark-border">
+          {prerolls.map((preroll) => (
+            <div key={preroll.id} className="flex items-center gap-3 p-3 hover:bg-dark-border/20 transition-colors">
+              {/* Icon */}
+              <div className="w-9 h-9 rounded-lg bg-dark-bg flex items-center justify-center flex-shrink-0">
+                <Clapperboard size={16} className="text-theatarr-400" />
+              </div>
 
-                  {/* Source */}
-                  <td className="px-4 py-2.5 hidden md:table-cell">
-                    <span className="text-xs text-dark-muted">{preroll.source_type === 'youtube' ? 'YouTube' : 'Upload'}</span>
-                  </td>
-
-                  {/* Format */}
-                  <td className="px-4 py-2.5 hidden md:table-cell">
-                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-dark-bg border border-dark-border text-dark-text uppercase">{preroll.format}</span>
-                  </td>
-
-                  {/* Duration */}
-                  <td className="px-4 py-2.5 hidden lg:table-cell text-right">
-                    <span className="text-sm text-dark-muted">
-                      {preroll.duration_seconds != null ? formatDur(preroll.duration_seconds) : '—'}
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                {/* Title row */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-medium text-dark-text text-sm truncate">{preroll.name}</span>
+                  {/* Status badge */}
+                  {preroll.status === 'ready' ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/15 text-green-400 flex-shrink-0">
+                      <CheckCircle size={10} />Prêt
                     </span>
-                  </td>
-
-                  {/* Size */}
-                  <td className="px-4 py-2.5 hidden lg:table-cell text-right">
-                    <span className="text-sm text-dark-muted">
-                      {preroll.file_size_mb != null ? `${preroll.file_size_mb.toFixed(0)} MB` : '—'}
+                  ) : preroll.status === 'downloading' || preroll.status === 'processing' ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 flex-shrink-0">
+                      <Loader2 size={10} className="animate-spin" />
+                      {((preroll.download_progress || 0) * 100).toFixed(0)}%
                     </span>
-                  </td>
+                  ) : preroll.status === 'pending' ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/15 text-yellow-400 flex-shrink-0">
+                      <Clock size={10} />Attente
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/15 text-red-400 flex-shrink-0 cursor-help"
+                      title={preroll.error_message || 'Erreur inconnue'}
+                    >
+                      <AlertCircle size={10} />Erreur
+                    </span>
+                  )}
+                </div>
 
-                  {/* Status */}
-                  <td className="px-4 py-2.5 text-center">
-                    {preroll.status === 'ready' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
-                        <CheckCircle size={12} />Prêt
-                      </span>
-                    ) : preroll.status === 'downloading' || preroll.status === 'processing' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
-                        <Loader2 size={12} className="animate-spin" />
-                        {((preroll.download_progress || 0) * 100).toFixed(0)}%
-                      </span>
-                    ) : preroll.status === 'pending' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/15 text-yellow-400">
-                        <Clock size={12} />En attente
-                      </span>
-                    ) : (
-                      <span
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400 cursor-help"
-                        title={preroll.error_message || 'Erreur inconnue'}
-                      >
-                        <AlertCircle size={12} />Erreur
-                      </span>
-                    )}
-                  </td>
+                {/* Meta row */}
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-dark-muted">
+                  <span className="flex-shrink-0">{preroll.source_type === 'youtube' ? 'YouTube' : 'Upload'}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-dark-bg border border-dark-border text-[10px] font-medium text-dark-text uppercase flex-shrink-0">
+                    {preroll.format}
+                  </span>
+                  {preroll.duration_seconds != null && (
+                    <span className="flex-shrink-0">{formatDur(preroll.duration_seconds)}</span>
+                  )}
+                  {preroll.file_size_mb != null && (
+                    <span className="flex-shrink-0">{preroll.file_size_mb.toFixed(0)} MB</span>
+                  )}
+                  {preroll.play_count > 0 && (
+                    <span className="inline-flex items-center gap-0.5 flex-shrink-0">
+                      <Play size={10} />{preroll.play_count}
+                    </span>
+                  )}
+                </div>
 
-                  {/* Actions */}
-                  <td className="px-4 py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {preroll.play_count > 0 && (
-                        <span className="text-xs text-dark-muted flex items-center gap-0.5 mr-1" title="Lectures">
-                          <Play size={10} />{preroll.play_count}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleDelete(preroll)}
-                        className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                        title="Supprimer"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                {/* Tags */}
+                {preroll.tags && preroll.tags.length > 0 && (
+                  <div className="flex gap-1 mt-1">
+                    {preroll.tags.map((tag) => (
+                      <span key={tag} className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded text-[10px] text-dark-muted">{tag}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={() => handleDelete(preroll)}
+                  className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  title="Supprimer"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="text-center py-12">
@@ -998,11 +900,18 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function SoundsTab() {
+function SoundsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'ready' | 'pending' | 'error'>('all');
+
+  useEffect(() => {
+    if (createOpen) {
+      setIsAddOpen(true);
+      onCreateOpenChange?.(false);
+    }
+  }, [createOpen]);
 
   // Fetch sounds
   const { data: soundsData, isLoading } = useQuery({
@@ -1042,168 +951,107 @@ function SoundsTab() {
 
   return (
     <>
-      {/* Stats bar */}
-      {soundsData && (
-        <div className="bg-dark-surface border border-dark-border rounded-xl px-4 py-2.5 mb-6">
-          <div className="flex items-center gap-6 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Music size={15} className="text-theatarr-400" />
-              <span className="text-sm text-dark-text">{soundsData.total} son{soundsData.total !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="w-px h-4 bg-dark-border" />
-            <div className="flex items-center gap-2">
-              <HardDrive size={15} className="text-indigo-400" />
-              <span className="text-sm text-dark-text">{soundsData.total_size_gb} GB</span>
-            </div>
-            <div className="ml-auto flex items-center gap-2 shrink-0">
-              <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-dark-muted" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Rechercher..."
-                  className="pl-8 pr-3 py-1.5 text-sm bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder:text-dark-muted w-40"
-                />
-              </div>
-              <Button size="sm" onClick={() => setIsAddOpen(true)}>
-                <Plus size={14} className="mr-1" />
-                Ajouter
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
-      <div className="flex gap-2 mb-6">
-        {(['all', 'ready', 'pending', 'error'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === f
-                ? 'bg-theatarr-500 text-white'
-                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
-            }`}
-          >
-            {f === 'all' ? 'Tous' : f === 'ready' ? 'Prêt' : f === 'pending' ? 'En cours' : 'Erreur'}
-          </button>
-        ))}
+      <div className="mb-4">
+        <ButtonGroup
+          options={[
+            { key: 'all' as const, label: 'Tous' },
+            { key: 'ready' as const, label: 'Prêt' },
+            { key: 'pending' as const, label: 'En cours' },
+            { key: 'error' as const, label: 'Erreur' },
+          ]}
+          value={filter}
+          onChange={setFilter}
+        />
       </div>
 
       {/* Table */}
       {isLoading ? (
         <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
       ) : sounds.length > 0 ? (
-        <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-dark-border text-left">
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider">Nom</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden md:table-cell w-20">Format</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-24 text-right">Durée</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden lg:table-cell w-20 text-right">Taille</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider hidden xl:table-cell w-24 text-right">Bitrate</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-24 text-center">Status</th>
-                <th className="px-4 py-3 text-xs font-medium text-dark-muted uppercase tracking-wider w-20 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-dark-border">
-              {sounds.map((sound) => (
-                <tr key={sound.id} className="hover:bg-dark-bg/50 transition-colors group">
-                  {/* Name + tags + chapter */}
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <Music size={14} className="text-theatarr-400 shrink-0" />
-                      <span className="font-medium text-dark-text text-sm truncate max-w-[250px]">{sound.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 ml-6 mt-0.5">
-                      {sound.chapter_title && (
-                        <span className="text-xs text-dark-muted italic truncate max-w-[200px]">{sound.chapter_title}</span>
-                      )}
-                      {sound.tags && sound.tags.length > 0 && (
-                        <div className="flex gap-1">
-                          {sound.tags.map((tag) => (
-                            <span key={tag} className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded text-xs text-dark-muted">{tag}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </td>
+        <div className="rounded-lg border border-dark-border bg-dark-surface overflow-hidden divide-y divide-dark-border">
+          {sounds.map((sound) => (
+            <div key={sound.id} className="flex items-center gap-3 p-3 hover:bg-dark-border/20 transition-colors">
+              {/* Icon */}
+              <div className="w-9 h-9 rounded-lg bg-dark-bg flex items-center justify-center flex-shrink-0">
+                <Music size={16} className="text-theatarr-400" />
+              </div>
 
-                  {/* Format */}
-                  <td className="px-4 py-2.5 hidden md:table-cell">
-                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-dark-bg border border-dark-border text-dark-text uppercase">{sound.format}</span>
-                  </td>
-
-                  {/* Duration */}
-                  <td className="px-4 py-2.5 hidden lg:table-cell text-right">
-                    <span className="text-sm text-dark-muted">
-                      {sound.duration_seconds != null ? formatDur(sound.duration_seconds) : '—'}
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                {/* Title row */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-medium text-dark-text text-sm truncate">{sound.name}</span>
+                  {/* Status badge */}
+                  {sound.status === 'ready' ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/15 text-green-400 flex-shrink-0">
+                      <CheckCircle size={10} />Prêt
                     </span>
-                  </td>
-
-                  {/* Size */}
-                  <td className="px-4 py-2.5 hidden lg:table-cell text-right">
-                    <span className="text-sm text-dark-muted">
-                      {sound.file_size_mb != null ? `${sound.file_size_mb.toFixed(0)} MB` : '—'}
+                  ) : sound.status === 'downloading' || sound.status === 'processing' ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 flex-shrink-0">
+                      <Loader2 size={10} className="animate-spin" />
+                      {((sound.download_progress || 0) * 100).toFixed(0)}%
                     </span>
-                  </td>
-
-                  {/* Bitrate */}
-                  <td className="px-4 py-2.5 hidden xl:table-cell text-right">
-                    <span className="text-sm text-dark-muted">
-                      {sound.bitrate != null ? `${sound.bitrate} kbps` : '—'}
+                  ) : sound.status === 'pending' ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/15 text-yellow-400 flex-shrink-0">
+                      <Clock size={10} />Attente
                     </span>
-                  </td>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/15 text-red-400 flex-shrink-0 cursor-help"
+                      title={sound.error_message || 'Erreur inconnue'}
+                    >
+                      <AlertCircle size={10} />Erreur
+                    </span>
+                  )}
+                </div>
 
-                  {/* Status */}
-                  <td className="px-4 py-2.5 text-center">
-                    {sound.status === 'ready' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
-                        <CheckCircle size={12} />Prêt
-                      </span>
-                    ) : sound.status === 'downloading' || sound.status === 'processing' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
-                        <Loader2 size={12} className="animate-spin" />
-                        {((sound.download_progress || 0) * 100).toFixed(0)}%
-                      </span>
-                    ) : sound.status === 'pending' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/15 text-yellow-400">
-                        <Clock size={12} />En attente
-                      </span>
-                    ) : (
-                      <span
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400 cursor-help"
-                        title={sound.error_message || 'Erreur inconnue'}
-                      >
-                        <AlertCircle size={12} />Erreur
-                      </span>
-                    )}
-                  </td>
+                {/* Meta row */}
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-dark-muted">
+                  {sound.chapter_title && (
+                    <span className="italic truncate max-w-[150px] sm:max-w-none">{sound.chapter_title}</span>
+                  )}
+                  <span className="px-1.5 py-0.5 rounded bg-dark-bg border border-dark-border text-[10px] font-medium text-dark-text uppercase flex-shrink-0">
+                    {sound.format}
+                  </span>
+                  {sound.duration_seconds != null && (
+                    <span className="flex-shrink-0">{formatDur(sound.duration_seconds)}</span>
+                  )}
+                  {sound.file_size_mb != null && (
+                    <span className="flex-shrink-0">{sound.file_size_mb.toFixed(0)} MB</span>
+                  )}
+                  {sound.bitrate != null && (
+                    <span className="flex-shrink-0">{sound.bitrate} kbps</span>
+                  )}
+                  {sound.play_count > 0 && (
+                    <span className="inline-flex items-center gap-0.5 flex-shrink-0">
+                      <Play size={10} />{sound.play_count}
+                    </span>
+                  )}
+                </div>
 
-                  {/* Actions */}
-                  <td className="px-4 py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sound.play_count > 0 && (
-                        <span className="text-xs text-dark-muted flex items-center gap-0.5 mr-1" title="Lectures">
-                          <Play size={10} />{sound.play_count}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleDelete(sound)}
-                        className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                        title="Supprimer"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                {/* Tags */}
+                {sound.tags && sound.tags.length > 0 && (
+                  <div className="flex gap-1 mt-1">
+                    {sound.tags.map((tag) => (
+                      <span key={tag} className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded text-[10px] text-dark-muted">{tag}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={() => handleDelete(sound)}
+                  className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  title="Supprimer"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="text-center py-12">

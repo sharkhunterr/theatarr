@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit2, Trash2, Check, RefreshCw, Monitor, ArrowLeft } from 'lucide-react';
-import { Button, Card, Modal, Spinner } from '../components/common';
+import { Edit2, Trash2, Check, Monitor, ArrowLeft } from 'lucide-react';
+import { Button, Modal, Spinner, ButtonGroup } from '../components/common';
 import { TemplateEditor } from '../components/templates/TemplateEditor';
 import { TemplatePreview } from '../components/templates/TemplatePreview';
 import { apiClient } from '../api/client';
@@ -39,7 +39,13 @@ interface TemplateListResponse {
   total: number;
 }
 
-export function TemplateManager() {
+interface TemplateManagerProps {
+  createOpen?: boolean;
+  onCreateOpenChange?: (open: boolean) => void;
+  refreshBuiltinsTrigger?: number;
+}
+
+export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltinsTrigger }: TemplateManagerProps = {}) {
   const queryClient = useQueryClient();
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -125,6 +131,23 @@ export function TemplateManager() {
     queryClient.invalidateQueries({ queryKey: ['templates'] });
   };
 
+  // Handle external create trigger
+  useEffect(() => {
+    if (createOpen) {
+      handleCreate();
+      onCreateOpenChange?.(false);
+    }
+  }, [createOpen]);
+
+  // Handle external refresh builtins trigger
+  const prevTrigger = useRef(0);
+  useEffect(() => {
+    if (refreshBuiltinsTrigger && refreshBuiltinsTrigger !== prevTrigger.current) {
+      prevTrigger.current = refreshBuiltinsTrigger;
+      initBuiltinsMutation.mutate();
+    }
+  }, [refreshBuiltinsTrigger]);
+
   const WALLMOUNT_TYPES = ['countdown', 'movie_info', 'session_status'];
 
   const filteredTemplates = data?.items.filter((t) => {
@@ -147,99 +170,86 @@ export function TemplateManager() {
           <p className="text-red-400">Erreur lors du chargement des templates</p>
         </div>
       ) : filteredTemplates && filteredTemplates.length > 0 ? (
-        <div className="space-y-2">
+        <div className="rounded-lg border border-dark-border bg-dark-surface overflow-hidden divide-y divide-dark-border">
           {filteredTemplates.map((template) => (
-            <Card key={template.id}>
-              <div
-                className={`p-3 cursor-pointer transition-colors ${
-                  isPreviewOpen && selectedTemplate?.id === template.id
-                    ? 'ring-1 ring-theatarr-500 bg-theatarr-500/5'
-                    : 'hover:bg-dark-border/20'
-                }`}
-                onClick={() => handlePreview(template)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {/* Icon */}
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      template.is_active ? 'bg-green-500/20' : 'bg-dark-border'
-                    }`}>
-                      <Monitor size={18} className={template.is_active ? 'text-green-400' : 'text-dark-muted'} />
-                    </div>
+            <div
+              key={template.id}
+              className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
+                isPreviewOpen && selectedTemplate?.id === template.id
+                  ? 'bg-theatarr-500/10'
+                  : 'hover:bg-dark-border/20'
+              }`}
+              onClick={() => handlePreview(template)}
+            >
+              {/* Icon */}
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                template.is_active ? 'bg-green-500/20' : 'bg-dark-bg'
+              }`}>
+                <Monitor size={16} className={template.is_active ? 'text-green-400' : 'text-dark-muted'} />
+              </div>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-dark-text text-sm">{template.name}</span>
-                        {template.is_active && (
-                          <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-[10px] font-medium rounded">
-                            Actif
-                          </span>
-                        )}
-                        {template.is_builtin && (
-                          <span className="px-1.5 py-0.5 bg-dark-border text-dark-muted text-[10px] font-medium rounded">
-                            Integre
-                          </span>
-                        )}
-                      </div>
-                      {!isPreviewOpen && template.description && (
-                        <p className="text-xs text-dark-muted truncate mt-0.5">{template.description}</p>
-                      )}
-                    </div>
-
-                    {/* Type badge */}
-                    {!isPreviewOpen && (
-                      <div className="hidden md:flex items-center gap-3 text-sm text-dark-muted">
-                        <span className="px-2 py-0.5 bg-theatarr-500/20 text-theatarr-400 text-xs rounded">
-                          {template.template_type}
-                        </span>
-                        {template.layout?.components && (
-                          <span className="text-xs">{template.layout.components.length} composants</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
-                    {!template.is_active && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleActivate(template)}
-                        disabled={activateMutation.isPending}
-                        title="Activer"
-                      >
-                        <Check size={14} />
-                      </Button>
-                    )}
-
-                    {!template.is_builtin && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(template)}
-                          title="Modifier"
-                        >
-                          <Edit2 size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(template)}
-                          disabled={deleteMutation.isPending}
-                          className="text-red-400 hover:text-red-300"
-                          title="Supprimer"
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </>
-                    )}
-                  </div>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-dark-text text-sm truncate">{template.name}</span>
+                  {template.is_active && (
+                    <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-[10px] font-medium rounded flex-shrink-0">
+                      Actif
+                    </span>
+                  )}
+                  {template.is_builtin && (
+                    <span className="px-1.5 py-0.5 bg-dark-border text-dark-muted text-[10px] font-medium rounded flex-shrink-0">
+                      Integre
+                    </span>
+                  )}
+                </div>
+                {/* Meta row */}
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-dark-muted">
+                  <span className="px-1.5 py-0.5 rounded bg-dark-bg border border-dark-border text-[10px] font-medium text-theatarr-400 flex-shrink-0">
+                    {template.template_type}
+                  </span>
+                  {template.layout?.components && (
+                    <span className="flex-shrink-0">{template.layout.components.length} composants</span>
+                  )}
+                  {template.description && (
+                    <span className="truncate hidden sm:inline">{template.description}</span>
+                  )}
                 </div>
               </div>
-            </Card>
+
+              {/* Actions */}
+              <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                {!template.is_active && (
+                  <button
+                    onClick={() => handleActivate(template)}
+                    disabled={activateMutation.isPending}
+                    className="p-1.5 rounded-lg text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
+                    title="Activer"
+                  >
+                    <Check size={14} />
+                  </button>
+                )}
+                {!template.is_builtin && (
+                  <>
+                    <button
+                      onClick={() => handleEdit(template)}
+                      className="p-1.5 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border/50 transition-colors"
+                      title="Modifier"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(template)}
+                      disabled={deleteMutation.isPending}
+                      className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       ) : (
@@ -258,32 +268,6 @@ export function TemplateManager() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-text">Templates</h1>
-          <p className="text-dark-muted text-sm mt-1">Gerez les templates d'affichage wallmount</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => initBuiltinsMutation.mutate()}
-            disabled={initBuiltinsMutation.isPending}
-            title="Mettre a jour les templates integres"
-          >
-            <RefreshCw
-              size={16}
-              className={initBuiltinsMutation.isPending ? 'animate-spin mr-2' : 'mr-2'}
-            />
-            <span className="hidden sm:inline">MAJ Integres</span>
-          </Button>
-          <Button onClick={handleCreate}>
-            <Plus size={16} className="mr-1" />
-            <span className="hidden sm:inline">Nouveau</span>
-          </Button>
-        </div>
-      </div>
-
       {/* Success Message */}
       {successMessage && (
         <div className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm flex items-center gap-2">
@@ -293,20 +277,19 @@ export function TemplateManager() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
-        {(['all', 'wallmount', 'waiting_screen', 'quiz', 'feedback', 'custom'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              filter === f
-                ? 'bg-theatarr-500 text-white'
-                : 'bg-dark-surface text-dark-muted hover:bg-dark-border/50 border border-dark-border'
-            }`}
-          >
-            {f === 'all' ? 'Tous' : f === 'wallmount' ? 'Wallmount' : f === 'waiting_screen' ? 'Waiting' : f === 'quiz' ? 'Quiz' : f === 'feedback' ? 'Feedback' : 'Custom'}
-          </button>
-        ))}
+      <div className="mb-4">
+        <ButtonGroup
+          options={[
+            { key: 'all' as const, label: 'Tous' },
+            { key: 'wallmount' as const, label: 'Wallmount' },
+            { key: 'waiting_screen' as const, label: 'Waiting' },
+            { key: 'quiz' as const, label: 'Quiz' },
+            { key: 'feedback' as const, label: 'Feedback' },
+            { key: 'custom' as const, label: 'Custom' },
+          ]}
+          value={filter}
+          onChange={setFilter}
+        />
       </div>
 
       {/* Main content: list + preview split */}
