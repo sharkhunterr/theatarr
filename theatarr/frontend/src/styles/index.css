@@ -3,17 +3,30 @@
 @tailwind utilities;
 
 @layer base {
+  /* Light theme (default) */
   :root {
     --color-theatarr-500: #e05d4d;
-    --color-dark-bg: #0f0f0f;
-    --color-dark-surface: #1a1a1a;
-    --color-dark-border: #2a2a2a;
-    --color-dark-text: #e5e5e5;
-    --color-dark-muted: #737373;
+    --color-dark-bg: 245 245 245;
+    --color-dark-surface: 255 255 255;
+    --color-dark-border: 226 226 226;
+    --color-dark-text: 26 26 26;
+    --color-dark-muted: 107 114 128;
+    color-scheme: light;
+  }
+
+  /* Dark theme */
+  .dark {
+    --color-dark-bg: 15 15 15;
+    --color-dark-surface: 26 26 26;
+    --color-dark-border: 42 42 42;
+    --color-dark-text: 229 229 229;
+    --color-dark-muted: 115 115 115;
+    color-scheme: dark;
   }
 
   html {
     @apply scroll-smooth;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   body {
@@ -22,7 +35,7 @@
       'Helvetica Neue', Arial, sans-serif;
   }
 
-  /* Custom scrollbar for dark mode */
+  /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

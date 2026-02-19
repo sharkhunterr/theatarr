@@ -15,7 +15,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ onMenuClick }: TopBarProps) {
-  const { sidebarCollapsed, theme, setTheme, language, setLanguage } = useLayoutStore();
+  const { theme, setTheme, language, setLanguage } = useLayoutStore();
   const { user, logout } = useAuthStore();
 
   return (
@@ -111,19 +111,64 @@ function LanguageSelector({ language, setLanguage }: LanguageSelectorProps) {
 
 // Theme Toggle Component
 interface ThemeToggleProps {
-  theme: 'dark' | 'light';
-  setTheme: (theme: 'dark' | 'light') => void;
+  theme: 'dark' | 'light' | 'system';
+  setTheme: (theme: 'dark' | 'light' | 'system') => void;
 }
 
 function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const options = [
+    { key: 'light' as const, label: 'Clair', icon: Sun },
+    { key: 'dark' as const, label: 'Sombre', icon: Moon },
+    { key: 'system' as const, label: 'Systeme', icon: Monitor },
+  ];
+
+  const currentIcon = theme === 'system' ? Monitor : theme === 'dark' ? Moon : Sun;
+  const CurrentIcon = currentIcon;
+
   return (
-    <button
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="flex items-center justify-center h-9 w-9 rounded-lg hover:bg-dark-border/50 transition-colors"
-      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-    >
-      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </button>
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center justify-center h-9 w-9 rounded-lg hover:bg-dark-border/50 transition-colors"
+        aria-label="Theme"
+      >
+        <CurrentIcon className="h-4 w-4" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-40 bg-dark-surface border border-dark-border rounded-lg shadow-lg py-1 z-50">
+          {options.map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => {
+                setTheme(opt.key);
+                setOpen(false);
+              }}
+              className={clsx(
+                'w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2',
+                theme === opt.key && 'text-theatarr-500'
+              )}
+            >
+              <opt.icon className="h-4 w-4" />
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

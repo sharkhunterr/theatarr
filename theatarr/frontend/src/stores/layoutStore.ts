@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type Theme = 'dark' | 'light';
+export type Theme = 'dark' | 'light' | 'system';
 export type Language = 'en' | 'fr';
 
 interface LayoutState {
@@ -23,11 +23,31 @@ interface LayoutState {
   setSidebarOpen: (open: boolean) => void;
   setTheme: (theme: Theme) => void;
   setLanguage: (language: Language) => void;
+  getEffectiveTheme: () => 'light' | 'dark';
+}
+
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  const effective =
+    theme === 'system'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light'
+      : theme;
+
+  root.classList.remove('light', 'dark');
+  root.classList.add(effective);
+
+  // Update meta theme-color
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    meta.setAttribute('content', effective === 'dark' ? '#0f0f0f' : '#f5f5f5');
+  }
 }
 
 export const useLayoutStore = create<LayoutState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Initial state
       sidebarCollapsed: false,
       sidebarOpen: false,
@@ -39,15 +59,19 @@ export const useLayoutStore = create<LayoutState>()(
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       setTheme: (theme) => {
-        // Update document class for Tailwind dark mode
-        if (theme === 'dark') {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
         set({ theme });
+        applyTheme(theme);
       },
       setLanguage: (language) => set({ language }),
+      getEffectiveTheme: () => {
+        const { theme } = get();
+        if (theme === 'system') {
+          return window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light';
+        }
+        return theme;
+      },
     }),
     {
       name: 'theatarr-layout',
@@ -57,13 +81,22 @@ export const useLayoutStore = create<LayoutState>()(
         language: state.language,
       }),
       onRehydrateStorage: () => (state) => {
-        // Apply theme on rehydration
-        if (state?.theme === 'light') {
-          document.documentElement.classList.remove('dark');
-        } else {
-          document.documentElement.classList.add('dark');
+        if (state) {
+          applyTheme(state.theme);
         }
       },
     }
   )
 );
+
+// Listen for system theme changes (re-apply when OS theme changes and user chose "system")
+if (typeof window !== 'undefined') {
+  window
+    .matchMedia('(prefers-color-scheme: dark)')
+    .addEventListener('change', () => {
+      const { theme } = useLayoutStore.getState();
+      if (theme === 'system') {
+        applyTheme('system');
+      }
+    });
+}

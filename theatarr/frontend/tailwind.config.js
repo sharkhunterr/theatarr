@@ -21,13 +21,13 @@ export default {
           900: '#752b22',
           950: '#40130e',
         },
-        // Dark mode palette
+        // Theme palette (adapts via CSS variables)
         dark: {
-          bg: '#0f0f0f',
-          surface: '#1a1a1a',
-          border: '#2a2a2a',
-          text: '#e5e5e5',
-          muted: '#737373',
+          bg: 'rgb(var(--color-dark-bg) / <alpha-value>)',
+          surface: 'rgb(var(--color-dark-surface) / <alpha-value>)',
+          border: 'rgb(var(--color-dark-border) / <alpha-value>)',
+          text: 'rgb(var(--color-dark-text) / <alpha-value>)',
+          muted: 'rgb(var(--color-dark-muted) / <alpha-value>)',
         },
       },
       animation: {
