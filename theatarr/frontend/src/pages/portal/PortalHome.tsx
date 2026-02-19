@@ -137,14 +137,6 @@ export function PortalHome() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome */}
-      <div className="text-center py-2">
-        <p className="text-sm text-dark-muted mb-1">Bonjour,</p>
-        <h1 className="text-xl font-bold text-dark-text">
-          {displayName}
-        </h1>
-      </div>
-
       {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {statItems.map((stat) => (

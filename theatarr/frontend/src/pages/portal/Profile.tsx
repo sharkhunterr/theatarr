@@ -288,23 +288,23 @@ export function Profile() {
         </h3>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-dark-text">Accepter automatiquement les invitations</p>
-              <p className="text-sm text-dark-muted">
-                Acceptez automatiquement les invitations aux sessions. Le vote reste requis si la session en comporte un.
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-dark-text text-sm">Accepter automatiquement les invitations</p>
+              <p className="text-xs text-dark-muted">
+                Le vote reste requis si la session en comporte un.
               </p>
             </div>
             <button
               onClick={handleToggleAutoAccept}
               disabled={toggleAutoAcceptMutation.isPending}
-              className={`relative w-12 h-6 rounded-full transition-colors ${
+              className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
                 autoAcceptInvitations ? 'bg-theatarr-500' : 'bg-dark-border'
               } ${toggleAutoAcceptMutation.isPending ? 'opacity-50' : ''}`}
             >
               <span
-                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                  autoAcceptInvitations ? 'left-7' : 'left-1'
+                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                  autoAcceptInvitations ? 'left-[22px]' : 'left-0.5'
                 }`}
               />
             </button>
