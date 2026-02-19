@@ -19,7 +19,7 @@
   <!-- Hinge -->
   <rect x="8" y="30" width="84" height="3" rx="1.5" fill="#ab3325"/>
   <!-- Screen -->
-  <rect x="14" y="39" width="72" height="49" rx="4" fill="#0f0f0f"/>
+  <rect x="14" y="39" width="72" height="49" rx="4" fill="#1a1a1a"/>
   <!-- Play button -->
-  <polygon points="38,48 38,80 62,64" fill="#e5e5e5" opacity="0.9"/>
+  <polygon points="38,48 38,80 62,64" fill="#e5e5e5" opacity="0.95"/>
 </svg>
