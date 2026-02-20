@@ -6,6 +6,7 @@
 import clsx from 'clsx';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { HelpPanel } from '../help/HelpPanel';
 import { useLayoutStore } from '../../stores/layoutStore';
 
 interface AdminLayoutProps {
@@ -37,6 +38,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           </div>
         </main>
       </div>
+
+      <HelpPanel />
     </div>
   );
 }

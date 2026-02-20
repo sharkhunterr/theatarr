@@ -19,6 +19,7 @@ import { ConfigPage } from './pages/ConfigPage';
 import { SessionHistory } from './pages/SessionHistory';
 import { SystemLogs } from './pages/SystemLogs';
 import { UsersPage } from './pages/UsersPage';
+import { HelpPage } from './pages/HelpPage';
 
 // Portal Pages
 import {
@@ -247,6 +248,14 @@ function AppRoutes() {
           </RequireAdmin>
         }
       />
+      <Route
+        path="/help"
+        element={
+          <RequireAuth>
+            <HelpPage />
+          </RequireAuth>
+        }
+      />
 
       {/* Portal routes (any authenticated user) */}
       <Route
@@ -310,6 +319,14 @@ function AppRoutes() {
         element={
           <RequireUser>
             <Profile />
+          </RequireUser>
+        }
+      />
+      <Route
+        path="/portal/help"
+        element={
+          <RequireUser>
+            <HelpPage />
           </RequireUser>
         }
       />

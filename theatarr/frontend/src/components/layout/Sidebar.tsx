@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { labelKey: 'admin:sidebar.history', icon: History, path: '/history' },
   { labelKey: 'admin:sidebar.logs', icon: ScrollText, path: '/logs' },
   { labelKey: 'admin:sidebar.settings', icon: Settings, path: '/settings' },
+  { labelKey: 'admin:sidebar.help', icon: HelpCircle, path: '/help' },
 ];
 
 interface NavItemComponentProps {

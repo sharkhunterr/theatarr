@@ -13,6 +13,7 @@ import servicesFr from './locales/fr/services.json';
 import mediaFr from './locales/fr/media.json';
 import settingsFr from './locales/fr/settings.json';
 import portalFr from './locales/fr/portal.json';
+import helpFr from './locales/fr/help.json';
 
 import commonEn from './locales/en/common.json';
 import adminEn from './locales/en/admin.json';
@@ -22,6 +23,7 @@ import servicesEn from './locales/en/services.json';
 import mediaEn from './locales/en/media.json';
 import settingsEn from './locales/en/settings.json';
 import portalEn from './locales/en/portal.json';
+import helpEn from './locales/en/help.json';
 
 import commonIt from './locales/it/common.json';
 import adminIt from './locales/it/admin.json';
@@ -31,6 +33,7 @@ import servicesIt from './locales/it/services.json';
 import mediaIt from './locales/it/media.json';
 import settingsIt from './locales/it/settings.json';
 import portalIt from './locales/it/portal.json';
+import helpIt from './locales/it/help.json';
 
 import commonEs from './locales/es/common.json';
 import adminEs from './locales/es/admin.json';
@@ -40,6 +43,7 @@ import servicesEs from './locales/es/services.json';
 import mediaEs from './locales/es/media.json';
 import settingsEs from './locales/es/settings.json';
 import portalEs from './locales/es/portal.json';
+import helpEs from './locales/es/help.json';
 
 import commonDe from './locales/de/common.json';
 import adminDe from './locales/de/admin.json';
@@ -49,6 +53,7 @@ import servicesDe from './locales/de/services.json';
 import mediaDe from './locales/de/media.json';
 import settingsDe from './locales/de/settings.json';
 import portalDe from './locales/de/portal.json';
+import helpDe from './locales/de/help.json';
 
 const SUPPORTED_LANGUAGES = ['fr', 'en', 'it', 'es', 'de'];
 
@@ -78,6 +83,7 @@ i18n.use(initReactI18next).init({
       media: mediaFr,
       settings: settingsFr,
       portal: portalFr,
+      help: helpFr,
     },
     en: {
       common: commonEn,
@@ -88,6 +94,7 @@ i18n.use(initReactI18next).init({
       media: mediaEn,
       settings: settingsEn,
       portal: portalEn,
+      help: helpEn,
     },
     it: {
       common: commonIt,
@@ -98,6 +105,7 @@ i18n.use(initReactI18next).init({
       media: mediaIt,
       settings: settingsIt,
       portal: portalIt,
+      help: helpIt,
     },
     es: {
       common: commonEs,
@@ -108,6 +116,7 @@ i18n.use(initReactI18next).init({
       media: mediaEs,
       settings: settingsEs,
       portal: portalEs,
+      help: helpEs,
     },
     de: {
       common: commonDe,
@@ -118,12 +127,13 @@ i18n.use(initReactI18next).init({
       media: mediaDe,
       settings: settingsDe,
       portal: portalDe,
+      help: helpDe,
     },
   },
   lng: getPersistedLanguage(),
   fallbackLng: 'fr',
   defaultNS: 'common',
-  ns: ['common', 'admin', 'sessions', 'votes', 'services', 'media', 'settings', 'portal'],
+  ns: ['common', 'admin', 'sessions', 'votes', 'services', 'media', 'settings', 'portal', 'help'],
   interpolation: {
     escapeValue: false,
   },

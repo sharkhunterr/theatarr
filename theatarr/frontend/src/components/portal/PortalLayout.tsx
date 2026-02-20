@@ -5,6 +5,7 @@
 import { PortalHeader } from './PortalHeader';
 import { BottomNav } from './BottomNav';
 import { DesktopNav } from './DesktopNav';
+import { HelpPanel } from '../help/HelpPanel';
 
 interface PortalLayoutProps {
   children: React.ReactNode;
@@ -26,6 +27,8 @@ export function PortalLayout({ children }: PortalLayoutProps) {
 
       {/* Bottom navigation (mobile only) */}
       <BottomNav />
+
+      <HelpPanel />
     </div>
   );
 }
