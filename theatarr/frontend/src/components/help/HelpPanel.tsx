@@ -84,7 +84,7 @@ export function HelpPanel() {
   const helpPagePath = location.pathname.startsWith('/portal') ? '/portal/help' : '/help';
 
   return (
-    <div ref={panelRef} className="fixed bottom-6 right-6 z-50">
+    <div ref={panelRef} className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50">
       {/* Panel */}
       {isOpen && (
         <div className="absolute bottom-16 right-0 w-[380px] max-h-[500px] bg-dark-surface border border-dark-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
