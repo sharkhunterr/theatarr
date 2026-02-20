@@ -2,7 +2,7 @@
  * Session card component for portal.
  */
 
-import { Calendar, Check, X, Clock, Vote, Shuffle, Trophy, Sparkles, Film, Star } from 'lucide-react';
+import { Calendar, Check, X, Clock, Vote, Shuffle, Trophy, Sparkles, Film, Star, Ticket } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { getMysteryRevealCountdown, getVoteRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
@@ -30,6 +30,7 @@ interface SessionCardProps {
   hasSubmittedFeedback?: boolean;
   feedbackCount?: number;
   feedbackAverage?: number | null;
+  qrTicketsEnabled?: boolean;
 }
 
 export function SessionCard({
@@ -50,6 +51,7 @@ export function SessionCard({
   feedbackAvailable,
   hasSubmittedFeedback,
   feedbackAverage,
+  qrTicketsEnabled,
 }: SessionCardProps) {
   const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
   const formatDate = (dateStr: string) => {
@@ -277,6 +279,13 @@ export function SessionCard({
                   </span>
                 );
               })()}
+              {/* Ticket badge */}
+              {qrTicketsEnabled && invitationStatus === 'accepted' && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-theatarr-500/20 text-theatarr-400">
+                  <Ticket size={10} />
+                  Ticket
+                </span>
+              )}
               {/* Feedback badge */}
               {feedbackAvailable && !hasSubmittedFeedback && (
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 animate-pulse">

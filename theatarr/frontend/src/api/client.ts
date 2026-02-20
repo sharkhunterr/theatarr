@@ -2,7 +2,17 @@
  * API client for Theatarr backend.
  */
 
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+function getApiBase(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl) return '';
+  // Avoid mixed content: if page is HTTPS but API URL is HTTP, use Vite proxy
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && envUrl.startsWith('http://')) {
+    return '';
+  }
+  return envUrl;
+}
+
+export const API_BASE = getApiBase();
 const API_URL = `${API_BASE}/api/v1`;
 
 interface RequestOptions extends RequestInit {

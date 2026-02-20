@@ -30,6 +30,7 @@ interface PortalSession {
   has_submitted_feedback?: boolean;
   feedback_count?: number;
   feedback_average?: number | null;
+  qr_tickets_enabled?: boolean;
 }
 
 type TabType = 'all' | 'upcoming' | 'feedback';
@@ -136,6 +137,7 @@ export function MySessions() {
               hasSubmittedFeedback={session.has_submitted_feedback}
               feedbackCount={session.feedback_count}
               feedbackAverage={session.feedback_average}
+              qrTicketsEnabled={session.qr_tickets_enabled}
             />
           ))}
         </div>

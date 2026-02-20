@@ -37,11 +37,13 @@ import {
   Timer,
   Image,
   Globe,
+  QrCode,
 } from 'lucide-react';
 
 import { Button, Modal, Spinner, MysteryPoster, VotePoster, VotePosterCollage } from '../components/common';
 import { TimelineDetailModal } from '../components/sessions/TimelineDetailModal';
 import { EventTimeline } from '../components/history/EventTimeline';
+import { QrScannerModal } from '../components/sessions/QrScannerModal';
 import { apiClient } from '../api/client';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCountdown } from '../hooks/useCountdown';
@@ -81,6 +83,8 @@ interface Participant {
   invitation_status: 'pending' | 'accepted' | 'declined';
   invited_at: string | null;
   responded_at: string | null;
+  checked_in: boolean;
+  checked_in_at: string | null;
 }
 
 // ============================================================================
@@ -329,10 +333,12 @@ function ParticipantsSection({
   participants,
   isLoading,
   language,
+  qrTicketsEnabled = false,
 }: {
   participants: Participant[];
   isLoading: boolean;
   language: string;
+  qrTicketsEnabled?: boolean;
 }) {
   const t = {
     title: language === 'fr' ? 'Participants' : 'Participants',
@@ -342,6 +348,7 @@ function ParticipantsSection({
     acceptedLabel: language === 'fr' ? 'Accepte' : 'Accepted',
     declined: language === 'fr' ? 'Refuse' : 'Declined',
     noParticipants: language === 'fr' ? 'Aucun participant invite' : 'No participants invited',
+    checkedIn: language === 'fr' ? 'scannes' : 'checked in',
   };
 
   if (isLoading) {
@@ -360,6 +367,7 @@ function ParticipantsSection({
   const accepted = participants.filter((p) => p.invitation_status === 'accepted');
   const pending = participants.filter((p) => p.invitation_status === 'pending');
   const declined = participants.filter((p) => p.invitation_status === 'declined');
+  const checkedInCount = accepted.filter((p) => p.checked_in).length;
 
   if (participants.length === 0) {
     return (
@@ -380,12 +388,17 @@ function ParticipantsSection({
     return p.username;
   };
 
+  const formatCheckInTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  };
+
   const renderGroup = (
     items: Participant[],
     icon: typeof Check,
     iconColor: string,
     bgColor: string,
     label: string,
+    showCheckIn = false,
   ) => {
     if (items.length === 0) return null;
     const Icon = icon;
@@ -403,7 +416,11 @@ function ParticipantsSection({
                 'flex items-center gap-2 px-2.5 py-1.5 rounded-lg border',
                 bgColor,
               )}
-              title={p.email || p.username}
+              title={
+                showCheckIn && p.checked_in && p.checked_in_at
+                  ? `Check-in: ${formatCheckInTime(p.checked_in_at)}`
+                  : p.email || p.username
+              }
             >
               <div className={clsx(
                 'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium',
@@ -414,6 +431,9 @@ function ParticipantsSection({
                 {getInitials(p)}
               </div>
               <span className="text-xs text-dark-text">{getDisplayName(p)}</span>
+              {showCheckIn && p.checked_in && (
+                <QrCode size={10} className="text-green-400" />
+              )}
             </div>
           ))}
         </div>
@@ -428,12 +448,19 @@ function ParticipantsSection({
           <Users size={14} className="text-dark-muted" />
           {t.title}
         </h3>
-        <span className="text-xs text-dark-muted">
-          {accepted.length} {t.accepted} / {participants.length} {t.invited}
-        </span>
+        <div className="flex items-center gap-3">
+          {qrTicketsEnabled && checkedInCount > 0 && (
+            <span className="text-xs text-green-400">
+              {checkedInCount} {t.checkedIn}
+            </span>
+          )}
+          <span className="text-xs text-dark-muted">
+            {accepted.length} {t.accepted} / {participants.length} {t.invited}
+          </span>
+        </div>
       </div>
       <div className="space-y-3">
-        {renderGroup(accepted, Check, 'text-green-400', 'bg-green-500/10 border-green-500/20', t.acceptedLabel)}
+        {renderGroup(accepted, Check, 'text-green-400', 'bg-green-500/10 border-green-500/20', t.acceptedLabel, qrTicketsEnabled)}
         {renderGroup(pending, Clock, 'text-yellow-400', 'bg-yellow-500/10 border-yellow-500/20', t.pending)}
         {renderGroup(declined, X, 'text-red-400', 'bg-red-500/10 border-red-500/20', t.declined)}
       </div>
@@ -511,6 +538,7 @@ export function SessionDetailPage() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [showTimelineDetail, setShowTimelineDetail] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const handleControl = useCallback(
     async (action: 'play' | 'pause' | 'stop' | 'skip') => {
@@ -825,102 +853,115 @@ export function SessionDetailPage() {
         </div>
       </div>
 
-      {/* Controls + Timeline */}
+      {/* Quick actions bar (always visible) */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Session controls */}
+        {canPlay && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => handleControl(currentStatus === 'paused' ? 'play' : 'play')}
+            disabled={controllingAction !== null}
+            isLoading={controllingAction === 'play'}
+          >
+            <Play size={14} className="mr-1" />
+            {currentStatus === 'paused' ? t.resume : t.play}
+          </Button>
+        )}
+        {canPause && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => handleControl('pause')}
+            disabled={controllingAction !== null}
+            isLoading={controllingAction === 'pause'}
+          >
+            <Pause size={14} className="mr-1" />
+            {t.pause}
+          </Button>
+        )}
+        {canSkip && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleControl('skip')}
+            disabled={controllingAction !== null}
+            isLoading={controllingAction === 'skip'}
+          >
+            <SkipForward size={14} className="mr-1" />
+            {t.skip}
+          </Button>
+        )}
+        {canStop && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleControl('stop')}
+            disabled={controllingAction !== null}
+            isLoading={controllingAction === 'stop'}
+            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+          >
+            <Square size={14} className="mr-1" />
+            {t.stop}
+          </Button>
+        )}
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Quick links */}
+        {sequences.length > 0 && (
+          <button
+            onClick={() => setShowTimelineDetail(true)}
+            title={language === 'fr' ? 'Detail timeline' : 'Timeline detail'}
+            className="p-1.5 rounded-lg text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
+          >
+            <BarChart3 size={16} />
+          </button>
+        )}
+        {session.display_code && (
+          <a
+            href={`/display/${session.display_code}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={t.display}
+            className="p-1.5 rounded-lg text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+          >
+            <ScreenShare size={16} />
+          </a>
+        )}
+        {(session.movie_id || session.movie_title || session.scheduled_at) && (
+          <a
+            href={`/wallmount/${session.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={t.wallmount}
+            className="p-1.5 rounded-lg text-dark-muted hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
+          >
+            <Monitor size={16} />
+          </a>
+        )}
+        {session.qr_tickets_enabled && (
+          <button
+            onClick={() => setShowScanner(true)}
+            title={language === 'fr' ? 'Scanner un ticket' : 'Scan a ticket'}
+            className="p-1.5 rounded-lg text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
+          >
+            <QrCode size={16} />
+          </button>
+        )}
+      </div>
+
+      {/* Error banner */}
+      {controlError && (
+        <div className="p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs">
+          {controlError}
+        </div>
+      )}
+
+      {/* Timeline */}
       {sequences.length > 0 && (
-        <div className="bg-dark-surface rounded-xl border border-dark-border p-4 space-y-3">
-          {/* Control buttons */}
-          <div className="flex items-center gap-2">
-            {canPlay && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleControl(currentStatus === 'paused' ? 'play' : 'play')}
-                disabled={controllingAction !== null}
-                isLoading={controllingAction === 'play'}
-              >
-                <Play size={14} className="mr-1" />
-                {currentStatus === 'paused' ? t.resume : t.play}
-              </Button>
-            )}
-            {canPause && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => handleControl('pause')}
-                disabled={controllingAction !== null}
-                isLoading={controllingAction === 'pause'}
-              >
-                <Pause size={14} className="mr-1" />
-                {t.pause}
-              </Button>
-            )}
-            {canSkip && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleControl('skip')}
-                disabled={controllingAction !== null}
-                isLoading={controllingAction === 'skip'}
-              >
-                <SkipForward size={14} className="mr-1" />
-                {t.skip}
-              </Button>
-            )}
-            {canStop && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleControl('stop')}
-                disabled={controllingAction !== null}
-                isLoading={controllingAction === 'stop'}
-                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-              >
-                <Square size={14} className="mr-1" />
-                {t.stop}
-              </Button>
-            )}
-
-            {/* Quick links */}
-            <div className="flex-1" />
-            <button
-              onClick={() => setShowTimelineDetail(true)}
-              title={language === 'fr' ? 'Detail timeline' : 'Timeline detail'}
-              className="p-1.5 rounded-lg text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
-            >
-              <BarChart3 size={16} />
-            </button>
-            {session.display_code && (
-              <a
-                href={`/display/${session.display_code}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={t.display}
-                className="p-1.5 rounded-lg text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-              >
-                <ScreenShare size={16} />
-              </a>
-            )}
-            {(session.movie_id || session.movie_title || session.scheduled_at) && (
-              <a
-                href={`/wallmount/${session.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={t.wallmount}
-                className="p-1.5 rounded-lg text-dark-muted hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
-              >
-                <Monitor size={16} />
-              </a>
-            )}
-          </div>
-
-          {/* Error banner */}
-          {controlError && (
-            <div className="p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs">
-              {controlError}
-            </div>
-          )}
-
-          {/* Timeline */}
+        <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
           <SessionTimeline
             sequences={sequences}
             currentIndex={currentIndex}
@@ -956,6 +997,7 @@ export function SessionDetailPage() {
         participants={participants}
         isLoading={isParticipantsLoading}
         language={language}
+        qrTicketsEnabled={session.qr_tickets_enabled}
       />
 
       {/* Details */}
@@ -963,6 +1005,12 @@ export function SessionDetailPage() {
 
       {/* Activity / Events */}
       <SessionActivitySection sessionId={id!} startedAt={session.started_at} language={language} />
+
+      {/* QR Scanner Modal */}
+      <QrScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+      />
     </div>
   );
 }

@@ -49,6 +49,7 @@ interface PortalSession {
   has_submitted_feedback?: boolean;
   feedback_count?: number;
   feedback_average?: number | null;
+  qr_tickets_enabled?: boolean;
 }
 
 interface PortalVote {
@@ -231,6 +232,7 @@ export function PortalHome() {
                       hasSubmittedFeedback={session.has_submitted_feedback}
                       feedbackCount={session.feedback_count}
                       feedbackAverage={session.feedback_average}
+                      qrTicketsEnabled={session.qr_tickets_enabled}
                     />
                     {/* Shine sweep overlay */}
                     <div
@@ -286,6 +288,7 @@ export function PortalHome() {
               hasSubmittedFeedback={session.has_submitted_feedback}
               feedbackCount={session.feedback_count}
               feedbackAverage={session.feedback_average}
+              qrTicketsEnabled={session.qr_tickets_enabled}
               />
             ))}
           </div>
@@ -403,6 +406,7 @@ export function PortalHome() {
               hasSubmittedFeedback={session.has_submitted_feedback}
               feedbackCount={session.feedback_count}
               feedbackAverage={session.feedback_average}
+              qrTicketsEnabled={session.qr_tickets_enabled}
               />
             ))}
           </div>

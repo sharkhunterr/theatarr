@@ -137,10 +137,15 @@ interface Session {
   vote_reveal_at?: string | null;
   mystery_reveal_at?: string | null;
   mystery_config?: MysteryConfig | null;
+  // Display options
+  pause_on_display_disconnect?: boolean;
+  qr_tickets_enabled?: boolean;
   // Template override
   template_id?: string | null;
   // Enrichment options
   enrichment_options?: Record<string, boolean> | null;
+  // Preparing trailers count
+  preparing_trailers?: number;
 }
 
 interface Service {
@@ -332,6 +337,10 @@ export function SessionEditor() {
     pauseOnDisplayDisconnectHelp: language === 'fr'
       ? 'Met la session en pause automatiquement si la page d\'affichage est fermée, et reprend quand elle se reconnecte'
       : 'Automatically pauses the session if the display page is closed, and resumes when it reconnects',
+    qrTickets: language === 'fr' ? 'Tickets QR Code' : 'QR Code Tickets',
+    qrTicketsHelp: language === 'fr'
+      ? 'Les participants recevront un ticket QR scannable a l\'entree'
+      : 'Participants will receive a scannable QR ticket at the entrance',
     // Template
     wallmountTemplate: language === 'fr' ? 'Template Wallmount' : 'Wallmount Template',
     activeTemplateLabel: language === 'fr' ? 'Template actif (global)' : 'Active template (global)',
@@ -644,6 +653,7 @@ export function SessionEditor() {
         template_id: session.template_id || null,
         enrichment_options: Object.keys(enrichOpts).length > 0 ? enrichOpts : null,
         pause_on_display_disconnect: session.pause_on_display_disconnect || false,
+        qr_tickets_enabled: session.qr_tickets_enabled || false,
       };
 
       // Mode-specific fields
@@ -1234,6 +1244,18 @@ export function SessionEditor() {
                 {t.displayOptions}
               </label>
               <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={session.qr_tickets_enabled || false}
+                  onChange={(e) => setSession({ ...session, qr_tickets_enabled: e.target.checked })}
+                  className="mt-1 w-4 h-4 rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500 focus:ring-offset-0"
+                />
+                <div>
+                  <span className="text-sm text-dark-text">{t.qrTickets}</span>
+                  <p className="text-xs text-dark-muted mt-0.5">{t.qrTicketsHelp}</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer mt-3">
                 <input
                   type="checkbox"
                   checked={session.pause_on_display_disconnect || false}

@@ -22,6 +22,7 @@ import {
   CopyPlus,
   Star,
   Pencil,
+  QrCode,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { getMysteryRevealCountdown, getVoteRevealCountdown } from '../utils/countdown';
@@ -36,6 +37,7 @@ import { useSession } from '../hooks/useSession';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useLayoutStore } from '../stores/layoutStore';
 import { apiClient } from '../api/client';
+import { QrScannerModal } from '../components/sessions/QrScannerModal';
 
 export function SessionsPage() {
   useCountdown();
@@ -50,6 +52,7 @@ export function SessionsPage() {
   const [voteResultsSession, setVoteResultsSession] = useState<VoteSessionSummary | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showScanner, setShowScanner] = useState(false);
 
   const t = {
     title: language === 'fr' ? 'Sessions' : 'Sessions',
@@ -559,6 +562,15 @@ export function SessionsPage() {
               <Monitor className="h-3.5 w-3.5" />
             </a>
           )}
+          {session.qr_tickets_enabled && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowScanner(true); }}
+              title={language === 'fr' ? 'Scanner un ticket' : 'Scan a ticket'}
+              className="h-8 w-8 flex items-center justify-center rounded-md text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
+            >
+              <QrCode className="h-3.5 w-3.5" />
+            </button>
+          )}
 
           {/* Spacer */}
           <div className="flex-1" />
@@ -801,6 +813,12 @@ export function SessionsPage() {
           </div>
         )}
       </Modal>
+
+      {/* QR Scanner Modal */}
+      <QrScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+      />
     </div>
   );
 }

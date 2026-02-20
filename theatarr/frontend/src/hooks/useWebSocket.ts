@@ -4,9 +4,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const WS_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080')
-  .replace('http://', 'ws://')
-  .replace('https://', 'wss://');
+function getWsUrl(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  // No URL or mixed content (HTTPS page + HTTP API) → use page origin via proxy
+  if (!envUrl || (typeof window !== 'undefined' && window.location.protocol === 'https:' && envUrl.startsWith('http://'))) {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}`;
+  }
+  return envUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+}
+
+const WS_URL = getWsUrl();
 
 interface WebSocketMessage {
   type: string;

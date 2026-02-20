@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import and_, func, or_, select
@@ -436,6 +437,7 @@ async def get_my_sessions(
                 linked_vote_session_id=session.linked_vote_session_id,
                 linked_vote_is_open=linked_vote_is_open,
                 vote_movie_posters=_extract_vote_movie_posters(linked_vote),
+                qr_tickets_enabled=session.qr_tickets_enabled,
                 feedback_available=feedback_available,
                 has_submitted_feedback=has_submitted_feedback,
                 feedback_count=feedback_count,
@@ -676,6 +678,9 @@ async def get_session_detail(
         linked_vote_session_id=session.linked_vote_session_id,
         linked_vote_is_open=linked_vote_is_open,
         vote_movie_posters=_extract_vote_movie_posters(linked_vote),
+        qr_tickets_enabled=session.qr_tickets_enabled,
+        ticket_token=participation.ticket_token if participation else None,
+        checked_in=participation.checked_in if participation else False,
         sequences=portal_sequences,
         current_sequence_index=session.current_sequence_index,
         current_sequence_elapsed_ms=session.current_sequence_elapsed_ms,
@@ -714,6 +719,15 @@ async def respond_to_session(
         InvitationStatus.ACCEPTED.value if data.accept else InvitationStatus.DECLINED.value
     )
     participation.responded_at = datetime.now(timezone.utc)
+
+    # Generate ticket token if accepting and QR tickets are enabled
+    if data.accept and not participation.ticket_token:
+        session_result = await db.execute(
+            select(Session).where(Session.id == session_id)
+        )
+        session_obj = session_result.scalar_one_or_none()
+        if session_obj and session_obj.qr_tickets_enabled:
+            participation.ticket_token = str(uuid4())
 
     await db.commit()
 

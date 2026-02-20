@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import DateTime, ForeignKey, Index, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from theatarr.database import Base
@@ -43,6 +43,22 @@ class SessionParticipant(UUIDMixin, TimestampMixin, Base):
         nullable=False,
     )
     responded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    ticket_token: Mapped[str | None] = mapped_column(
+        String(36),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
+    checked_in: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="0",
+    )
+    checked_in_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

@@ -26,6 +26,8 @@ class PortalSessionSummary(BaseSchema):
     linked_vote_session_id: str | None = None
     linked_vote_is_open: bool | None = None
     vote_movie_posters: list[str] | None = None
+    # QR tickets
+    qr_tickets_enabled: bool = False
     # Feedback
     feedback_available: bool = False
     has_submitted_feedback: bool = False
@@ -77,6 +79,10 @@ class PortalSessionDetail(BaseSchema):
     current_sequence_elapsed_ms: int = 0
     total_sequences: int = 0
     movie_runtime_minutes: int | None = None
+    # QR tickets
+    qr_tickets_enabled: bool = False
+    ticket_token: str | None = None
+    checked_in: bool = False
     # Feedback
     feedback_available: bool = False
     has_submitted_feedback: bool = False

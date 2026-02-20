@@ -94,6 +94,12 @@ class Session(UUIDMixin, TimestampMixin, Base):
         default=False,
         nullable=False,
     )
+    qr_tickets_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="0",
+    )
     workflow: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,

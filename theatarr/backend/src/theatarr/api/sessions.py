@@ -4,6 +4,7 @@ import logging
 import secrets
 import string
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlalchemy import func, select, Integer, case
@@ -476,6 +477,8 @@ def _session_to_response(
         current_sequence_index=session.current_sequence_index,
         current_sequence_elapsed_ms=session.current_sequence_elapsed_ms,
         auto_resume_enabled=session.auto_resume_enabled,
+        pause_on_display_disconnect=session.pause_on_display_disconnect,
+        qr_tickets_enabled=session.qr_tickets_enabled,
         total_sequences=session.total_sequences,
         created_at=session.created_at,
         updated_at=session.updated_at,
@@ -876,6 +879,8 @@ async def create_session(
         color_palette=data.color_palette,
         scheduled_at=data.scheduled_at,
         auto_resume_enabled=data.auto_resume_enabled,
+        pause_on_display_disconnect=data.pause_on_display_disconnect,
+        qr_tickets_enabled=data.qr_tickets_enabled,
         workflow=data.workflow,
         status=SessionStatus.SCHEDULED if data.scheduled_at else SessionStatus.DRAFT,
         display_code=display_code,
@@ -1027,6 +1032,59 @@ async def get_session_timeline(
     )
 
 
+@router.post(
+    "/check-in/{ticket_token}",
+    summary="Check-in participant via QR code",
+)
+async def check_in_participant(
+    db: DbSession,
+    user: AdminUser,
+    ticket_token: str,
+) -> dict:
+    """Check in a participant using their QR ticket token."""
+    from theatarr.models.user import User
+
+    result = await db.execute(
+        select(SessionParticipant, User, Session)
+        .join(User, SessionParticipant.user_id == User.id)
+        .join(Session, SessionParticipant.session_id == Session.id)
+        .where(SessionParticipant.ticket_token == ticket_token)
+    )
+    row = result.one_or_none()
+
+    if not row:
+        raise NotFoundError("Ticket", ticket_token)
+
+    participant, participant_user, session = row
+
+    if participant.invitation_status != InvitationStatus.ACCEPTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Participant has not accepted the invitation",
+        )
+
+    if participant.checked_in:
+        return {
+            "success": True,
+            "already_checked_in": True,
+            "participant_name": participant_user.first_name or participant_user.username,
+            "session_name": session.name,
+            "checked_in_at": participant.checked_in_at.isoformat() if participant.checked_in_at else None,
+        }
+
+    participant.checked_in = True
+    participant.checked_in_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return {
+        "success": True,
+        "already_checked_in": False,
+        "participant_name": participant_user.first_name or participant_user.username,
+        "session_name": session.name,
+        "checked_in_at": participant.checked_in_at.isoformat(),
+    }
+
+
 @router.get(
     "/{session_id}",
     response_model=SessionDetailResponse,
@@ -1116,6 +1174,8 @@ async def get_session(
         current_sequence_index=session.current_sequence_index,
         current_sequence_elapsed_ms=session.current_sequence_elapsed_ms,
         auto_resume_enabled=session.auto_resume_enabled,
+        pause_on_display_disconnect=session.pause_on_display_disconnect,
+        qr_tickets_enabled=session.qr_tickets_enabled,
         total_sequences=session.total_sequences,
         created_at=session.created_at,
         updated_at=session.updated_at,
@@ -1261,6 +1321,18 @@ async def update_session(
         flag_modified(session, "enrichment_options")
     if "mystery_config" in update_data:
         flag_modified(session, "mystery_config")
+
+    # Generate ticket tokens for accepted participants when QR tickets are enabled
+    if session.qr_tickets_enabled:
+        participants_result = await db.execute(
+            select(SessionParticipant).where(
+                SessionParticipant.session_id == session.id,
+                SessionParticipant.invitation_status == InvitationStatus.ACCEPTED.value,
+                SessionParticipant.ticket_token.is_(None),
+            )
+        )
+        for p in participants_result.scalars().all():
+            p.ticket_token = str(uuid4())
 
     # Handle VOTE mode: create/update inline vote session
     if data.vote_session_config is not None:
@@ -1866,6 +1938,8 @@ async def list_session_participants(
             "invitation_status": participant.invitation_status,
             "invited_at": participant.invited_at.isoformat() if participant.invited_at else None,
             "responded_at": participant.responded_at.isoformat() if participant.responded_at else None,
+            "checked_in": participant.checked_in,
+            "checked_in_at": participant.checked_in_at.isoformat() if participant.checked_in_at else None,
         })
 
     return {"items": items, "total": len(items)}

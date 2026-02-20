@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Calendar, Check, X, Clock, MapPin, Film, Vote, Shuffle, Sparkles, Eye, Trophy, Zap, Play, Timer, Star, MessageSquare, Send } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarPlus, Check, X, Clock, MapPin, Film, QrCode, Vote, Shuffle, Sparkles, Eye, Trophy, Zap, Play, Timer, Star, MessageSquare, Send, Ticket } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { apiClient } from '../../api/client';
@@ -12,7 +12,9 @@ import { getMysteryRevealCountdown, getVoteRevealCountdown, getSessionStartCount
 import { useCountdown } from '../../hooks/useCountdown';
 import { useSetting } from '../../hooks/useSettings';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import { useAuthStore } from '../../stores/authStore';
 import { MysteryPoster } from '../../components/common/MysteryPoster';
+import { TicketModal } from '../../components/portal/TicketModal';
 import { VotePoster } from '../../components/common/VotePoster';
 import { VotePosterCollage } from '../../components/common/VotePosterCollage';
 import {
@@ -61,6 +63,9 @@ interface SessionDetailData {
   linked_vote_session_id: string | null;
   linked_vote_is_open: boolean | null;
   vote_movie_posters: string[] | null;
+  qr_tickets_enabled: boolean;
+  ticket_token: string | null;
+  checked_in: boolean;
   sequences: SequenceSummary[];
   current_sequence_index: number;
   current_sequence_elapsed_ms: number;
@@ -272,12 +277,67 @@ function PortalTimeline({
 // Main Component
 // ============================================================================
 
+function downloadIcs(session: SessionDetailData) {
+  const start = new Date(session.scheduled_at!);
+  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  // RFC 5545: escape special characters in text values
+  const escText = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  // RFC 5545: fold lines longer than 75 octets
+  const foldLine = (line: string) => {
+    const parts: string[] = [];
+    let remaining = line;
+    while (remaining.length > 75) {
+      parts.push(remaining.slice(0, 75));
+      remaining = ' ' + remaining.slice(75);
+    }
+    parts.push(remaining);
+    return parts.join('\r\n');
+  };
+
+  const summary = session.movie_title
+    ? `${session.name} - ${session.movie_title}`
+    : session.name;
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'PRODID:-//Theatarr//Cinema//FR',
+    'BEGIN:VEVENT',
+    `DTSTART:${fmt(start)}`,
+    `DTEND:${fmt(end)}`,
+    `SUMMARY:${escText(summary)}`,
+    ...(session.description ? [`DESCRIPTION:${escText(session.description)}`] : []),
+    `UID:${session.id}@theatarr`,
+    `DTSTAMP:${fmt(new Date())}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ];
+
+  const ics = lines.map(foldLine).join('\r\n');
+
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `theatarr-${session.name.replace(/\s+/g, '-').toLowerCase()}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function SessionDetail() {
   useCountdown();
   const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [showTicket, setShowTicket] = useState(false);
+  const authUser = useAuthStore((s) => s.user);
+  const userName = authUser?.first_name && authUser?.last_name
+    ? `${authUser.first_name} ${authUser.last_name}`
+    : authUser?.first_name || authUser?.username || null;
 
   const { data: session, isLoading } = useQuery({
     queryKey: ['portal', 'sessions', id],
@@ -492,6 +552,18 @@ export function SessionDetail() {
                   Live
                 </span>
               )}
+              {/* Ticket badge */}
+              {session.qr_tickets_enabled && session.invitation_status === 'accepted' && session.ticket_token && (
+                <span className={clsx(
+                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                  session.checked_in
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-theatarr-500/20 text-theatarr-400'
+                )}>
+                  <Ticket size={12} />
+                  {session.checked_in ? 'Ticket valide' : 'Ticket'}
+                </span>
+              )}
             </div>
             <h1 className="text-xl font-bold text-white">{session.name}</h1>
             {isMysteryHidden ? (
@@ -576,23 +648,23 @@ export function SessionDetail() {
       <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
         <h2 className="font-medium text-dark-text mb-3">Votre invitation</h2>
 
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3">
           {session.invitation_status === 'accepted' && (
-            <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
               <Check className="text-green-400" size={20} />
             </div>
           )}
           {session.invitation_status === 'declined' && (
-            <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
               <X className="text-red-400" size={20} />
             </div>
           )}
           {session.invitation_status === 'pending' && (
-            <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
               <Clock className="text-yellow-400" size={20} />
             </div>
           )}
-          <div>
+          <div className="flex-1">
             <p className="font-medium text-dark-text">
               {invitationLabels[session.invitation_status]}
             </p>
@@ -602,11 +674,23 @@ export function SessionDetail() {
               </p>
             )}
           </div>
+          {/* Check-in badge (inline with invitation status) */}
+          {session.invitation_status === 'accepted' && session.qr_tickets_enabled && (
+            <div className={clsx(
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0',
+              session.checked_in
+                ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                : 'bg-dark-bg text-dark-muted border border-dark-border'
+            )}>
+              {session.checked_in ? <Check size={12} /> : <Ticket size={12} />}
+              {session.checked_in ? 'Check-in OK' : 'Non scanne'}
+            </div>
+          )}
         </div>
 
         {/* Response buttons */}
         {session.invitation_status === 'pending' && (
-          <div className="flex gap-3">
+          <div className="flex gap-3 mt-4">
             <button
               onClick={() => respondMutation.mutate(true)}
               disabled={respondMutation.isPending}
@@ -626,27 +710,53 @@ export function SessionDetail() {
           </div>
         )}
 
-        {/* Change response */}
-        {session.invitation_status !== 'pending' && session.status !== 'completed' && (
-          <div className="flex gap-3">
-            {session.invitation_status === 'declined' && (
-              <button
-                onClick={() => respondMutation.mutate(true)}
-                disabled={respondMutation.isPending}
-                className="flex-1 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50"
-              >
-                Changer en Accepte
-              </button>
-            )}
-            {session.invitation_status === 'accepted' && (
+        {/* Actions for accepted invitation */}
+        {session.invitation_status === 'accepted' && (
+          <div className="mt-4 space-y-2">
+            {/* Primary action buttons: Ticket + Calendar */}
+            <div className="flex gap-2">
+              {session.qr_tickets_enabled && session.ticket_token && (
+                <button
+                  onClick={() => setShowTicket(true)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-theatarr-500 text-white rounded-lg text-sm font-semibold hover:bg-theatarr-600 transition-colors shadow-sm"
+                >
+                  <QrCode size={18} />
+                  Mon Ticket
+                </button>
+              )}
+              {session.scheduled_at && (
+                <button
+                  onClick={() => downloadIcs(session)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors shadow-sm"
+                >
+                  <CalendarPlus size={18} />
+                  Calendrier
+                </button>
+              )}
+            </div>
+            {/* Secondary: decline option */}
+            {session.status !== 'completed' && (
               <button
                 onClick={() => respondMutation.mutate(false)}
                 disabled={respondMutation.isPending}
-                className="flex-1 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                className="w-full py-1.5 text-xs text-dark-muted hover:text-red-400 transition-colors disabled:opacity-50"
               >
-                Changer en Decline
+                Annuler ma participation
               </button>
             )}
+          </div>
+        )}
+
+        {/* Change response for declined */}
+        {session.invitation_status === 'declined' && session.status !== 'completed' && (
+          <div className="mt-4">
+            <button
+              onClick={() => respondMutation.mutate(true)}
+              disabled={respondMutation.isPending}
+              className="w-full py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50"
+            >
+              Changer en Accepte
+            </button>
           </div>
         )}
       </div>
@@ -756,6 +866,16 @@ export function SessionDetail() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Ticket Modal */}
+      {session.qr_tickets_enabled && session.ticket_token && (
+        <TicketModal
+          isOpen={showTicket}
+          onClose={() => setShowTicket(false)}
+          session={session}
+          userName={userName}
+        />
       )}
     </div>
   );

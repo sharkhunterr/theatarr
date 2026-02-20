@@ -112,6 +112,7 @@ export interface Session {
   // Display
   display_code?: string;
   pause_on_display_disconnect?: boolean;
+  qr_tickets_enabled?: boolean;
   // Movie runtime (from detail response)
   movie_runtime_minutes?: number;
   // Movie details (from detail response)
