@@ -3,7 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, Clock, Trophy } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Lock, Trophy } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import clsx from 'clsx';
@@ -58,24 +58,32 @@ export function VoteDetail() {
     await castVoteMutation.mutateAsync(selectedIndex);
   };
 
-  const formatTimeRemaining = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = date.getTime() - now.getTime();
-
-    if (diff <= 0) return 'Termine';
-
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (hours > 24) {
-      const days = Math.floor(hours / 24);
-      return `${days} jour${days > 1 ? 's' : ''} restant${days > 1 ? 's' : ''}`;
+  const getStatusBadge = () => {
+    if (!vote?.is_open) {
+      return { text: 'Cloture', color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
     }
-    if (hours > 0) {
-      return `${hours}h ${minutes}min restantes`;
+    if (!vote?.closes_at) {
+      return { text: 'Ouvert', color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
     }
-    return `${minutes} minutes restantes`;
+    const diff = new Date(vote.closes_at).getTime() - Date.now();
+    if (diff <= 0) {
+      return { text: 'Cloture', color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
+    }
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days >= 2) {
+      return { text: `${days}j restants`, color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
+    }
+    if (hours >= 6) {
+      return { text: `${hours}h restantes`, color: 'bg-blue-500/20 text-blue-400', icon: Clock, pulse: false };
+    }
+    if (hours >= 1) {
+      const m = minutes % 60;
+      return { text: `${hours}h${m > 0 ? `${m.toString().padStart(2, '0')}` : ''} restantes`, color: 'bg-orange-500/20 text-orange-400', icon: Clock, pulse: false };
+    }
+    return { text: `${minutes}min restantes`, color: 'bg-red-500/20 text-red-400', icon: Clock, pulse: true };
   };
 
   const getTotalVotes = () => {
@@ -148,26 +156,31 @@ export function VoteDetail() {
           <p className="text-dark-muted mt-1">{vote.description}</p>
         )}
 
-        <div className="flex items-center gap-4 mt-3">
+        <div className="flex items-center gap-2 mt-3 flex-wrap">
+          {(() => {
+            const badge = getStatusBadge();
+            const BadgeIcon = badge.icon;
+            return (
+              <span className={clsx(
+                'flex items-center gap-1 text-xs px-2.5 py-1 rounded-full',
+                badge.color,
+                badge.pulse && 'animate-pulse'
+              )}>
+                <BadgeIcon size={12} />
+                {badge.text}
+              </span>
+            );
+          })()}
           {vote.has_voted ? (
-            <span className="flex items-center gap-1 text-sm text-green-400">
-              <Check size={16} />
-              Vous avez vote
+            <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-green-500/20 text-green-400">
+              <Check size={12} />
+              Vote
             </span>
           ) : vote.is_open ? (
-            <span className="flex items-center gap-1 text-sm text-blue-400">
-              <Clock size={16} />
-              En attente de votre vote
+            <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-400">
+              A voter
             </span>
-          ) : (
-            <span className="text-sm text-dark-muted">{vote.status}</span>
-          )}
-
-          {vote.closes_at && vote.is_open && (
-            <span className="text-sm text-dark-muted">
-              {formatTimeRemaining(vote.closes_at)}
-            </span>
-          )}
+          ) : null}
         </div>
       </div>
 

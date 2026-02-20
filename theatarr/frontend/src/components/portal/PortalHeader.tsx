@@ -2,17 +2,20 @@
  * Compact header for portal interface.
  */
 
-import { LogOut, Settings } from 'lucide-react';
+import { LogOut, Moon, Settings, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { useLayoutStore } from '../../stores/layoutStore';
 import { NotificationBell } from './NotificationBell';
 import { TheatarrLogo } from '../common';
 
 export function PortalHeader() {
   const { user, logout } = useAuthStore();
+  const { theme, setTheme } = useLayoutStore();
 
   const displayName = user?.first_name || user?.username || 'User';
   const isAdmin = user?.role === 'admin';
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-dark-surface border-b border-dark-border z-40">
@@ -28,6 +31,15 @@ export function PortalHeader() {
           <span className="text-sm text-dark-muted hidden sm:block mr-1">
             {displayName}
           </span>
+
+          {/* Theme toggle */}
+          <button
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            className="p-2 rounded-lg hover:bg-dark-border/50 text-dark-muted transition-colors"
+            title={isDark ? 'Theme clair' : 'Theme sombre'}
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
 
           {/* Notification bell */}
           <NotificationBell />

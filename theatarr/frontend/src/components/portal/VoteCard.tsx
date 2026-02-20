@@ -30,28 +30,39 @@ export function VoteCard({
   closesAt,
   status,
 }: VoteCardProps) {
-  const formatTimeRemaining = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = date.getTime() - now.getTime();
+  const isOpen = status === 'open';
 
-    if (diff <= 0) return 'Closed';
-
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (hours > 24) {
-      const days = Math.floor(hours / 24);
-      return `${days}j restants`;
+  const getStatusBadge = () => {
+    if (!isOpen) {
+      return { text: 'Cloture', color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
     }
-    if (hours > 0) {
-      return `${hours}h ${minutes}m restants`;
+    if (!closesAt) {
+      return { text: 'Ouvert', color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
     }
-    return `${minutes}m restants`;
+    const diff = new Date(closesAt).getTime() - Date.now();
+    if (diff <= 0) {
+      return { text: 'Cloture', color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
+    }
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days >= 2) {
+      return { text: `${days}j restants`, color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
+    }
+    if (hours >= 6) {
+      return { text: `${hours}h restantes`, color: 'bg-blue-500/20 text-blue-400', icon: Clock, pulse: false };
+    }
+    if (hours >= 1) {
+      const m = minutes % 60;
+      return { text: `${hours}h${m > 0 ? `${m.toString().padStart(2, '0')}` : ''} restantes`, color: 'bg-orange-500/20 text-orange-400', icon: Clock, pulse: false };
+    }
+    return { text: `${minutes}min restantes`, color: 'bg-red-500/20 text-red-400', icon: Clock, pulse: true };
   };
 
-  const isOpen = status === 'open';
-  const showUrgent = isOpen && closesAt && new Date(closesAt).getTime() - Date.now() < 3600000; // < 1 hour
+  const badge = getStatusBadge();
+  const StatusIcon = badge.icon;
+  const showUrgent = isOpen && closesAt && new Date(closesAt).getTime() - Date.now() < 3600000;
 
   return (
     <Link
@@ -107,23 +118,15 @@ export function VoteCard({
 
           {/* Status badges */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* Session status badge */}
-            {isOpen ? (
-              <span className={clsx(
-                'flex items-center gap-1 text-xs px-2 py-1 rounded-full',
-                showUrgent
-                  ? 'bg-theatarr-500/20 text-theatarr-400 animate-pulse'
-                  : 'bg-blue-500/20 text-blue-400'
-              )}>
-                <Clock size={12} />
-                Ouvert
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-dark-muted/20 text-dark-muted">
-                <Lock size={12} />
-                Cloture
-              </span>
-            )}
+            {/* Unified status + countdown badge */}
+            <span className={clsx(
+              'flex items-center gap-1 text-xs px-2 py-1 rounded-full',
+              badge.color,
+              badge.pulse && 'animate-pulse'
+            )}>
+              <StatusIcon size={12} />
+              {badge.text}
+            </span>
 
             {/* Vote status badge */}
             {hasVoted ? (
@@ -141,16 +144,6 @@ export function VoteCard({
               </span>
             )}</div>
         </div>
-
-        {/* Time remaining */}
-        {isOpen && closesAt && (
-          <p className={clsx(
-            'text-xs mt-2',
-            showUrgent ? 'text-theatarr-400' : 'text-dark-muted'
-          )}>
-            {formatTimeRemaining(closesAt)}
-          </p>
-        )}
       </div>
     </Link>
   );

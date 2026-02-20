@@ -33,6 +33,17 @@ interface MyAnswer {
   correct_indices: number[];
 }
 
+interface ReviewItem {
+  question_index: number;
+  text: string;
+  choices: string[];
+  correct_indices: number[];
+  selected_indices: number[] | null;
+  is_correct: boolean;
+  answered: boolean;
+  response_time_ms: number | null;
+}
+
 interface QuizDetail {
   id: string;
   name: string;
@@ -46,7 +57,10 @@ interface QuizDetail {
   has_joined: boolean;
   participant_name: string | null;
   token: string;
+  my_token_id: string;
   scoreboard: ScoreboardEntry[] | null;
+  review: ReviewItem[] | null;
+  my_rank: number | null;
   config: {
     show_live_results: string;
     show_scores_live: boolean;
@@ -183,6 +197,8 @@ export function QuizDetail() {
         if (sb) setScoreboard(sb);
         pendingAnswerRef.current = false;
         setScreen('results');
+        // Refetch to get review data (all questions + answers)
+        queryClient.invalidateQueries({ queryKey: ['portal', 'quiz', id] });
         break;
       }
     }
@@ -450,43 +466,144 @@ export function QuizDetail() {
 
       {/* RESULTS SCREEN */}
       {screen === 'results' && (
-        <div className="py-4">
-          <div className="text-center mb-6">
-            <Trophy size={40} className="mx-auto text-yellow-400 mb-3" />
-            <h2 className="text-xl font-bold text-dark-text mb-1">Quiz termine !</h2>
-            <p className="text-dark-muted">
-              Score : <span className="text-yellow-400 font-bold">{myScore}</span>/{totalQuestions}
-            </p>
+        <div className="py-4 space-y-6">
+          {/* Score summary */}
+          <div className="bg-dark-surface rounded-xl border border-dark-border p-5 text-center">
+            <Trophy size={36} className="mx-auto text-yellow-400 mb-2" />
+            <h2 className="text-xl font-bold text-dark-text">Quiz termine !</h2>
+            <div className="flex items-center justify-center gap-6 mt-3">
+              <div>
+                <p className="text-2xl font-bold text-yellow-400">{myScore}<span className="text-base text-dark-muted">/{totalQuestions}</span></p>
+                <p className="text-[11px] text-dark-muted">Score</p>
+              </div>
+              {quiz?.my_rank && (
+                <div>
+                  <p className="text-2xl font-bold text-theatarr-400">{quiz.my_rank}<span className="text-base text-dark-muted">e</span></p>
+                  <p className="text-[11px] text-dark-muted">Position</p>
+                </div>
+              )}
+              {scoreboard.length > 0 && (
+                <div>
+                  <p className="text-2xl font-bold text-dark-text">{scoreboard.length}</p>
+                  <p className="text-[11px] text-dark-muted">Participants</p>
+                </div>
+              )}
+            </div>
           </div>
 
+          {/* Scoreboard */}
           {scoreboard.length > 0 && (
-            <div className="space-y-2">
+            <div>
               <h3 className="text-sm font-medium text-dark-muted mb-2">Classement</h3>
-              {scoreboard.map((entry, idx) => (
-                <div
-                  key={entry.token_id}
-                  className={clsx(
-                    'flex items-center justify-between p-3 rounded-xl border',
-                    idx === 0 ? 'bg-yellow-500/10 border-yellow-500/30' :
-                    idx === 1 ? 'bg-gray-400/10 border-gray-400/30' :
-                    idx === 2 ? 'bg-amber-700/10 border-amber-700/30' :
-                    'bg-dark-surface border-dark-border'
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={clsx(
-                      'text-lg font-bold w-6',
-                      idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-gray-300' : idx === 2 ? 'text-amber-600' : 'text-dark-muted'
-                    )}>
-                      {idx + 1}
-                    </span>
-                    <span className="text-dark-text font-medium">{entry.participant_name}</span>
+              <div className="space-y-1.5">
+                {scoreboard.map((entry, idx) => {
+                  const isMe = entry.token_id === quiz?.my_token_id;
+                  return (
+                    <div
+                      key={entry.token_id}
+                      className={clsx(
+                        'flex items-center justify-between px-3 py-2 rounded-lg border',
+                        isMe ? 'bg-theatarr-500/10 border-theatarr-500/30' :
+                        idx === 0 ? 'bg-yellow-500/10 border-yellow-500/30' :
+                        'bg-dark-surface border-dark-border'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className={clsx(
+                          'text-sm font-bold w-5 text-center',
+                          idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-gray-300' : idx === 2 ? 'text-amber-600' : 'text-dark-muted'
+                        )}>
+                          {idx + 1}
+                        </span>
+                        <span className={clsx('text-sm', isMe ? 'text-theatarr-400 font-semibold' : 'text-dark-text')}>
+                          {entry.participant_name}{isMe ? ' (vous)' : ''}
+                        </span>
+                      </div>
+                      <span className="text-sm text-dark-text font-bold">
+                        {entry.score}/{entry.total_answered}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Question review */}
+          {quiz?.review && quiz.review.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-dark-muted mb-2">Detail des questions</h3>
+              <div className="space-y-3">
+                {quiz.review.map((item) => (
+                  <div
+                    key={item.question_index}
+                    className={clsx(
+                      'bg-dark-surface rounded-xl border p-3',
+                      item.is_correct ? 'border-green-500/30' :
+                      !item.answered ? 'border-dark-border' :
+                      'border-red-500/30'
+                    )}
+                  >
+                    {/* Question header */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="text-sm font-medium text-dark-text">
+                        <span className="text-dark-muted mr-1.5">{item.question_index + 1}.</span>
+                        {item.text}
+                      </p>
+                      <span className={clsx(
+                        'flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center',
+                        item.is_correct ? 'bg-green-500/20' :
+                        !item.answered ? 'bg-dark-border' :
+                        'bg-red-500/20'
+                      )}>
+                        {item.is_correct ? (
+                          <Check size={14} className="text-green-400" />
+                        ) : !item.answered ? (
+                          <span className="text-dark-muted text-xs">-</span>
+                        ) : (
+                          <X size={14} className="text-red-400" />
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Choices */}
+                    <div className="space-y-1">
+                      {item.choices.map((choice, ci) => {
+                        const isCorrect = item.correct_indices.includes(ci);
+                        const isSelected = item.selected_indices?.includes(ci) ?? false;
+                        return (
+                          <div
+                            key={ci}
+                            className={clsx(
+                              'flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs',
+                              isCorrect ? 'bg-green-500/15 text-green-300' :
+                              isSelected ? 'bg-red-500/15 text-red-300' :
+                              'text-dark-muted'
+                            )}
+                          >
+                            {isCorrect ? (
+                              <Check size={12} className="text-green-400 flex-shrink-0" />
+                            ) : isSelected ? (
+                              <X size={12} className="text-red-400 flex-shrink-0" />
+                            ) : (
+                              <span className="w-3 flex-shrink-0" />
+                            )}
+                            <span>{choice}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Response time */}
+                    {item.answered && item.response_time_ms != null && (
+                      <p className="text-[10px] text-dark-muted mt-1.5 flex items-center gap-1">
+                        <Clock size={10} />
+                        {(item.response_time_ms / 1000).toFixed(1)}s
+                      </p>
+                    )}
                   </div>
-                  <span className="text-dark-text font-bold text-sm">
-                    {entry.score}/{entry.total_answered}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>

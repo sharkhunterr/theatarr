@@ -11,6 +11,7 @@
     --color-dark-border: 226 226 226;
     --color-dark-text: 26 26 26;
     --color-dark-muted: 107 114 128;
+    --shine-color: rgba(0, 0, 0, 0.07);
     color-scheme: light;
   }
 
@@ -21,6 +22,7 @@
     --color-dark-border: 42 42 42;
     --color-dark-text: 229 229 229;
     --color-dark-muted: 115 115 115;
+    --shine-color: rgba(255, 255, 255, 0.25);
     color-scheme: dark;
   }
 
@@ -210,6 +212,16 @@
 /* Show on mobile, hide on desktop */
 .show-mobile {
   @apply block md:hidden;
+}
+
+/* Shine sweep animation for cards */
+@keyframes card-shine {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Responsive typography */

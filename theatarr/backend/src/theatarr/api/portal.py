@@ -364,7 +364,12 @@ async def get_my_sessions(
     if status_filter:
         query = query.where(Session.status == status_filter)
 
-    query = query.order_by(SessionParticipant.invited_at.desc()).offset(skip).limit(limit)
+    if status_filter == "scheduled":
+        query = query.order_by(Session.scheduled_at.asc().nullslast())
+    else:
+        query = query.order_by(Session.scheduled_at.desc().nullslast())
+
+    query = query.offset(skip).limit(limit)
 
     result = await db.execute(query)
     participations = result.scalars().all()
@@ -1377,8 +1382,44 @@ async def get_quiz_detail(
 
     # Scoreboard if completed or show_scores_live
     scoreboard = None
-    if qs.status in (QuizSessionStatus.COMPLETED, QuizSessionStatus.COMPLETED.value) or config.get("show_scores_live"):
+    is_completed = qs.status in (QuizSessionStatus.COMPLETED, QuizSessionStatus.COMPLETED.value)
+    if is_completed or config.get("show_scores_live"):
         scoreboard = await get_scoreboard(db, qs.id)
+
+    # Full review data when quiz is completed
+    review = None
+    my_rank = None
+    if is_completed:
+        # Get all user's answers
+        all_answers_result = await db.execute(
+            select(QuizAnswer).where(
+                QuizAnswer.quiz_session_id == qs.id,
+                QuizAnswer.token_id == token.id,
+            ).order_by(QuizAnswer.question_index)
+        )
+        all_answers = all_answers_result.scalars().all()
+        answers_by_index = {a.question_index: a for a in all_answers}
+
+        review = []
+        for i, q in enumerate(questions):
+            answer = answers_by_index.get(i)
+            review.append({
+                "question_index": i,
+                "text": q.get("text", ""),
+                "choices": q.get("choices", []),
+                "correct_indices": q.get("correct_indices", []),
+                "selected_indices": answer.selected_indices if answer else None,
+                "is_correct": answer.is_correct if answer else False,
+                "answered": answer is not None,
+                "response_time_ms": answer.response_time_ms if answer else None,
+            })
+
+        # Calculate user's rank
+        if scoreboard:
+            for rank_idx, entry in enumerate(scoreboard):
+                if entry["token_id"] == token.id:
+                    my_rank = rank_idx + 1
+                    break
 
     return {
         "id": qs.id,
@@ -1393,7 +1434,10 @@ async def get_quiz_detail(
         "has_joined": token.joined_at is not None,
         "participant_name": token.participant_name,
         "token": token.token,
+        "my_token_id": token.id,
         "scoreboard": scoreboard,
+        "review": review,
+        "my_rank": my_rank,
         "config": {
             "show_live_results": config.get("show_live_results", "anonymous"),
             "show_scores_live": config.get("show_scores_live", False),

@@ -63,6 +63,16 @@ export function SessionCard({
     });
   };
 
+  const parseDateParts = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return {
+      day: date.getDate(),
+      weekday: date.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''),
+      month: date.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''),
+      time: date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    };
+  };
+
   const statusColors: Record<string, string> = {
     draft: 'bg-dark-muted/20 text-dark-muted',
     scheduled: 'bg-blue-500/20 text-blue-400',
@@ -168,6 +178,19 @@ export function SessionCard({
       )}
     >
       <div className="flex">
+        {/* Date block */}
+        {scheduledAt && (() => {
+          const d = parseDateParts(scheduledAt);
+          return (
+            <div className="w-14 flex-shrink-0 flex flex-col items-center justify-center bg-dark-bg/60 border-r border-dark-border">
+              <span className="text-[10px] uppercase text-dark-muted leading-none">{d.weekday}</span>
+              <span className="text-xl font-bold text-dark-text leading-tight">{d.day}</span>
+              <span className="text-[10px] uppercase text-dark-muted leading-none">{d.month}</span>
+              <span className="text-[10px] font-medium text-theatarr-400 mt-0.5 leading-none">{d.time}</span>
+            </div>
+          );
+        })()}
+
         {/* Poster */}
         <div className="w-20 h-28 flex-shrink-0">
           {movieSelectionMode === 'mystery' && !movieResolved ? (
@@ -229,8 +252,7 @@ export function SessionCard({
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2 mt-2">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
               <span
                 className={clsx(
                   'text-xs px-2 py-0.5 rounded-full',
@@ -268,13 +290,6 @@ export function SessionCard({
                   {feedbackAverage}/10
                 </span>
               )}
-            </div>
-
-            {scheduledAt && (
-              <span className="text-xs text-dark-muted">
-                {formatDate(scheduledAt)}
-              </span>
-            )}
           </div>
         </div>
       </div>

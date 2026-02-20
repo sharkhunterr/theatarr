@@ -3,7 +3,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { Calendar, Vote, CheckCircle, Film, HelpCircle, Mail } from 'lucide-react';
+import { Calendar, Vote, CheckCircle, Film, HelpCircle, Mail, Play, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
@@ -96,6 +96,30 @@ export function PortalHome() {
     refetchInterval: 15000,
   });
 
+  // Sessions starting soon: accepted + scheduled within next 48h
+  const startingSoon = (sessions?.items || []).filter((s) => {
+    if (s.invitation_status !== 'accepted' || !s.scheduled_at) return false;
+    const diff = new Date(s.scheduled_at).getTime() - Date.now();
+    return diff > 0 && diff < 48 * 3600 * 1000;
+  });
+
+  const formatCountdown = (dateStr: string) => {
+    const diff = new Date(dateStr).getTime() - Date.now();
+    if (diff <= 0) return 'Maintenant';
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    if (hours >= 24) {
+      const days = Math.floor(hours / 24);
+      const h = hours % 24;
+      return `dans ${days}j ${h}h`;
+    }
+    if (hours >= 1) {
+      const m = minutes % 60;
+      return `dans ${hours}h${m > 0 ? `${m.toString().padStart(2, '0')}` : ''}`;
+    }
+    return `dans ${minutes}min`;
+  };
+
   const statItems = [
     {
       icon: Calendar,
@@ -154,6 +178,76 @@ export function PortalHome() {
           </div>
         ))}
       </div>
+
+      {/* Sessions aujourd'hui */}
+      {startingSoon.length > 0 && (() => {
+        const nearest = startingSoon.reduce((a, b) =>
+          new Date(a.scheduled_at!).getTime() < new Date(b.scheduled_at!).getTime() ? a : b
+        );
+        const nearestDiff = new Date(nearest.scheduled_at!).getTime() - Date.now();
+        const isImminent = nearestDiff < 3600 * 1000;
+        const isClose = nearestDiff < 12 * 3600 * 1000;
+
+        return (
+          <section className={isImminent ? 'animate-pulse-subtle' : ''}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Play size={18} className={isImminent ? 'text-green-400' : 'text-theatarr-400'} />
+                <h2 className="text-lg font-semibold text-dark-text">Sessions aujourd'hui</h2>
+                <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-full ${
+                  isImminent
+                    ? 'bg-green-500 text-white animate-pulse'
+                    : isClose
+                      ? 'bg-theatarr-500 text-white animate-blink'
+                      : 'bg-blue-500 text-white'
+                }`}>
+                  <Clock size={10} />
+                  {formatCountdown(nearest.scheduled_at!)}
+                </span>
+              </div>
+              <Link to="/portal/sessions" className="text-sm text-theatarr-500 hover:underline">
+                Voir tout
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {startingSoon.map((session, i) => (
+                  <div key={session.id} className="relative overflow-hidden rounded-xl">
+                    <SessionCard
+                      id={session.id}
+                      name={session.name}
+                      movieTitle={session.movie_title}
+                      moviePosterUrl={session.movie_poster_url}
+                      status={session.status}
+                      scheduledAt={session.scheduled_at}
+                      invitationStatus={session.invitation_status}
+                      movieSelectionMode={session.movie_selection_mode}
+                      movieResolved={session.movie_resolved}
+                      mysteryRevealAt={session.mystery_reveal_at}
+                      voteRevealAt={session.vote_reveal_at}
+                      linkedVoteSessionId={session.linked_vote_session_id}
+                      linkedVoteIsOpen={session.linked_vote_is_open}
+                      voteMoviePosters={session.vote_movie_posters}
+                      feedbackAvailable={session.feedback_available}
+                      hasSubmittedFeedback={session.has_submitted_feedback}
+                      feedbackCount={session.feedback_count}
+                      feedbackAverage={session.feedback_average}
+                    />
+                    {/* Shine sweep overlay */}
+                    <div
+                      className="absolute inset-0 pointer-events-none rounded-xl"
+                      style={{
+                        background: 'linear-gradient(110deg, transparent 33%, var(--shine-color) 50%, transparent 67%)',
+                        backgroundSize: '300% 100%',
+                        backgroundPosition: '200% 0',
+                        animation: `card-shine 2.5s ease-in-out infinite ${i * 0.8}s`,
+                      }}
+                    />
+                  </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Pending invitations */}
       {pendingInvitations && pendingInvitations.items.length > 0 && (
@@ -275,8 +369,11 @@ export function PortalHome() {
         </section>
       )}
 
-      {/* Upcoming sessions */}
-      {sessions && sessions.items.length > 0 && (
+      {/* Upcoming sessions (exclude starting soon to avoid duplicates) */}
+      {(() => {
+        const startingSoonIds = new Set(startingSoon.map((s) => s.id));
+        const upcomingFiltered = (sessions?.items || []).filter((s) => !startingSoonIds.has(s.id));
+        return upcomingFiltered.length > 0 ? (
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-dark-text">Prochaines sessions</h2>
@@ -285,7 +382,7 @@ export function PortalHome() {
             </Link>
           </div>
           <div className="space-y-3">
-            {sessions.items.slice(0, 3).map((session) => (
+            {upcomingFiltered.slice(0, 3).map((session) => (
               <SessionCard
                 key={session.id}
                 id={session.id}
@@ -310,7 +407,8 @@ export function PortalHome() {
             ))}
           </div>
         </section>
-      )}
+        ) : null;
+      })()}
 
       {/* Empty state */}
       {(!sessions || sessions.items.length === 0) &&

@@ -36,7 +36,7 @@ type TabType = 'all' | 'upcoming' | 'feedback';
 
 export function MySessions() {
   useCountdown();
-  const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const { items } = usePortalNotifications();
   const invitationCount = items.find((i) => i.id === 'invitations')?.count || 0;
   const feedbackCount = items.find((i) => i.id === 'feedback')?.count || 0;
@@ -61,8 +61,8 @@ export function MySessions() {
     : data?.items || [];
 
   const tabs: Array<{ key: TabType; label: string; badge?: number; badgeColor?: string }> = [
-    { key: 'all', label: 'Tous' },
     { key: 'upcoming', label: 'A venir', badge: invitationCount, badgeColor: 'bg-orange-500' },
+    { key: 'all', label: 'Tous' },
     { key: 'feedback', label: 'A noter', badge: feedbackCount, badgeColor: 'bg-yellow-500' },
   ];
 
