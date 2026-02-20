@@ -1,0 +1,80 @@
+{
+  "title": "Dienste",
+  "subtitle": "Externe Dienste konfigurieren (Beleuchtung, Player, Medienquellen)",
+  "addService": "Dienst hinzufügen",
+  "refresh": "Aktualisieren",
+  "categories": {
+    "all": "Alle",
+    "lighting": "Beleuchtung",
+    "player": "Player",
+    "media_source": "Medienquellen",
+    "actuator": "Aktoren",
+    "metadata": "Metadaten"
+  },
+  "empty": {
+    "noServices": "Keine Dienste konfiguriert",
+    "addFirst": "Fügen Sie Ihren ersten Dienst hinzu"
+  },
+  "stats": {
+    "services": "Dienste",
+    "connected": "verbunden",
+    "errors": "Fehler"
+  },
+  "modal": {
+    "editService": "Dienst bearbeiten",
+    "newService": "Neuer Dienst",
+    "deleteService": "Dienst löschen",
+    "deleteConfirm": "Möchten Sie wirklich löschen",
+    "deleteWarning": "Diese Aktion kann nicht rückgängig gemacht werden. Sequenzen, die diesen Dienst verwenden, müssen aktualisiert werden.",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "capabilities": "Fähigkeiten"
+  },
+  "form": {
+    "name": "Dienstname",
+    "type": "Diensttyp",
+    "selectType": "Typ auswählen",
+    "enabled": "Aktiviert",
+    "host": "Host / URL",
+    "apiKey": "API-Schlüssel",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "loadingLibraries": "Bibliotheken werden geladen...",
+    "basicInfo": "Grundinformationen",
+    "description": "Beschreibung",
+    "descriptionPlaceholder": "Optionale Beschreibung",
+    "enableService": "Diesen Dienst aktivieren",
+    "adapterConfig": "Adapter-Konfiguration",
+    "category": "Kategorie",
+    "adapterType": "Adaptertyp",
+    "selectAdapter": "Adapter auswählen...",
+    "noAdapters": "Keine Adapter für diese Kategorie verfügbar",
+    "settings": "Einstellungen",
+    "libraries": "Bibliotheken",
+    "librariesError": "Bibliotheken konnten nicht geladen werden. Prüfen Sie die Verbindung.",
+    "noLibraries": "Keine Bibliotheken gefunden. Testen Sie zuerst die Dienstverbindung.",
+    "librariesHelp": "Wählen Sie die zu verwendenden Bibliotheken. Wenn keine ausgewählt, werden alle Filmbibliotheken verwendet.",
+    "elements": "Elemente",
+    "saving": "Speichern...",
+    "updateService": "Dienst aktualisieren",
+    "createService": "Dienst erstellen"
+  },
+  "card": {
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "lastSeen": "Zuletzt gesehen",
+    "capabilities": "Fähigkeiten",
+    "test": "Testen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "connected": "Verbunden",
+    "disconnected": "Getrennt",
+    "error": "Fehler",
+    "unknown": "Unbekannt",
+    "lighting": "Beleuchtung",
+    "player": "Player",
+    "media_source": "Medienquelle",
+    "actuator": "Aktor",
+    "metadata": "Metadaten"
+  }
+}

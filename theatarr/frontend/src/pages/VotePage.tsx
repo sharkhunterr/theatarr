@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, Film } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { MovieVoteCard } from '../components/vote/MovieVoteCard';
 import { VoteResults } from '../components/vote/VoteResults';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -33,6 +34,7 @@ interface VoteSessionPublic {
 }
 
 export function VotePage() {
+  const { t } = useTranslation(['votes', 'common']);
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -122,9 +124,9 @@ export function VotePage() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center p-8">
           <Film size={48} className="mx-auto text-gray-600 mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Invalid Vote Link</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">{t('votes:votePage.invalidLink')}</h1>
           <p className="text-gray-400">
-            {error instanceof Error ? error.message : 'This vote link is not valid or has expired.'}
+            {error instanceof Error ? error.message : t('votes:votePage.invalidLinkMessage')}
           </p>
         </div>
       </div>
@@ -159,19 +161,19 @@ export function VotePage() {
           {session.is_open ? (
             <>
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-green-400 text-sm">Voting Open</span>
+              <span className="text-green-400 text-sm">{t('votes:votePage.votingOpen')}</span>
             </>
           ) : (
             <>
               <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-red-400 text-sm">Voting Closed</span>
+              <span className="text-red-400 text-sm">{t('votes:votePage.votingClosed')}</span>
             </>
           )}
 
           {session.closes_at && session.is_open && (
             <span className="text-gray-500 text-sm ml-4 flex items-center gap-1">
               <Clock size={14} />
-              Closes: {new Date(session.closes_at).toLocaleString()}
+              {t('votes:votePage.closes')} {new Date(session.closes_at).toLocaleString()}
             </span>
           )}
         </div>
@@ -183,10 +185,10 @@ export function VotePage() {
         {hasVoted && !canVoteMore && (
           <div className="mb-8 p-4 bg-green-500/10 border border-green-500/30 rounded-lg text-center">
             <Check size={24} className="mx-auto text-green-500 mb-2" />
-            <p className="text-green-400 font-medium">Your vote has been recorded!</p>
+            <p className="text-green-400 font-medium">{t('votes:votePage.voteRecorded')}</p>
             {session.show_results_during_voting && (
               <p className="text-gray-400 text-sm mt-1">
-                Watch the results update in real-time below.
+                {t('votes:votePage.watchResults')}
               </p>
             )}
           </div>
@@ -196,8 +198,7 @@ export function VotePage() {
         {hasVoted && canVoteMore && (
           <div className="mb-8 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-center">
             <p className="text-indigo-400 font-medium">
-              Vote recorded! You can vote for {session.max_votes_per_user - votedIndices.length} more{' '}
-              {session.max_votes_per_user - votedIndices.length === 1 ? 'movie' : 'movies'}.
+              {t('votes:votePage.voteRecordedMore', { remaining: session.max_votes_per_user - votedIndices.length })}
             </p>
           </div>
         )}
@@ -237,17 +238,17 @@ export function VotePage() {
               }`}
             >
               {voteMutation.isPending
-                ? 'Submitting...'
+                ? t('votes:votePage.submitting')
                 : selectedIndex !== null
-                ? `Vote for "${session.movie_options[selectedIndex].title}"`
-                : 'Select a movie to vote'}
+                ? t('votes:votePage.voteFor', { title: session.movie_options[selectedIndex].title })
+                : t('votes:votePage.selectMovie')}
             </button>
 
             {voteMutation.error && (
               <p className="mt-4 text-red-400">
                 {voteMutation.error instanceof Error
                   ? voteMutation.error.message
-                  : 'Failed to cast vote'}
+                  : t('votes:votePage.voteError')}
               </p>
             )}
           </div>
@@ -257,7 +258,7 @@ export function VotePage() {
         {results && Object.keys(results).length > 0 && (
           <div className="mt-12">
             <h2 className="text-xl font-semibold text-white mb-6 text-center">
-              Current Results
+              {t('votes:votePage.currentResults')}
             </h2>
             <VoteResults
               movieOptions={session.movie_options}
@@ -273,7 +274,7 @@ export function VotePage() {
 
       {/* Footer */}
       <footer className="p-6 text-center text-gray-600 text-sm">
-        Powered by Theatarr
+        {t('votes:votePage.poweredBy')}
       </footer>
     </div>
   );

@@ -7,6 +7,7 @@ import { HelpCircle, Trophy } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../api/client';
 import { usePortalNotifications } from '../../hooks/usePortalNotifications';
 
@@ -23,6 +24,7 @@ interface PortalQuiz {
 type TabType = 'pending' | 'all';
 
 export function MyQuiz() {
+  const { t } = useTranslation(['portal', 'common']);
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const { items } = usePortalNotifications();
   const pendingQuizCount = items.find((i) => i.id === 'quiz')?.count || 0;
@@ -48,10 +50,10 @@ export function MyQuiz() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, { bg: string; label: string }> = {
-      draft: { bg: 'bg-yellow-500/20 text-yellow-400', label: 'Brouillon' },
-      open: { bg: 'bg-blue-500/20 text-blue-400', label: 'Ouvert' },
-      active: { bg: 'bg-green-500/20 text-green-400', label: 'En cours' },
-      completed: { bg: 'bg-dark-muted/20 text-dark-muted', label: 'Termine' },
+      draft: { bg: 'bg-yellow-500/20 text-yellow-400', label: t('portal:quiz.status.draft') },
+      open: { bg: 'bg-blue-500/20 text-blue-400', label: t('portal:quiz.status.open') },
+      active: { bg: 'bg-green-500/20 text-green-400', label: t('portal:quiz.status.active') },
+      completed: { bg: 'bg-dark-muted/20 text-dark-muted', label: t('portal:quiz.status.completed') },
     };
     return styles[status] || { bg: 'bg-dark-muted/20 text-dark-muted', label: status };
   };
@@ -60,7 +62,7 @@ export function MyQuiz() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-dark-text">Mes Quiz</h1>
+        <h1 className="text-xl font-bold text-dark-text">{t('portal:quiz.title')}</h1>
       </div>
 
       {/* Tabs */}
@@ -74,7 +76,7 @@ export function MyQuiz() {
               : 'border-transparent text-dark-muted hover:text-dark-text'
           )}
         >
-          En cours
+          {t('portal:quiz.tabs.pending')}
           {pendingQuizCount > 0 && (
             <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-purple-500 text-white text-[10px] font-bold leading-none">
               {pendingQuizCount}
@@ -90,7 +92,7 @@ export function MyQuiz() {
               : 'border-transparent text-dark-muted hover:text-dark-text'
           )}
         >
-          Tous les quiz
+          {t('portal:quiz.tabs.all')}
           {completedQuizCount > 0 && (
             <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-dark-muted/50 text-dark-text text-[10px] font-bold leading-none">
               {completedQuizCount}
@@ -137,7 +139,7 @@ export function MyQuiz() {
                       <p className="text-sm text-dark-muted line-clamp-1">{quiz.description}</p>
                     )}
                     <div className="flex items-center gap-4 mt-2 text-xs text-dark-muted">
-                      <span>{quiz.question_count} questions</span>
+                      <span>{t('portal:quiz.questions', { count: quiz.question_count })}</span>
                       {quiz.has_joined && quiz.my_score > 0 && (
                         <span className="flex items-center gap-1 text-yellow-400">
                           <Trophy size={12} />
@@ -145,7 +147,7 @@ export function MyQuiz() {
                         </span>
                       )}
                       {!quiz.has_joined && (
-                        <span className="text-blue-400">Pas encore rejoint</span>
+                        <span className="text-blue-400">{t('portal:quiz.notJoined')}</span>
                       )}
                     </div>
                   </div>
@@ -161,12 +163,12 @@ export function MyQuiz() {
         <div className="text-center py-12">
           <HelpCircle size={48} className="mx-auto text-dark-muted mb-4" />
           <h3 className="text-lg font-medium text-dark-text mb-2">
-            {activeTab === 'pending' ? 'Aucun quiz en cours' : 'Aucun quiz'}
+            {activeTab === 'pending' ? t('portal:quiz.empty.pendingTitle') : t('portal:quiz.empty.allTitle')}
           </h3>
           <p className="text-dark-muted">
             {activeTab === 'pending'
-              ? 'Aucun quiz actif pour le moment.'
-              : "Vous n'avez pas encore ete invite a un quiz."}
+              ? t('portal:quiz.empty.pendingDescription')
+              : t('portal:quiz.empty.allDescription')}
           </p>
         </div>
       )}

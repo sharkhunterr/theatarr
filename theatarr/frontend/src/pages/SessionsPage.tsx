@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Plus,
   Play,
@@ -28,6 +29,7 @@ import clsx from 'clsx';
 import { getMysteryRevealCountdown, getVoteRevealCountdown } from '../utils/countdown';
 import { useCountdown } from '../hooks/useCountdown';
 import { useSetting } from '../hooks/useSettings';
+import { useLocaleFormat } from '../hooks/useLocaleFormat';
 import { MysteryPoster } from '../components/common/MysteryPoster';
 import { VotePoster } from '../components/common/VotePoster';
 import { VotePosterCollage } from '../components/common/VotePosterCollage';
@@ -35,7 +37,6 @@ import { Button, Card, Spinner, Modal, PageHeader, ButtonGroup } from '../compon
 import { useSessionStore, Session, SessionState, VoteSessionSummary } from '../stores/sessionStore';
 import { useSession } from '../hooks/useSession';
 import { useWebSocket } from '../hooks/useWebSocket';
-import { useLayoutStore } from '../stores/layoutStore';
 import { apiClient } from '../api/client';
 import { QrScannerModal } from '../components/sessions/QrScannerModal';
 
@@ -43,7 +44,8 @@ export function SessionsPage() {
   useCountdown();
   const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
   const navigate = useNavigate();
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['sessions', 'common']);
+  const { formatDate } = useLocaleFormat();
   const { sessions, isLoading } = useSessionStore();
   const { fetchSessions } = useSession();
   const [deleteSession, setDeleteSession] = useState<Session | null>(null);
@@ -53,45 +55,6 @@ export function SessionsPage() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showScanner, setShowScanner] = useState(false);
-
-  const t = {
-    title: language === 'fr' ? 'Sessions' : 'Sessions',
-    subtitle: language === 'fr' ? 'Gérez vos sessions de cinéma maison' : 'Manage your home cinema sessions',
-    addSession: language === 'fr' ? 'Nouvelle session' : 'New Session',
-    noSessions: language === 'fr' ? 'Aucune session' : 'No sessions',
-    createFirst: language === 'fr' ? 'Créer votre première session' : 'Create your first session',
-    play: language === 'fr' ? 'Lancer' : 'Play',
-    resume: language === 'fr' ? 'Reprendre' : 'Resume',
-    pause: language === 'fr' ? 'Pause' : 'Pause',
-    stop: language === 'fr' ? 'Arrêter' : 'Stop',
-    delete: language === 'fr' ? 'Supprimer' : 'Delete',
-    deleteConfirm: language === 'fr' ? 'Supprimer la session' : 'Delete Session',
-    deleteWarning: language === 'fr' ? 'Êtes-vous sûr de vouloir supprimer cette session ? Cette action est irréversible.' : 'Are you sure you want to delete this session? This action cannot be undone.',
-    cancel: language === 'fr' ? 'Annuler' : 'Cancel',
-    draft: language === 'fr' ? 'Brouillon' : 'Draft',
-    scheduled: language === 'fr' ? 'Programmé' : 'Scheduled',
-    running: language === 'fr' ? 'En cours' : 'Running',
-    paused: language === 'fr' ? 'En pause' : 'Paused',
-    completed: language === 'fr' ? 'Terminé' : 'Completed',
-    interrupted: language === 'fr' ? 'Interrompu' : 'Interrupted',
-    participants: language === 'fr' ? 'participants' : 'participants',
-    actions: language === 'fr' ? 'actions' : 'actions',
-    voteOpen: language === 'fr' ? 'Vote ouvert' : 'Vote open',
-    voteClosed: language === 'fr' ? 'Vote fermé' : 'Vote closed',
-    voteDraft: language === 'fr' ? 'Vote en attente' : 'Vote pending',
-    mystery: language === 'fr' ? 'Film mystère' : 'Mystery movie',
-    noMovie: language === 'fr' ? 'Aucun film' : 'No movie',
-    seeResults: language === 'fr' ? 'Voir résultats' : 'See results',
-    voteResults: language === 'fr' ? 'Résultats du vote' : 'Vote Results',
-    votes: language === 'fr' ? 'votes' : 'votes',
-    winner: language === 'fr' ? 'Gagnant' : 'Winner',
-    wallmount: language === 'fr' ? 'Wallmount' : 'Wallmount',
-    display: language === 'fr' ? 'Display' : 'Display',
-    copyCode: language === 'fr' ? 'Copier le code' : 'Copy code',
-    codeCopied: language === 'fr' ? 'Copié !' : 'Copied!',
-    all: language === 'fr' ? 'Toutes' : 'All',
-    duplicate: language === 'fr' ? 'Dupliquer' : 'Duplicate',
-  };
 
   // WebSocket for real-time session state updates
   const token = localStorage.getItem('theatarr_token');
@@ -136,7 +99,7 @@ export function SessionsPage() {
       await apiClient.post(`/sessions/${session.id}/control`, { action });
     } catch (error: any) {
       console.error('Session control failed:', error);
-      setControlError(error?.message || (language === 'fr' ? 'Erreur de contrôle' : 'Control error'));
+      setControlError(error?.message || t('sessions:list.controlError'));
       setTimeout(() => setControlError(null), 4000);
     } finally {
       setControllingId(null);
@@ -151,7 +114,7 @@ export function SessionsPage() {
       await apiClient.post(`/sessions/${session.id}/control`, { action: 'stop' });
     } catch (error: any) {
       console.error('Session stop failed:', error);
-      setControlError(error?.message || (language === 'fr' ? 'Erreur lors de l\'arrêt' : 'Stop error'));
+      setControlError(error?.message || t('sessions:list.stopError'));
       setTimeout(() => setControlError(null), 4000);
     } finally {
       setControllingId(null);
@@ -169,7 +132,7 @@ export function SessionsPage() {
       setDeleteSession(null);
     } catch (error: any) {
       console.error('Failed to delete session:', error);
-      setDeleteError(error?.message || 'Erreur lors de la suppression');
+      setDeleteError(error?.message || t('sessions:list.deleteError'));
     } finally {
       setIsDeleting(false);
     }
@@ -184,7 +147,7 @@ export function SessionsPage() {
       fetchSessions();
     } catch (error: any) {
       console.error('Failed to duplicate session:', error);
-      setControlError(error?.message || (language === 'fr' ? 'Erreur lors de la duplication' : 'Duplication error'));
+      setControlError(error?.message || t('sessions:list.duplicationError'));
       setTimeout(() => setControlError(null), 4000);
     } finally {
       setDuplicatingId(null);
@@ -193,28 +156,27 @@ export function SessionsPage() {
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { color: string; label: string }> = {
-      draft: { color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', label: t.draft },
-      scheduled: { color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', label: t.scheduled },
-      running: { color: 'bg-green-500/20 text-green-400 border-green-500/30', label: t.running },
-      paused: { color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', label: t.paused },
-      completed: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', label: t.completed },
-      interrupted: { color: 'bg-red-500/20 text-red-400 border-red-500/30', label: t.interrupted },
+      draft: { color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', label: t('sessions:list.draft') },
+      scheduled: { color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', label: t('sessions:list.scheduled') },
+      running: { color: 'bg-green-500/20 text-green-400 border-green-500/30', label: t('sessions:list.running') },
+      paused: { color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', label: t('sessions:list.paused') },
+      completed: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', label: t('sessions:list.completed') },
+      interrupted: { color: 'bg-red-500/20 text-red-400 border-red-500/30', label: t('sessions:list.interrupted') },
     };
     return config[status] || config.draft;
   };
 
   const getVoteStatusBadge = (voteSession: VoteSessionSummary) => {
     if (voteSession.status === 'open') {
-      return { color: 'bg-green-500/20 text-green-400', label: t.voteOpen, icon: Vote };
+      return { color: 'bg-green-500/20 text-green-400', label: t('sessions:list.voteOpen'), icon: Vote };
     } else if (voteSession.status === 'closed') {
-      return { color: 'bg-blue-500/20 text-blue-400', label: t.voteClosed, icon: Trophy };
+      return { color: 'bg-blue-500/20 text-blue-400', label: t('sessions:list.voteClosed'), icon: Trophy };
     }
-    return { color: 'bg-gray-500/20 text-gray-400', label: t.voteDraft, icon: Vote };
+    return { color: 'bg-gray-500/20 text-gray-400', label: t('sessions:list.voteDraft'), icon: Vote };
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
+  const formatSessionDate = (dateStr: string) => {
+    return formatDate(dateStr, {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -238,7 +200,7 @@ export function SessionsPage() {
       }
       return {
         poster: null,
-        title: language === 'fr' ? 'En attente du vote' : 'Waiting for vote',
+        title: t('sessions:list.waitingForVote'),
         icon: Vote,
         iconColor: 'text-blue-400',
         type: 'vote',
@@ -257,7 +219,7 @@ export function SessionsPage() {
       }
       return {
         poster: null,
-        title: t.mystery,
+        title: t('sessions:list.mystery'),
         icon: Shuffle,
         iconColor: 'text-purple-400 animate-pulse',
         type: 'mystery',
@@ -277,7 +239,7 @@ export function SessionsPage() {
 
     return {
       poster: null,
-      title: t.noMovie,
+      title: t('sessions:list.noMovie'),
       icon: Film,
       iconColor: 'text-dark-muted',
       type: 'none',
@@ -287,13 +249,13 @@ export function SessionsPage() {
   const STATUS_ORDER = ['running', 'paused', 'scheduled', 'draft', 'completed', 'interrupted'];
 
   const statusFilters = [
-    { key: 'all', label: t.all },
-    { key: 'running', label: t.running },
-    { key: 'paused', label: t.paused },
-    { key: 'scheduled', label: t.scheduled },
-    { key: 'draft', label: t.draft },
-    { key: 'completed', label: t.completed },
-    { key: 'interrupted', label: t.interrupted },
+    { key: 'all', label: t('sessions:list.all') },
+    { key: 'running', label: t('sessions:list.running') },
+    { key: 'paused', label: t('sessions:list.paused') },
+    { key: 'scheduled', label: t('sessions:list.scheduled') },
+    { key: 'draft', label: t('sessions:list.draft') },
+    { key: 'completed', label: t('sessions:list.completed') },
+    { key: 'interrupted', label: t('sessions:list.interrupted') },
   ];
 
   // Filter sessions
@@ -386,7 +348,7 @@ export function SessionsPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                BA
+                {t('sessions:list.preparingTrailers')}
               </span>
             )}
             {/* Mystery reveal countdown */}
@@ -444,7 +406,7 @@ export function SessionsPage() {
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-dark-border text-dark-text hover:bg-dark-muted/50 transition-colors"
                       >
                         <Eye size={12} />
-                        <span className="hidden sm:inline">{t.seeResults}</span>
+                        <span className="hidden sm:inline">{t('sessions:list.seeResults')}</span>
                       </button>
                     )}
                   </>
@@ -458,8 +420,8 @@ export function SessionsPage() {
             {session.scheduled_at && (
               <span className="flex items-center gap-1 text-purple-400">
                 <Calendar size={11} />
-                <span className="hidden sm:inline">{formatDate(session.scheduled_at)}</span>
-                <span className="sm:hidden">{new Date(session.scheduled_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                <span className="hidden sm:inline">{formatSessionDate(session.scheduled_at)}</span>
+                <span className="sm:hidden">{formatDate(session.scheduled_at, { day: 'numeric', month: 'short' })}</span>
               </span>
             )}
             {(session.participants_total ?? 0) > 0 && (
@@ -482,7 +444,7 @@ export function SessionsPage() {
                   setCopiedCode(session.id);
                   setTimeout(() => setCopiedCode(null), 2000);
                 }}
-                title={copiedCode === session.id ? t.codeCopied : t.copyCode}
+                title={copiedCode === session.id ? t('sessions:list.codeCopied') : t('sessions:list.copyCode')}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-dark-border/80 hover:bg-dark-muted/50 transition-colors"
               >
                 <ScreenShare size={10} className="text-theatarr-500" />
@@ -506,7 +468,7 @@ export function SessionsPage() {
           {(session.status === 'draft' || session.status === 'scheduled' || session.status === 'interrupted' || session.status === 'paused') && (
             <button
               onClick={() => handlePlayPause(session)}
-              title={session.status === 'paused' ? t.resume : t.play}
+              title={session.status === 'paused' ? t('sessions:list.resume') : t('sessions:list.play')}
               disabled={controllingId === session.id || (session.actions_count ?? 0) === 0}
               className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-dark-border/50 transition-colors disabled:opacity-50"
             >
@@ -516,7 +478,7 @@ export function SessionsPage() {
           {session.status === 'running' && (
             <button
               onClick={() => handlePlayPause(session)}
-              title={t.pause}
+              title={t('sessions:list.pause')}
               disabled={controllingId === session.id}
               className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-dark-border/50 transition-colors disabled:opacity-50"
             >
@@ -526,7 +488,7 @@ export function SessionsPage() {
           {(session.status === 'running' || session.status === 'paused') && (
             <button
               onClick={() => handleStop(session)}
-              title={t.stop}
+              title={t('sessions:list.stop')}
               disabled={controllingId === session.id}
               className="h-8 w-8 flex items-center justify-center rounded-md text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
             >
@@ -545,7 +507,7 @@ export function SessionsPage() {
               href={`/display/${session.display_code}`}
               target="_blank"
               rel="noopener noreferrer"
-              title={t.display}
+              title={t('sessions:list.display')}
               className="h-8 w-8 flex items-center justify-center rounded-md text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
             >
               <ScreenShare className="h-3.5 w-3.5" />
@@ -556,7 +518,7 @@ export function SessionsPage() {
               href={`/wallmount/${session.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              title={t.wallmount}
+              title={t('sessions:list.wallmount')}
               className="h-8 w-8 flex items-center justify-center rounded-md text-dark-muted hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
             >
               <Monitor className="h-3.5 w-3.5" />
@@ -565,7 +527,7 @@ export function SessionsPage() {
           {session.qr_tickets_enabled && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowScanner(true); }}
-              title={language === 'fr' ? 'Scanner un ticket' : 'Scan a ticket'}
+              title={t('sessions:list.scanTicket')}
               className="h-8 w-8 flex items-center justify-center rounded-md text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
             >
               <QrCode className="h-3.5 w-3.5" />
@@ -578,14 +540,14 @@ export function SessionsPage() {
           {/* Management actions */}
           <button
             onClick={() => navigate(`/sessions/${session.id}`)}
-            title={language === 'fr' ? 'Modifier' : 'Edit'}
+            title={t('sessions:list.edit')}
             className="h-8 w-8 flex items-center justify-center rounded-md text-dark-muted hover:text-dark-text hover:bg-dark-border/50 transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => handleDuplicate(session)}
-            title={t.duplicate}
+            title={t('sessions:list.duplicate')}
             disabled={duplicatingId === session.id}
             className="h-8 w-8 flex items-center justify-center rounded-md text-dark-muted hover:text-dark-text hover:bg-dark-border/50 transition-colors disabled:opacity-50"
           >
@@ -593,7 +555,7 @@ export function SessionsPage() {
           </button>
           <button
             onClick={() => setDeleteSession(session)}
-            title={t.delete}
+            title={t('sessions:list.delete')}
             className="h-8 w-8 flex items-center justify-center rounded-md text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -614,8 +576,8 @@ export function SessionsPage() {
   return (
     <div>
       <PageHeader
-        title={t.title}
-        subtitle={t.subtitle}
+        title={t('sessions:list.title')}
+        subtitle={t('sessions:list.subtitle')}
       />
 
       {/* Control Error Banner */}
@@ -646,7 +608,7 @@ export function SessionsPage() {
           </Button>
           <Button size="sm" onClick={() => navigate('/sessions/new')} className="h-9">
             <Plus className="h-4 w-4" />
-            <span className="ml-1.5">{t.addSession}</span>
+            <span className="ml-1.5">{t('sessions:list.addSession')}</span>
           </Button>
         </div>
       </div>
@@ -655,15 +617,15 @@ export function SessionsPage() {
       {sessions.length === 0 ? (
         <Card className="p-6 text-center">
           <Play size={32} className="mx-auto text-dark-muted mb-3" />
-          <p className="text-sm text-dark-muted mb-4">{t.noSessions}</p>
+          <p className="text-sm text-dark-muted mb-4">{t('sessions:list.noSessions')}</p>
           <Button onClick={() => navigate('/sessions/new')} className="h-10">
             <Plus className="h-4 w-4 mr-2" />
-            {t.createFirst}
+            {t('sessions:list.createFirst')}
           </Button>
         </Card>
       ) : filteredSessions.length === 0 ? (
         <Card className="p-6 text-center">
-          <p className="text-sm text-dark-muted">{language === 'fr' ? 'Aucune session avec ce statut' : 'No sessions with this status'}</p>
+          <p className="text-sm text-dark-muted">{t('sessions:list.noSessionsWithStatus')}</p>
         </Card>
       ) : groupedSessions ? (
         /* Grouped "All" view */
@@ -726,11 +688,11 @@ export function SessionsPage() {
       <Modal
         isOpen={!!deleteSession}
         onClose={() => { setDeleteSession(null); setDeleteError(null); }}
-        title={t.deleteConfirm}
+        title={t('sessions:list.deleteConfirm')}
         size="sm"
       >
         <div className="space-y-4">
-          <p className="text-dark-text">{t.deleteWarning}</p>
+          <p className="text-dark-text">{t('sessions:list.deleteWarning')}</p>
           <p className="text-sm text-dark-muted font-medium">"{deleteSession?.name}"</p>
           {deleteError && (
             <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
@@ -739,10 +701,10 @@ export function SessionsPage() {
           )}
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
             <Button variant="secondary" onClick={() => { setDeleteSession(null); setDeleteError(null); }}>
-              {t.cancel}
+              {t('sessions:list.cancel')}
             </Button>
             <Button variant="danger" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? '...' : t.delete}
+              {isDeleting ? '...' : t('sessions:list.delete')}
             </Button>
           </div>
         </div>
@@ -752,7 +714,7 @@ export function SessionsPage() {
       <Modal
         isOpen={!!voteResultsSession}
         onClose={() => setVoteResultsSession(null)}
-        title={t.voteResults}
+        title={t('sessions:list.voteResults')}
         size="md"
       >
         {voteResultsSession && voteResultsSession.movie_options && (
@@ -805,7 +767,7 @@ export function SessionsPage() {
                     {/* Vote count */}
                     <div className="text-right">
                       <div className="text-lg font-bold text-dark-text">{movie.vote_count || 0}</div>
-                      <div className="text-xs text-dark-muted">{t.votes}</div>
+                      <div className="text-xs text-dark-muted">{t('sessions:list.votes')}</div>
                     </div>
                   </div>
                 );

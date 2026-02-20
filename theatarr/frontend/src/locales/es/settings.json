@@ -1,0 +1,273 @@
+{
+  "config": {
+    "title": "Ajustes",
+    "subtitle": "Configuracion general de la aplicacion",
+    "tabs": {
+      "settings": "Ajustes",
+      "export": "Exportar",
+      "import": "Importar"
+    },
+    "actions": {
+      "reset": "Restablecer",
+      "save": "Guardar",
+      "saving": "Guardando..."
+    },
+    "settings": {
+      "enabled": "Activado",
+      "customSettings": "Ajustes personalizados",
+      "noCustomSettings": "Sin ajustes personalizados. Haz clic en \"Agregar\" para crear uno.",
+      "settingKey": "Clave del ajuste",
+      "settingValue": "Valor (JSON o texto)",
+      "unsavedChanges": "Cambios sin guardar",
+      "allSaved": "Todos los cambios estan guardados",
+      "emailTestPlaceholder": "Direccion de correo de prueba",
+      "emailSending": "Enviando...",
+      "emailTest": "Probar",
+      "emailSuccess": "Correo enviado correctamente",
+      "emailSaveFirst": "Guarda tu configuracion SMTP primero, luego introduce una direccion y haz clic en Probar."
+    },
+    "export": {
+      "title": "Exportar configuracion",
+      "description": "Exporta tu configuracion incluyendo sesiones, servicios, plantillas y ajustes.",
+      "items": {
+        "sessions": "Sesiones",
+        "services": "Servicios",
+        "templates": "Plantillas",
+        "trailers": "Trailers"
+      },
+      "includeInExport": "Incluir en la exportacion",
+      "optionSessions": "Sesiones",
+      "optionSessionsDesc": "Configuraciones de sesiones y secuencias",
+      "optionServices": "Servicios",
+      "optionServicesDesc": "Servicios conectados y credenciales",
+      "optionTemplates": "Plantillas",
+      "optionTemplatesDesc": "Plantillas personalizadas de pantalla mural",
+      "optionTrailerRules": "Reglas de trailers",
+      "optionTrailerRulesDesc": "Configuraciones de descarga automatica",
+      "optionSettings": "Ajustes",
+      "optionSettingsDesc": "Ajustes de la aplicacion",
+      "encryptSensitiveData": "Cifrar datos sensibles",
+      "encryptedDesc": "Las claves API y contrasenas seran cifradas",
+      "unencryptedWarning": "ADVERTENCIA: Los datos sensibles se exportaran en texto plano",
+      "encryptionPassword": "Contrasena de cifrado",
+      "enterStrongPassword": "Introduce una contrasena segura",
+      "confirmPassword": "Confirmar contrasena",
+      "confirmPasswordPlaceholder": "Confirmar contrasena",
+      "passwordRequired": "La contrasena es obligatoria para el cifrado",
+      "passwordMinLength": "La contrasena debe tener al menos 8 caracteres",
+      "passwordMismatch": "Las contrasenas no coinciden",
+      "passwordNote": "Esta contrasena sera necesaria para importar la configuracion con los secretos descifrados. Guardala de forma segura.",
+      "exporting": "Exportando...",
+      "exportConfiguration": "Exportar configuracion",
+      "exportFailed": "Error en la exportacion. Por favor, intentalo de nuevo."
+    },
+    "import": {
+      "title": "Importar configuracion",
+      "description": "Restaura la configuracion desde una copia de seguridad exportada.",
+      "startImport": "Iniciar importacion",
+      "processTitle": "Proceso de importacion",
+      "steps": {
+        "selectFile": "1. Seleccionar el archivo",
+        "selectFileDesc": "Archivo de configuracion exportado",
+        "preview": "2. Vista previa de los cambios",
+        "previewDesc": "Revisar las modificaciones",
+        "resolve": "3. Resolver conflictos",
+        "resolveDesc": "Gestionar elementos existentes",
+        "apply": "4. Aplicar importacion",
+        "applyDesc": "Configuracion importada"
+      },
+      "results": {
+        "sessions": "Sesiones",
+        "services": "Servicios",
+        "templates": "Plantillas",
+        "trailerRules": "Reglas de trailers",
+        "created": "Creados:",
+        "updated": "Actualizados:",
+        "skipped": "Omitidos:",
+        "settingsUpdated": "ajustes actualizados",
+        "errors": "Errores",
+        "done": "Listo"
+      },
+      "dropZone": "Arrastra el archivo de configuracion aqui",
+      "or": "o",
+      "browseFiles": "Explorar archivos",
+      "validFile": "Archivo de configuracion valido",
+      "remove": "Quitar",
+      "encryptedConfig": "Configuracion cifrada",
+      "encryptedConfigDesc": "Esta configuracion contiene secretos cifrados. Introduce la contrasena para descifrarlos durante la importacion.",
+      "decryptionPassword": "Contrasena de descifrado",
+      "enterExportPassword": "Introduce la contrasena de exportacion",
+      "cancel": "Cancelar",
+      "analyzing": "Analizando...",
+      "previewImport": "Vista previa de la importacion",
+      "analysisFailed": "Error al analizar el archivo. Asegurate de que es una exportacion valida de Theatarr.",
+      "readyToImport": "Listo para importar",
+      "noConflicts": "No se detectaron conflictos. Revisa los cambios a continuacion y procede con la importacion.",
+      "toCreate": "por crear",
+      "toUpdate": "por actualizar",
+      "settingsWillBeUpdated": "Los ajustes de la aplicacion seran actualizados",
+      "importConfiguration": "Importar configuracion",
+      "back": "Volver",
+      "conflictsDetected": "{{count}} conflicto detectado",
+      "conflictsDetected_other": "{{count}} conflictos detectados",
+      "conflictsDescription": "Algunos elementos de la importacion ya existen. Elige como gestionar cada conflicto.",
+      "applyAndImport": "Aplicar e importar",
+      "importingConfig": "Importando configuracion...",
+      "importingWait": "Esto puede tardar un momento",
+      "importComplete": "Importacion completada",
+      "importSuccess": "La configuracion se ha importado correctamente.",
+      "importWithWarnings": "Importacion completada con advertencias",
+      "importPartial": "Algunos elementos no pudieron importarse. Consulta los detalles a continuacion.",
+      "modalTitle": "Importar configuracion"
+    }
+  },
+  "users": {
+    "title": "Usuarios",
+    "subtitle": "Gestiona cuentas y permisos",
+    "filters": {
+      "all": "Todos",
+      "admin": "Admin",
+      "user": "Usuario"
+    },
+    "newUser": "Nuevo usuario",
+    "roles": {
+      "user": "Usuario",
+      "admin": "Administrador"
+    },
+    "badges": {
+      "admin": "Admin",
+      "inactive": "Inactivo"
+    },
+    "neverConnected": "Nunca ha iniciado sesion",
+    "empty": {
+      "title": "Sin usuarios",
+      "description": "Crea tu primer usuario para empezar."
+    },
+    "form": {
+      "username": "Nombre de usuario *",
+      "password": "Contrasena *",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Correo electronico",
+      "role": "Rol"
+    },
+    "validation": {
+      "usernameRequired": "El nombre de usuario es obligatorio",
+      "passwordRequired": "La contrasena es obligatoria",
+      "passwordMinLength": "La contrasena debe tener al menos 6 caracteres"
+    },
+    "modal": {
+      "editTitle": "Editar usuario",
+      "createTitle": "Nuevo usuario",
+      "cancel": "Cancelar",
+      "saving": "Guardando...",
+      "edit": "Editar",
+      "create": "Crear"
+    },
+    "passwordModal": {
+      "title": "Cambiar contrasena",
+      "newPassword": "Nueva contrasena",
+      "minChars": "Minimo 6 caracteres",
+      "cancel": "Cancelar",
+      "changing": "Cambiando...",
+      "change": "Cambiar"
+    },
+    "actions": {
+      "edit": "Editar",
+      "changePassword": "Cambiar contrasena",
+      "activate": "Activar",
+      "deactivate": "Desactivar",
+      "delete": "Eliminar"
+    },
+    "deleteConfirm": "¿Eliminar el usuario \"{{username}}\"?"
+  },
+  "logs": {
+    "title": "Registros del sistema",
+    "entries": "entradas",
+    "autoRefresh": "Actualizacion automatica",
+    "live": "En vivo",
+    "paused": "En pausa",
+    "search": "Buscar...",
+    "noLogs": "Sin registros",
+    "loadingEvents": "Cargando eventos...",
+    "categories": {
+      "all": "Todos",
+      "scheduler": "Programador",
+      "sessions": "Sesiones",
+      "vote": "Voto",
+      "services": "Servicios",
+      "enrichment": "Enriquecimiento",
+      "movies": "Peliculas",
+      "auth": "Autenticacion",
+      "system": "Sistema"
+    },
+    "levels": {
+      "all": "Todos",
+      "debug": "DEBUG",
+      "info": "INFO",
+      "warning": "WARN",
+      "error": "ERROR"
+    }
+  },
+  "history": {
+    "title": "Historial",
+    "totalPlayback": "{{hours}}h de reproduccion total",
+    "last7days": "Ultimos 7 dias",
+    "filters": {
+      "all": "Todas",
+      "completed": "Completadas",
+      "running": "En curso",
+      "paused": "En pausa",
+      "interrupted": "Interrumpidas"
+    },
+    "status": {
+      "completed": "Completada",
+      "running": "En curso",
+      "paused": "En pausa",
+      "stopped": "Detenida",
+      "interrupted": "Interrumpida",
+      "draft": "Borrador",
+      "scheduled": "Programada"
+    },
+    "labels": {
+      "start": "Inicio:",
+      "duration": "Duracion:",
+      "end": "Fin:",
+      "sequences": "Secuencias:",
+      "id": "ID:"
+    },
+    "noEvents": "No hay eventos registrados (la sesion se ejecuto antes de que se activara el seguimiento)",
+    "events": {
+      "sessionStarted": "Sesion iniciada",
+      "sessionPaused": "Sesion en pausa",
+      "sessionResumed": "Sesion reanudada",
+      "sessionStopped": "Sesion detenida",
+      "sessionCompleted": "Sesion completada",
+      "sessionInterrupted": "Sesion interrumpida",
+      "sequenceStarted": "Secuencia iniciada",
+      "sequenceCompleted": "Secuencia completada",
+      "sequenceSkipped": "Secuencia omitida",
+      "actionExecuted": "Accion ejecutada",
+      "trailerResolved": "Trailer resuelto",
+      "prerollResolved": "Pre-roll resuelto",
+      "playbackEnded": "Reproduccion finalizada",
+      "displayConnected": "Pantalla conectada",
+      "displayDisconnected": "Pantalla desconectada",
+      "noEventsForSession": "No hay eventos registrados para esta sesion"
+    },
+    "empty": "No se encontro historial",
+    "pagination": {
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "pageOf": "Pagina {{page}} de {{total}}"
+    }
+  },
+  "login": {
+    "subtitle": "Orquestacion de cine en casa",
+    "username": "Nombre de usuario",
+    "usernamePlaceholder": "Introduce tu nombre de usuario",
+    "password": "Contrasena",
+    "passwordPlaceholder": "Introduce tu contrasena",
+    "signIn": "Iniciar sesion"
+  }
+}

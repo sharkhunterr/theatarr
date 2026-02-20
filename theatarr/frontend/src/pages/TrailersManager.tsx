@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -23,7 +24,7 @@ import {
 } from 'lucide-react';
 import { Button, Card, Modal, Spinner, Input, ButtonGroup } from '../components/common';
 import { TrailerRuleForm } from '../components/trailers/TrailerRuleForm';
-import { StorageStats } from '../components/trailers/StorageStats';
+
 import { apiClient, API_BASE } from '../api/client';
 import { TemplateManager } from './TemplateManager';
 
@@ -137,6 +138,7 @@ interface SoundInfo {
 // ============================================================================
 
 export function TrailersManager() {
+  const { t } = useTranslation('media');
   const [mainTab, setMainTab] = useState<'trailers' | 'sounds' | 'prerolls' | 'templates'>('trailers');
   const [trailersSubTab, setTrailersSubTab] = useState<'library' | 'rules'>('library');
   const [createOpen, setCreateOpen] = useState(false);
@@ -152,10 +154,10 @@ export function TrailersManager() {
       <div className="flex items-center justify-between mb-6">
         <ButtonGroup
           options={[
-            { key: 'trailers' as const, label: 'Bandes-annonces' },
-            { key: 'prerolls' as const, label: 'Pré-rolls' },
-            { key: 'sounds' as const, label: 'Sons' },
-            { key: 'templates' as const, label: 'Modèles' },
+            { key: 'trailers' as const, label: t('media:tabs.trailers') },
+            { key: 'prerolls' as const, label: t('media:tabs.prerolls') },
+            { key: 'sounds' as const, label: t('media:tabs.sounds') },
+            { key: 'templates' as const, label: t('media:tabs.templates') },
           ]}
           value={mainTab}
           onChange={setMainTab}
@@ -169,13 +171,13 @@ export function TrailersManager() {
               className="h-9"
             >
               <RefreshCw size={14} />
-              <span className="hidden sm:inline ml-1.5">Refresh Built-in</span>
+              <span className="hidden sm:inline ml-1.5">{t('media:actions.refreshBuiltin')}</span>
             </Button>
           )}
           <Button size="sm" onClick={() => setCreateOpen(true)} className="h-9">
             <Plus className="h-4 w-4" />
             <span className="ml-1.5">
-              {mainTab === 'trailers' && trailersSubTab === 'rules' ? 'Créer' : 'Ajouter'}
+              {mainTab === 'trailers' && trailersSubTab === 'rules' ? t('media:actions.create') : t('media:actions.add')}
             </span>
           </Button>
         </div>
@@ -218,6 +220,7 @@ interface TrailersTabProps {
 }
 
 function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabChange }: TrailersTabProps) {
+  const { t } = useTranslation('media');
   const queryClient = useQueryClient();
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const [isRuleFormOpen, setIsRuleFormOpen] = useState(false);
@@ -294,7 +297,7 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
   };
 
   const handleDelete = async (trailer: Trailer) => {
-    if (window.confirm(`Supprimer "${trailer.title}" ?`)) {
+    if (window.confirm(t('media:trailers.deleteConfirm', { title: trailer.title }))) {
       await deleteMutation.mutateAsync(trailer.id);
     }
   };
@@ -316,8 +319,8 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
       <div className="mb-4">
         <ButtonGroup
           options={[
-            { key: 'library' as const, label: 'Bibliothèque' },
-            { key: 'rules' as const, label: 'Règles' },
+            { key: 'library' as const, label: t('media:trailers.subtabs.library') },
+            { key: 'rules' as const, label: t('media:trailers.subtabs.rules') },
           ]}
           value={activeSubTab}
           onChange={onSubTabChange}
@@ -330,10 +333,10 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
           <div className="mb-4">
             <ButtonGroup
               options={[
-                { key: 'all' as const, label: 'Tous' },
-                { key: 'ready' as const, label: 'Prêt' },
-                { key: 'pending' as const, label: 'En cours' },
-                { key: 'error' as const, label: 'Erreur' },
+                { key: 'all' as const, label: t('media:trailers.filters.all') },
+                { key: 'ready' as const, label: t('media:trailers.filters.ready') },
+                { key: 'pending' as const, label: t('media:trailers.filters.pending') },
+                { key: 'error' as const, label: t('media:trailers.filters.error') },
               ]}
               value={filter}
               onChange={setFilter}
@@ -372,25 +375,25 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
                         {trailer.status === 'ready' ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/15 text-green-400 flex-shrink-0">
                             <CheckCircle size={10} />
-                            Prêt
+                            {t('media:trailers.status.ready')}
                           </span>
                         ) : trailer.status === 'downloading' ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 flex-shrink-0">
                             <Loader2 size={10} className="animate-spin" />
-                            {((trailer.download_progress || 0) * 100).toFixed(0)}%
+                            {t('media:trailers.status.downloading', { progress: ((trailer.download_progress || 0) * 100).toFixed(0) })}
                           </span>
                         ) : trailer.status === 'pending' ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/15 text-yellow-400 flex-shrink-0">
                             <Clock size={10} />
-                            Attente
+                            {t('media:trailers.status.pending')}
                           </span>
                         ) : (
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/15 text-red-400 flex-shrink-0 cursor-help"
-                            title={trailer.error_message || 'Erreur inconnue'}
+                            title={trailer.error_message || t('media:trailers.status.unknownError')}
                           >
                             <AlertCircle size={10} />
-                            Erreur
+                            {t('media:trailers.status.error')}
                           </span>
                         )}
                       </div>
@@ -423,7 +426,7 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-1.5 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border/50 transition-colors hidden sm:flex"
-                          title="Ouvrir sur YouTube"
+                          title={t('media:trailers.openYoutube')}
                         >
                           <ExternalLink size={14} />
                         </a>
@@ -431,7 +434,7 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
                       <button
                         onClick={() => handleDelete(trailer)}
                         className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                        title="Supprimer"
+                        title={t('media:trailers.delete')}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -443,9 +446,9 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
           ) : (
             <div className="text-center py-12">
               <Film size={48} className="mx-auto text-dark-muted mb-4" />
-              <p className="text-dark-muted">Aucune bande-annonce</p>
+              <p className="text-dark-muted">{t('media:trailers.empty.title')}</p>
               <Button className="mt-4" onClick={() => setIsDownloadOpen(true)}>
-                Télécharger une bande-annonce
+                {t('media:trailers.empty.action')}
               </Button>
             </div>
           )}
@@ -469,25 +472,25 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
                           <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                             rule.is_enabled ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-dark-muted'
                           }`}>
-                            {rule.is_enabled ? 'Active' : 'Désactivée'}
+                            {rule.is_enabled ? t('media:trailers.rules.active') : t('media:trailers.rules.disabled')}
                           </span>
                         </div>
                         {rule.description && <p className="text-dark-muted text-sm mt-1">{rule.description}</p>}
                         <div className="flex flex-wrap gap-4 mt-4 text-sm text-dark-muted">
                           <span className="flex items-center gap-1"><HardDrive size={14} />{rule.storage_used_gb.toFixed(1)} / {rule.max_storage_gb} GB</span>
-                          <span className="flex items-center gap-1"><Film size={14} />{rule.trailer_count} trailers</span>
+                          <span className="flex items-center gap-1"><Film size={14} />{rule.trailer_count} {t('media:trailers.rules.trailers')}</span>
                           <span className="flex items-center gap-1"><Clock size={14} />{rule.frequency}</span>
-                          {rule.genres && rule.genres.length > 0 && <span>Genres: {rule.genres.join(', ')}</span>}
+                          {rule.genres && rule.genres.length > 0 && <span>{t('media:trailers.rules.genres', { genres: rule.genres.join(', ') })}</span>}
                         </div>
-                        {rule.last_run_at && <p className="text-xs text-dark-muted mt-2">Dernière exécution: {new Date(rule.last_run_at).toLocaleString()}</p>}
+                        {rule.last_run_at && <p className="text-xs text-dark-muted mt-2">{t('media:trailers.rules.lastRun', { date: new Date(rule.last_run_at).toLocaleString() })}</p>}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button variant="ghost" size="sm" onClick={() => runRuleMutation.mutate(rule.id)} disabled={runRuleMutation.isPending}>
                           <RefreshCw size={14} className={runRuleMutation.isPending ? 'animate-spin' : ''} />
-                          <span className="ml-1">Exécuter</span>
+                          <span className="ml-1">{t('media:trailers.rules.run')}</span>
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleEditRule(rule)}>
-                          <Settings size={14} /><span className="ml-1">Modifier</span>
+                          <Settings size={14} /><span className="ml-1">{t('media:trailers.rules.edit')}</span>
                         </Button>
                       </div>
                     </div>
@@ -498,29 +501,29 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
           ) : (
             <div className="text-center py-12">
               <Settings size={48} className="mx-auto text-dark-muted mb-4" />
-              <p className="text-dark-muted">Aucune règle configurée</p>
-              <Button className="mt-4" onClick={() => setIsRuleFormOpen(true)}>Créer une règle</Button>
+              <p className="text-dark-muted">{t('media:trailers.rules.empty.title')}</p>
+              <Button className="mt-4" onClick={() => setIsRuleFormOpen(true)}>{t('media:trailers.rules.empty.action')}</Button>
             </div>
           )}
         </>
       )}
 
       {/* Download Modal */}
-      <Modal isOpen={isDownloadOpen} onClose={() => setIsDownloadOpen(false)} title="Télécharger une bande-annonce">
+      <Modal isOpen={isDownloadOpen} onClose={() => setIsDownloadOpen(false)} title={t('media:trailers.download.title')}>
         <div className="space-y-4">
-          <Input label="Titre du film" value={downloadTitle} onChange={(e) => setDownloadTitle(e.target.value)} placeholder="Blade Runner 2049" />
-          <Input label="URL YouTube" value={downloadUrl} onChange={(e) => setDownloadUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
+          <Input label={t('media:trailers.download.movieTitle')} value={downloadTitle} onChange={(e) => setDownloadTitle(e.target.value)} placeholder={t('media:trailers.download.movieTitlePlaceholder')} />
+          <Input label={t('media:trailers.download.youtubeUrl')} value={downloadUrl} onChange={(e) => setDownloadUrl(e.target.value)} placeholder={t('media:trailers.download.youtubeUrlPlaceholder')} />
           <div className="flex justify-end gap-4 pt-4">
-            <Button variant="ghost" onClick={() => setIsDownloadOpen(false)}>Annuler</Button>
+            <Button variant="ghost" onClick={() => setIsDownloadOpen(false)}>{t('media:trailers.download.cancel')}</Button>
             <Button onClick={handleDownload} disabled={!downloadUrl || !downloadTitle || downloadMutation.isPending}>
-              {downloadMutation.isPending ? 'Téléchargement...' : 'Télécharger'}
+              {downloadMutation.isPending ? t('media:trailers.download.downloading') : t('media:trailers.download.download')}
             </Button>
           </div>
         </div>
       </Modal>
 
       {/* Rule Form Modal */}
-      <Modal isOpen={isRuleFormOpen} onClose={handleRuleFormClose} title={selectedRule ? 'Modifier la règle' : 'Créer une règle'} size="lg">
+      <Modal isOpen={isRuleFormOpen} onClose={handleRuleFormClose} title={selectedRule ? t('media:trailers.rules.modal.editTitle') : t('media:trailers.rules.modal.createTitle')} size="lg">
         <TrailerRuleForm rule={selectedRule || undefined} onSave={handleRuleFormClose} onCancel={handleRuleFormClose} />
       </Modal>
     </>
@@ -537,6 +540,7 @@ interface MediaTabProps {
 }
 
 function PreRollsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
+  const { t } = useTranslation('media');
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -570,7 +574,7 @@ function PreRollsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
   });
 
   const handleDelete = async (preroll: PreRollItem) => {
-    if (window.confirm(`Supprimer "${preroll.name}" ?`)) {
+    if (window.confirm(t('media:prerolls.deleteConfirm', { name: preroll.name }))) {
       await deleteMutation.mutateAsync(preroll.id);
     }
   };
@@ -589,10 +593,10 @@ function PreRollsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
       <div className="mb-4">
         <ButtonGroup
           options={[
-            { key: 'all' as const, label: 'Tous' },
-            { key: 'ready' as const, label: 'Prêt' },
-            { key: 'pending' as const, label: 'En cours' },
-            { key: 'error' as const, label: 'Erreur' },
+            { key: 'all' as const, label: t('media:prerolls.filters.all') },
+            { key: 'ready' as const, label: t('media:prerolls.filters.ready') },
+            { key: 'pending' as const, label: t('media:prerolls.filters.pending') },
+            { key: 'error' as const, label: t('media:prerolls.filters.error') },
           ]}
           value={filter}
           onChange={setFilter}
@@ -619,30 +623,30 @@ function PreRollsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
                   {/* Status badge */}
                   {preroll.status === 'ready' ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/15 text-green-400 flex-shrink-0">
-                      <CheckCircle size={10} />Prêt
+                      <CheckCircle size={10} />{t('media:prerolls.status.ready')}
                     </span>
                   ) : preroll.status === 'downloading' || preroll.status === 'processing' ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 flex-shrink-0">
                       <Loader2 size={10} className="animate-spin" />
-                      {((preroll.download_progress || 0) * 100).toFixed(0)}%
+                      {t('media:prerolls.status.downloading', { progress: ((preroll.download_progress || 0) * 100).toFixed(0) })}
                     </span>
                   ) : preroll.status === 'pending' ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/15 text-yellow-400 flex-shrink-0">
-                      <Clock size={10} />Attente
+                      <Clock size={10} />{t('media:prerolls.status.pending')}
                     </span>
                   ) : (
                     <span
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/15 text-red-400 flex-shrink-0 cursor-help"
-                      title={preroll.error_message || 'Erreur inconnue'}
+                      title={preroll.error_message || t('media:prerolls.status.unknownError')}
                     >
-                      <AlertCircle size={10} />Erreur
+                      <AlertCircle size={10} />{t('media:prerolls.status.error')}
                     </span>
                   )}
                 </div>
 
                 {/* Meta row */}
                 <div className="flex items-center gap-2 mt-0.5 text-xs text-dark-muted">
-                  <span className="flex-shrink-0">{preroll.source_type === 'youtube' ? 'YouTube' : 'Upload'}</span>
+                  <span className="flex-shrink-0">{preroll.source_type === 'youtube' ? t('media:prerolls.sourceType.youtube') : t('media:prerolls.sourceType.upload')}</span>
                   <span className="px-1.5 py-0.5 rounded bg-dark-bg border border-dark-border text-[10px] font-medium text-dark-text uppercase flex-shrink-0">
                     {preroll.format}
                   </span>
@@ -674,7 +678,7 @@ function PreRollsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
                 <button
                   onClick={() => handleDelete(preroll)}
                   className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                  title="Supprimer"
+                  title={t('media:prerolls.delete')}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -685,9 +689,9 @@ function PreRollsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
       ) : (
         <div className="text-center py-12">
           <Clapperboard size={48} className="mx-auto text-dark-muted mb-4" />
-          <p className="text-dark-muted">Aucun pré-roll dans la bibliothèque</p>
+          <p className="text-dark-muted">{t('media:prerolls.empty.title')}</p>
           <Button className="mt-4" onClick={() => setIsAddOpen(true)}>
-            Ajouter votre premier pré-roll
+            {t('media:prerolls.empty.action')}
           </Button>
         </div>
       )}
@@ -709,6 +713,7 @@ function PreRollsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
 // ============================================================================
 
 function AddPreRollModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { t } = useTranslation('media');
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<'upload' | 'youtube'>('upload');
   const [name, setName] = useState('');
@@ -793,7 +798,7 @@ function AddPreRollModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
   const isValid = mode === 'upload' ? (file && name) : (url && name);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Ajouter un pré-roll">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('media:prerolls.addModal.title')}>
       <div className="space-y-4">
         {/* Mode selector */}
         <div className="flex gap-2">
@@ -806,7 +811,7 @@ function AddPreRollModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
             }`}
           >
             <Upload size={18} />
-            Importer un fichier
+            {t('media:prerolls.addModal.uploadFile')}
           </button>
           <button
             onClick={() => setMode('youtube')}
@@ -817,31 +822,31 @@ function AddPreRollModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
             }`}
           >
             <Download size={18} />
-            YouTube
+            {t('media:prerolls.addModal.youtube')}
           </button>
         </div>
 
         {/* Name */}
         <Input
-          label="Nom"
+          label={t('media:prerolls.addModal.name')}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Nom du pré-roll"
+          placeholder={t('media:prerolls.addModal.namePlaceholder')}
         />
 
         {/* Tags */}
         <Input
-          label="Tags (optionnel, séparés par des virgules)"
+          label={t('media:prerolls.addModal.tags')}
           value={tags}
           onChange={(e) => setTags(e.target.value)}
-          placeholder="studio, intro, custom..."
+          placeholder={t('media:prerolls.addModal.tagsPlaceholder')}
         />
 
         {/* Upload mode */}
         {mode === 'upload' && (
           <div>
             <label className="block text-sm font-medium text-dark-text mb-2">
-              Fichier vidéo
+              {t('media:prerolls.addModal.videoFile')}
             </label>
             <input
               type="file"
@@ -860,28 +865,28 @@ function AddPreRollModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
         {/* YouTube mode */}
         {mode === 'youtube' && (
           <Input
-            label="URL YouTube"
+            label={t('media:prerolls.addModal.youtubeUrl')}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=..."
+            placeholder={t('media:prerolls.addModal.youtubeUrlPlaceholder')}
           />
         )}
 
         {/* Error */}
         {(uploadMutation.isError || downloadMutation.isError) && (
           <p className="text-red-400 text-sm">
-            Erreur : {((uploadMutation.error || downloadMutation.error) as Error)?.message || 'Une erreur est survenue'}
+            {t('media:prerolls.addModal.errorPrefix')} {((uploadMutation.error || downloadMutation.error) as Error)?.message || t('media:prerolls.addModal.errorDefault')}
           </p>
         )}
 
         {/* Actions */}
         <div className="flex justify-end gap-4 pt-2">
-          <Button variant="ghost" onClick={onClose}>Annuler</Button>
+          <Button variant="ghost" onClick={onClose}>{t('media:prerolls.addModal.cancel')}</Button>
           <Button onClick={handleSubmit} disabled={!isValid || isPending}>
             {isPending ? (
-              <><Loader2 size={16} className="mr-1 animate-spin" />{mode === 'upload' ? 'Import...' : 'Téléchargement...'}</>
+              <><Loader2 size={16} className="mr-1 animate-spin" />{mode === 'upload' ? t('media:prerolls.addModal.importing') : t('media:prerolls.addModal.downloading')}</>
             ) : (
-              <>{mode === 'upload' ? <><Upload size={16} className="mr-1" />Importer</> : <><Download size={16} className="mr-1" />Télécharger</>}</>
+              <>{mode === 'upload' ? <><Upload size={16} className="mr-1" />{t('media:prerolls.addModal.import')}</> : <><Download size={16} className="mr-1" />{t('media:prerolls.addModal.download')}</>}</>
             )}
           </Button>
         </div>
@@ -901,6 +906,7 @@ function formatDuration(seconds: number): string {
 }
 
 function SoundsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
+  const { t } = useTranslation('media');
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -936,7 +942,7 @@ function SoundsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
   });
 
   const handleDelete = async (sound: SoundItem) => {
-    if (window.confirm(`Supprimer "${sound.name}" ?`)) {
+    if (window.confirm(t('media:sounds.deleteConfirm', { name: sound.name }))) {
       await deleteMutation.mutateAsync(sound.id);
     }
   };
@@ -955,10 +961,10 @@ function SoundsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
       <div className="mb-4">
         <ButtonGroup
           options={[
-            { key: 'all' as const, label: 'Tous' },
-            { key: 'ready' as const, label: 'Prêt' },
-            { key: 'pending' as const, label: 'En cours' },
-            { key: 'error' as const, label: 'Erreur' },
+            { key: 'all' as const, label: t('media:sounds.filters.all') },
+            { key: 'ready' as const, label: t('media:sounds.filters.ready') },
+            { key: 'pending' as const, label: t('media:sounds.filters.pending') },
+            { key: 'error' as const, label: t('media:sounds.filters.error') },
           ]}
           value={filter}
           onChange={setFilter}
@@ -985,23 +991,23 @@ function SoundsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
                   {/* Status badge */}
                   {sound.status === 'ready' ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/15 text-green-400 flex-shrink-0">
-                      <CheckCircle size={10} />Prêt
+                      <CheckCircle size={10} />{t('media:sounds.status.ready')}
                     </span>
                   ) : sound.status === 'downloading' || sound.status === 'processing' ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 flex-shrink-0">
                       <Loader2 size={10} className="animate-spin" />
-                      {((sound.download_progress || 0) * 100).toFixed(0)}%
+                      {t('media:sounds.status.downloading', { progress: ((sound.download_progress || 0) * 100).toFixed(0) })}
                     </span>
                   ) : sound.status === 'pending' ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/15 text-yellow-400 flex-shrink-0">
-                      <Clock size={10} />Attente
+                      <Clock size={10} />{t('media:sounds.status.pending')}
                     </span>
                   ) : (
                     <span
                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/15 text-red-400 flex-shrink-0 cursor-help"
-                      title={sound.error_message || 'Erreur inconnue'}
+                      title={sound.error_message || t('media:sounds.status.unknownError')}
                     >
-                      <AlertCircle size={10} />Erreur
+                      <AlertCircle size={10} />{t('media:sounds.status.error')}
                     </span>
                   )}
                 </div>
@@ -1045,7 +1051,7 @@ function SoundsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
                 <button
                   onClick={() => handleDelete(sound)}
                   className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                  title="Supprimer"
+                  title={t('media:sounds.delete')}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -1056,9 +1062,9 @@ function SoundsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
       ) : (
         <div className="text-center py-12">
           <Music size={48} className="mx-auto text-dark-muted mb-4" />
-          <p className="text-dark-muted">Aucun son dans la bibliothèque</p>
+          <p className="text-dark-muted">{t('media:sounds.empty.title')}</p>
           <Button className="mt-4" onClick={() => setIsAddOpen(true)}>
-            Ajouter votre premier son
+            {t('media:sounds.empty.action')}
           </Button>
         </div>
       )}
@@ -1080,6 +1086,7 @@ function SoundsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
 // ============================================================================
 
 function AddSoundModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { t } = useTranslation('media');
   const queryClient = useQueryClient();
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
@@ -1193,33 +1200,33 @@ function AddSoundModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Ajouter un son" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('media:sounds.addModal.title')} size="lg">
       <div className="space-y-4">
         {/* Step 1: URL Input */}
         {step === 'url' && (
           <>
             <Input
-              label="URL YouTube"
+              label={t('media:sounds.addModal.youtubeUrl')}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=... ou URL de playlist"
+              placeholder={t('media:sounds.addModal.youtubeUrlPlaceholder')}
             />
             <div className="flex justify-end gap-4 pt-2">
-              <Button variant="ghost" onClick={onClose}>Annuler</Button>
+              <Button variant="ghost" onClick={onClose}>{t('media:sounds.addModal.cancel')}</Button>
               <Button
                 onClick={handleAnalyze}
                 disabled={!url.trim() || analyzeMutation.isPending}
               >
                 {analyzeMutation.isPending ? (
-                  <><Loader2 size={16} className="mr-1 animate-spin" />Analyse...</>
+                  <><Loader2 size={16} className="mr-1 animate-spin" />{t('media:sounds.addModal.analyzing')}</>
                 ) : (
-                  <><Search size={16} className="mr-1" />Analyser</>
+                  <><Search size={16} className="mr-1" />{t('media:sounds.addModal.analyze')}</>
                 )}
               </Button>
             </div>
             {analyzeMutation.isError && (
               <p className="text-red-400 text-sm">
-                Erreur : {(analyzeMutation.error as Error)?.message || 'Impossible d\'analyser l\'URL'}
+                {t('media:sounds.addModal.errorPrefix')} {(analyzeMutation.error as Error)?.message || t('media:sounds.addModal.analyzeError')}
               </p>
             )}
           </>
@@ -1230,24 +1237,24 @@ function AddSoundModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
           <>
             {/* Name */}
             <Input
-              label="Nom"
+              label={t('media:sounds.addModal.name')}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Nom du son"
+              placeholder={t('media:sounds.addModal.namePlaceholder')}
             />
 
             {/* Tags */}
             <Input
-              label="Tags (séparés par des virgules)"
+              label={t('media:sounds.addModal.tags')}
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="ambiance, musique, intro..."
+              placeholder={t('media:sounds.addModal.tagsPlaceholder')}
             />
 
             {/* Info */}
             <div className="text-sm text-dark-muted">
               <p><strong>{soundInfo.title}</strong></p>
-              {soundInfo.duration && <p>Durée : {formatDuration(Math.round(soundInfo.duration))}</p>}
+              {soundInfo.duration && <p>{t('media:sounds.addModal.duration', { duration: formatDuration(Math.round(soundInfo.duration)) })}</p>}
             </div>
 
             {/* Chapters */}
@@ -1255,13 +1262,13 @@ function AddSoundModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-dark-text">
-                    Chapitres ({selectedChapters.size}/{soundInfo.chapters.length})
+                    {t('media:sounds.addModal.chapters', { selected: selectedChapters.size, total: soundInfo.chapters.length })}
                   </label>
                   <button
                     onClick={toggleAllChapters}
                     className="text-xs text-theatarr-400 hover:text-theatarr-300"
                   >
-                    {selectedChapters.size === soundInfo.chapters.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                    {selectedChapters.size === soundInfo.chapters.length ? t('media:sounds.addModal.deselectAll') : t('media:sounds.addModal.selectAll')}
                   </button>
                 </div>
                 <div className="max-h-60 overflow-y-auto space-y-1 border border-dark-border rounded-lg p-2">
@@ -1292,13 +1299,13 @@ function AddSoundModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-dark-text">
-                    Pistes ({selectedEntries.size}/{soundInfo.entries.length})
+                    {t('media:sounds.addModal.tracks', { selected: selectedEntries.size, total: soundInfo.entries.length })}
                   </label>
                   <button
                     onClick={toggleAllEntries}
                     className="text-xs text-theatarr-400 hover:text-theatarr-300"
                   >
-                    {selectedEntries.size === soundInfo.entries.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                    {selectedEntries.size === soundInfo.entries.length ? t('media:sounds.addModal.deselectAll') : t('media:sounds.addModal.selectAll')}
                   </button>
                 </div>
                 <div className="max-h-60 overflow-y-auto space-y-1 border border-dark-border rounded-lg p-2">
@@ -1329,26 +1336,26 @@ function AddSoundModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
             {/* No chapters/playlist — single video */}
             {soundInfo.chapters.length === 0 && !soundInfo.is_playlist && (
               <p className="text-sm text-dark-muted">
-                Vidéo unique — l'audio complet sera extrait.
+                {t('media:sounds.addModal.singleVideo')}
               </p>
             )}
 
             <div className="flex justify-end gap-4 pt-2">
-              <Button variant="ghost" onClick={() => setStep('url')}>Retour</Button>
+              <Button variant="ghost" onClick={() => setStep('url')}>{t('media:sounds.addModal.back')}</Button>
               <Button
                 onClick={() => downloadMutation.mutate()}
                 disabled={downloadMutation.isPending}
               >
                 {downloadMutation.isPending ? (
-                  <><Loader2 size={16} className="mr-1 animate-spin" />Téléchargement...</>
+                  <><Loader2 size={16} className="mr-1 animate-spin" />{t('media:sounds.addModal.downloading')}</>
                 ) : (
-                  <><Download size={16} className="mr-1" />Télécharger</>
+                  <><Download size={16} className="mr-1" />{t('media:sounds.addModal.download')}</>
                 )}
               </Button>
             </div>
             {downloadMutation.isError && (
               <p className="text-red-400 text-sm">
-                Erreur : {(downloadMutation.error as Error)?.message || 'Échec du téléchargement'}
+                {t('media:sounds.addModal.errorPrefix')} {(downloadMutation.error as Error)?.message || t('media:sounds.addModal.downloadError')}
               </p>
             )}
           </>
@@ -1358,9 +1365,9 @@ function AddSoundModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
         {step === 'downloading' && (
           <div className="text-center py-8">
             <Music size={48} className="mx-auto text-theatarr-400 mb-4" />
-            <p className="text-dark-text font-medium">Téléchargement lancé !</p>
+            <p className="text-dark-text font-medium">{t('media:sounds.addModal.downloadStarted')}</p>
             <p className="text-dark-muted text-sm mt-1">
-              Les sons apparaîtront dans la bibliothèque une fois prêts.
+              {t('media:sounds.addModal.downloadStartedHint')}
             </p>
           </div>
         )}

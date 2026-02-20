@@ -4,9 +4,9 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Users, UserPlus, X, ChevronDown, ChevronUp, Check, Clock, XCircle } from 'lucide-react';
 import { apiClient } from '../../api/client';
-import { useLayoutStore } from '../../stores/layoutStore';
 import { Spinner } from '../common';
 
 interface User {
@@ -35,24 +35,11 @@ interface ParticipantsManagerProps {
 }
 
 export function ParticipantsManager({ sessionId, isNew }: ParticipantsManagerProps) {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation('sessions');
   const queryClient = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-
-  const t = {
-    participants: language === 'fr' ? 'Participants' : 'Participants',
-    addParticipant: language === 'fr' ? 'Ajouter un participant' : 'Add participant',
-    searchUser: language === 'fr' ? 'Rechercher un utilisateur...' : 'Search user...',
-    noParticipants: language === 'fr' ? 'Aucun participant' : 'No participants',
-    noResults: language === 'fr' ? 'Aucun résultat' : 'No results',
-    pending: language === 'fr' ? 'En attente' : 'Pending',
-    accepted: language === 'fr' ? 'Accepté' : 'Accepted',
-    declined: language === 'fr' ? 'Refusé' : 'Declined',
-    saveFirst: language === 'fr' ? 'Enregistrez d\'abord la session pour ajouter des participants' : 'Save the session first to add participants',
-    remove: language === 'fr' ? 'Retirer' : 'Remove',
-  };
 
   // Fetch participants
   const { data: participantsData, isLoading: isLoadingParticipants } = useQuery({
@@ -106,11 +93,11 @@ export function ParticipantsManager({ sessionId, isNew }: ParticipantsManagerPro
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'accepted':
-        return t.accepted;
+        return t('participantsManager.accepted');
       case 'declined':
-        return t.declined;
+        return t('participantsManager.declined');
       default:
-        return t.pending;
+        return t('participantsManager.pending');
     }
   };
 
@@ -129,7 +116,7 @@ export function ParticipantsManager({ sessionId, isNew }: ParticipantsManagerPro
       >
         <div className="flex items-center gap-2">
           <Users size={16} className="text-theatarr-500" />
-          <span className="text-sm font-medium text-dark-text">{t.participants}</span>
+          <span className="text-sm font-medium text-dark-text">{t('participantsManager.title')}</span>
           <span className="text-xs text-dark-muted">({participants.length})</span>
         </div>
         {isExpanded ? (
@@ -143,7 +130,7 @@ export function ParticipantsManager({ sessionId, isNew }: ParticipantsManagerPro
       {isExpanded && (
         <div className="border-t border-dark-border p-3 space-y-3">
           {isNew ? (
-            <p className="text-sm text-dark-muted text-center py-2">{t.saveFirst}</p>
+            <p className="text-sm text-dark-muted text-center py-2">{t('participantsManager.saveFirst')}</p>
           ) : (
             <>
               {/* Add participant search */}
@@ -152,7 +139,7 @@ export function ParticipantsManager({ sessionId, isNew }: ParticipantsManagerPro
                   <UserPlus size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
                   <input
                     type="text"
-                    placeholder={t.searchUser}
+                    placeholder={t('participantsManager.searchUser')}
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
@@ -195,7 +182,7 @@ export function ParticipantsManager({ sessionId, isNew }: ParticipantsManagerPro
                         ))}
                       </div>
                     ) : (
-                      <div className="p-3 text-center text-sm text-dark-muted">{t.noResults}</div>
+                      <div className="p-3 text-center text-sm text-dark-muted">{t('participantsManager.noResults')}</div>
                     )}
                   </div>
                 )}
@@ -232,7 +219,7 @@ export function ParticipantsManager({ sessionId, isNew }: ParticipantsManagerPro
                         onClick={() => removeParticipantMutation.mutate(participant.user_id)}
                         disabled={removeParticipantMutation.isPending}
                         className="p-1.5 text-dark-muted hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                        title={t.remove}
+                        title={t('participantsManager.remove')}
                       >
                         <X size={14} />
                       </button>
@@ -240,7 +227,7 @@ export function ParticipantsManager({ sessionId, isNew }: ParticipantsManagerPro
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-dark-muted text-center py-2">{t.noParticipants}</p>
+                <p className="text-sm text-dark-muted text-center py-2">{t('participantsManager.noParticipants')}</p>
               )}
             </>
           )}

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Film, Search, RefreshCw, Filter, Star, Clock } from 'lucide-react';
-import { Button, Card, Input, Spinner, Modal } from '../components/common';
+import { useTranslation } from 'react-i18next';
+import { Film, Search, Star, Clock } from 'lucide-react';
+import { Button, Spinner, Modal } from '../components/common';
 import { apiClient } from '../api/client';
 
 interface Movie {
@@ -28,6 +29,7 @@ interface MoviesResponse {
 }
 
 export function MoviesPage() {
+  const { t } = useTranslation(['media', 'common']);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string>('');
@@ -47,8 +49,7 @@ export function MoviesPage() {
       if (selectedGenre) {
         params.append('genre', selectedGenre);
       }
-      const response = await apiClient.get(`/movies?${params}`);
-      return response.data;
+      return apiClient.get<MoviesResponse>(`/movies?${params}`);
     },
   });
 
@@ -56,8 +57,7 @@ export function MoviesPage() {
   const { data: genres } = useQuery<string[]>({
     queryKey: ['genres'],
     queryFn: async () => {
-      const response = await apiClient.get('/movies/genres/list');
-      return response.data;
+      return apiClient.get<string[]>('/movies/genres/list');
     },
   });
 
@@ -78,8 +78,8 @@ export function MoviesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Movies</h1>
-          <p className="text-gray-500 mt-1">Browse movies from your media library</p>
+          <h1 className="text-3xl font-bold">{t('media:movies.title')}</h1>
+          <p className="text-gray-500 mt-1">{t('media:movies.subtitle')}</p>
         </div>
       </div>
 
@@ -92,7 +92,7 @@ export function MoviesPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search movies..."
+              placeholder={t('media:movies.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -107,7 +107,7 @@ export function MoviesPage() {
             }}
             className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            <option value="">All Genres</option>
+            <option value="">{t('media:movies.allGenres')}</option>
             {genres.map((genre) => (
               <option key={genre} value={genre}>
                 {genre}
@@ -171,7 +171,7 @@ export function MoviesPage() {
                 </div>
                 <div className="mt-2">
                   <div className="font-medium text-sm truncate">{movie.title}</div>
-                  <div className="text-xs text-gray-500">{movie.year || 'Unknown year'}</div>
+                  <div className="text-xs text-gray-500">{movie.year || t('media:movies.unknownYear')}</div>
                 </div>
               </button>
             ))}
@@ -186,7 +186,7 @@ export function MoviesPage() {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
-                Previous
+                {t('media:movies.previous')}
               </Button>
               <span className="text-sm text-gray-400">
                 Page {page} of {moviesData.total_pages}
@@ -197,7 +197,7 @@ export function MoviesPage() {
                 onClick={() => setPage((p) => Math.min(moviesData.total_pages, p + 1))}
                 disabled={page === moviesData.total_pages}
               >
-                Next
+                {t('media:movies.next')}
               </Button>
             </div>
           )}
@@ -205,9 +205,9 @@ export function MoviesPage() {
       ) : (
         <div className="text-center py-12">
           <Film size={48} className="mx-auto text-gray-600 mb-4" />
-          <p className="text-gray-500">No movies found</p>
+          <p className="text-gray-500">{t('media:movies.noMovies')}</p>
           <p className="text-sm text-gray-600 mt-2">
-            Connect a media service (Plex, Jellyfin) to see your library
+            {t('media:movies.connectService')}
           </p>
         </div>
       )}
@@ -280,7 +280,7 @@ export function MoviesPage() {
                     {selectedMovie.source_id && ` (${selectedMovie.source_id})`}
                   </div>
                   {selectedMovie.has_trailer && (
-                    <div className="text-xs text-green-400 mt-1">Trailer available</div>
+                    <div className="text-xs text-green-400 mt-1">{t('media:movies.trailerAvailable')}</div>
                   )}
                 </div>
               </div>
@@ -300,9 +300,9 @@ export function MoviesPage() {
             {/* Actions */}
             <div className="flex justify-end gap-4">
               <Button variant="ghost" onClick={() => setSelectedMovie(null)}>
-                Close
+                {t('media:movies.close')}
               </Button>
-              <Button>Create Session</Button>
+              <Button>{t('media:movies.createSession')}</Button>
             </div>
           </div>
         )}

@@ -1,0 +1,273 @@
+{
+  "config": {
+    "title": "Einstellungen",
+    "subtitle": "Allgemeine Anwendungskonfiguration",
+    "tabs": {
+      "settings": "Einstellungen",
+      "export": "Exportieren",
+      "import": "Importieren"
+    },
+    "actions": {
+      "reset": "Zurücksetzen",
+      "save": "Speichern",
+      "saving": "Speichern..."
+    },
+    "settings": {
+      "enabled": "Aktiviert",
+      "customSettings": "Benutzerdefinierte Einstellungen",
+      "noCustomSettings": "Keine benutzerdefinierten Einstellungen. Klicken Sie auf \"Hinzufügen\", um eine zu erstellen.",
+      "settingKey": "Einstellungsschlüssel",
+      "settingValue": "Wert (JSON oder Text)",
+      "unsavedChanges": "Ungespeicherte Änderungen",
+      "allSaved": "Alle Änderungen gespeichert",
+      "emailTestPlaceholder": "Test-E-Mail-Adresse",
+      "emailSending": "Wird gesendet...",
+      "emailTest": "Testen",
+      "emailSuccess": "E-Mail erfolgreich gesendet",
+      "emailSaveFirst": "Speichern Sie zuerst Ihre SMTP-Einstellungen, geben Sie dann eine Adresse ein und klicken Sie auf Testen."
+    },
+    "export": {
+      "title": "Konfiguration exportieren",
+      "description": "Exportieren Sie Ihre Konfiguration einschließlich Sitzungen, Dienste, Vorlagen und Einstellungen.",
+      "items": {
+        "sessions": "Sitzungen",
+        "services": "Dienste",
+        "templates": "Vorlagen",
+        "trailers": "Trailer"
+      },
+      "includeInExport": "In Export einbeziehen",
+      "optionSessions": "Sitzungen",
+      "optionSessionsDesc": "Sitzungskonfigurationen und Sequenzen",
+      "optionServices": "Dienste",
+      "optionServicesDesc": "Verbundene Dienste und Zugangsdaten",
+      "optionTemplates": "Vorlagen",
+      "optionTemplatesDesc": "Benutzerdefinierte Wandanzeige-Vorlagen",
+      "optionTrailerRules": "Trailer-Regeln",
+      "optionTrailerRulesDesc": "Auto-Download-Konfigurationen",
+      "optionSettings": "Einstellungen",
+      "optionSettingsDesc": "Anwendungseinstellungen",
+      "encryptSensitiveData": "Sensible Daten verschlüsseln",
+      "encryptedDesc": "API-Schlüssel und Passwörter werden verschlüsselt",
+      "unencryptedWarning": "WARNUNG: Sensible Daten werden im Klartext exportiert",
+      "encryptionPassword": "Verschlüsselungspasswort",
+      "enterStrongPassword": "Geben Sie ein sicheres Passwort ein",
+      "confirmPassword": "Passwort bestätigen",
+      "confirmPasswordPlaceholder": "Passwort bestätigen",
+      "passwordRequired": "Passwort ist für die Verschlüsselung erforderlich",
+      "passwordMinLength": "Passwort muss mindestens 8 Zeichen lang sein",
+      "passwordMismatch": "Passwörter stimmen nicht überein",
+      "passwordNote": "Dieses Passwort wird benötigt, um die Konfiguration mit entschlüsselten Geheimnissen zu importieren. Bewahren Sie es sicher auf.",
+      "exporting": "Wird exportiert...",
+      "exportConfiguration": "Konfiguration exportieren",
+      "exportFailed": "Export fehlgeschlagen. Bitte versuchen Sie es erneut."
+    },
+    "import": {
+      "title": "Konfiguration importieren",
+      "description": "Konfiguration aus einem exportierten Backup wiederherstellen.",
+      "startImport": "Import starten",
+      "processTitle": "Importvorgang",
+      "steps": {
+        "selectFile": "1. Datei auswählen",
+        "selectFileDesc": "Exportierte Konfigurationsdatei",
+        "preview": "2. Änderungen prüfen",
+        "previewDesc": "Änderungen überprüfen",
+        "resolve": "3. Konflikte lösen",
+        "resolveDesc": "Vorhandene Einträge behandeln",
+        "apply": "4. Import anwenden",
+        "applyDesc": "Konfiguration importiert"
+      },
+      "results": {
+        "sessions": "Sitzungen",
+        "services": "Dienste",
+        "templates": "Vorlagen",
+        "trailerRules": "Trailer-Regeln",
+        "created": "Erstellt:",
+        "updated": "Aktualisiert:",
+        "skipped": "Übersprungen:",
+        "settingsUpdated": "Einstellungen aktualisiert",
+        "errors": "Fehler",
+        "done": "Fertig"
+      },
+      "dropZone": "Konfigurationsdatei hier ablegen",
+      "or": "oder",
+      "browseFiles": "Dateien durchsuchen",
+      "validFile": "Gültige Konfigurationsdatei",
+      "remove": "Entfernen",
+      "encryptedConfig": "Verschlüsselte Konfiguration",
+      "encryptedConfigDesc": "Diese Konfiguration enthält verschlüsselte Geheimnisse. Geben Sie das Passwort ein, um sie beim Import zu entschlüsseln.",
+      "decryptionPassword": "Entschlüsselungspasswort",
+      "enterExportPassword": "Exportpasswort eingeben",
+      "cancel": "Abbrechen",
+      "analyzing": "Wird analysiert...",
+      "previewImport": "Import-Vorschau",
+      "analysisFailed": "Datei konnte nicht analysiert werden. Stellen Sie sicher, dass es sich um einen gültigen Theatarr-Konfigurationsexport handelt.",
+      "readyToImport": "Bereit zum Import",
+      "noConflicts": "Keine Konflikte erkannt. Überprüfen Sie die Änderungen unten und fahren Sie mit dem Import fort.",
+      "toCreate": "zu erstellen",
+      "toUpdate": "zu aktualisieren",
+      "settingsWillBeUpdated": "Anwendungseinstellungen werden aktualisiert",
+      "importConfiguration": "Konfiguration importieren",
+      "back": "Zurück",
+      "conflictsDetected": "{{count}} Konflikt erkannt",
+      "conflictsDetected_other": "{{count}} Konflikte erkannt",
+      "conflictsDescription": "Einige Einträge im Import existieren bereits. Wählen Sie, wie jeder Konflikt behandelt werden soll.",
+      "applyAndImport": "Anwenden & Importieren",
+      "importingConfig": "Konfiguration wird importiert...",
+      "importingWait": "Dies kann einen Moment dauern",
+      "importComplete": "Import abgeschlossen",
+      "importSuccess": "Die Konfiguration wurde erfolgreich importiert.",
+      "importWithWarnings": "Import mit Warnungen abgeschlossen",
+      "importPartial": "Einige Einträge konnten nicht importiert werden. Siehe Details unten.",
+      "modalTitle": "Konfiguration importieren"
+    }
+  },
+  "users": {
+    "title": "Benutzer",
+    "subtitle": "Konten und Berechtigungen verwalten",
+    "filters": {
+      "all": "Alle",
+      "admin": "Admin",
+      "user": "Benutzer"
+    },
+    "newUser": "Neuer Benutzer",
+    "roles": {
+      "user": "Benutzer",
+      "admin": "Administrator"
+    },
+    "badges": {
+      "admin": "Admin",
+      "inactive": "Inaktiv"
+    },
+    "neverConnected": "Nie angemeldet",
+    "empty": {
+      "title": "Keine Benutzer",
+      "description": "Erstellen Sie Ihren ersten Benutzer, um zu beginnen."
+    },
+    "form": {
+      "username": "Benutzername *",
+      "password": "Passwort *",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "email": "E-Mail",
+      "role": "Rolle"
+    },
+    "validation": {
+      "usernameRequired": "Benutzername ist erforderlich",
+      "passwordRequired": "Passwort ist erforderlich",
+      "passwordMinLength": "Passwort muss mindestens 6 Zeichen lang sein"
+    },
+    "modal": {
+      "editTitle": "Benutzer bearbeiten",
+      "createTitle": "Neuer Benutzer",
+      "cancel": "Abbrechen",
+      "saving": "Speichern...",
+      "edit": "Bearbeiten",
+      "create": "Erstellen"
+    },
+    "passwordModal": {
+      "title": "Passwort ändern",
+      "newPassword": "Neues Passwort",
+      "minChars": "Mindestens 6 Zeichen",
+      "cancel": "Abbrechen",
+      "changing": "Wird geändert...",
+      "change": "Ändern"
+    },
+    "actions": {
+      "edit": "Bearbeiten",
+      "changePassword": "Passwort ändern",
+      "activate": "Aktivieren",
+      "deactivate": "Deaktivieren",
+      "delete": "Löschen"
+    },
+    "deleteConfirm": "Benutzer \"{{username}}\" löschen?"
+  },
+  "logs": {
+    "title": "Systemprotokolle",
+    "entries": "Einträge",
+    "autoRefresh": "Automatische Aktualisierung",
+    "live": "Live",
+    "paused": "Pausiert",
+    "search": "Suchen...",
+    "noLogs": "Keine Protokolle",
+    "loadingEvents": "Ereignisse werden geladen...",
+    "categories": {
+      "all": "Alle",
+      "scheduler": "Planer",
+      "sessions": "Sitzungen",
+      "vote": "Abstimmung",
+      "services": "Dienste",
+      "enrichment": "Anreicherung",
+      "movies": "Filme",
+      "auth": "Auth",
+      "system": "System"
+    },
+    "levels": {
+      "all": "Alle",
+      "debug": "DEBUG",
+      "info": "INFO",
+      "warning": "WARN",
+      "error": "ERROR"
+    }
+  },
+  "history": {
+    "title": "Verlauf",
+    "totalPlayback": "{{hours}}h Gesamtwiedergabe",
+    "last7days": "Letzte 7 Tage",
+    "filters": {
+      "all": "Alle",
+      "completed": "Abgeschlossen",
+      "running": "Läuft",
+      "paused": "Pausiert",
+      "interrupted": "Unterbrochen"
+    },
+    "status": {
+      "completed": "Abgeschlossen",
+      "running": "Läuft",
+      "paused": "Pausiert",
+      "stopped": "Gestoppt",
+      "interrupted": "Unterbrochen",
+      "draft": "Entwurf",
+      "scheduled": "Geplant"
+    },
+    "labels": {
+      "start": "Start:",
+      "duration": "Dauer:",
+      "end": "Ende:",
+      "sequences": "Sequenzen:",
+      "id": "ID:"
+    },
+    "noEvents": "Keine Ereignisse aufgezeichnet (Sitzung lief vor Aktivierung der Aufzeichnung)",
+    "events": {
+      "sessionStarted": "Sitzung gestartet",
+      "sessionPaused": "Sitzung pausiert",
+      "sessionResumed": "Sitzung fortgesetzt",
+      "sessionStopped": "Sitzung gestoppt",
+      "sessionCompleted": "Sitzung abgeschlossen",
+      "sessionInterrupted": "Sitzung unterbrochen",
+      "sequenceStarted": "Sequenz gestartet",
+      "sequenceCompleted": "Sequenz abgeschlossen",
+      "sequenceSkipped": "Sequenz übersprungen",
+      "actionExecuted": "Aktion ausgeführt",
+      "trailerResolved": "Trailer aufgelöst",
+      "prerollResolved": "Vorfilm aufgelöst",
+      "playbackEnded": "Wiedergabe beendet",
+      "displayConnected": "Anzeige verbunden",
+      "displayDisconnected": "Anzeige getrennt",
+      "noEventsForSession": "Keine Ereignisse für diese Sitzung aufgezeichnet"
+    },
+    "empty": "Kein Verlauf gefunden",
+    "pagination": {
+      "previous": "Zurück",
+      "next": "Weiter",
+      "pageOf": "Seite {{page}} von {{total}}"
+    }
+  },
+  "login": {
+    "subtitle": "Heimkino-Orchestrierung",
+    "username": "Benutzername",
+    "usernamePlaceholder": "Benutzernamen eingeben",
+    "password": "Passwort",
+    "passwordPlaceholder": "Passwort eingeben",
+    "signIn": "Anmelden"
+  }
+}

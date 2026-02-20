@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Hls from 'hls.js';
 import { TemplateRenderer } from '../components/wallmount';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -82,6 +83,7 @@ interface DisplayLayer {
 // ============================================================================
 
 function CodeInput() {
+  const { t } = useTranslation(['media', 'common']);
   const navigate = useNavigate();
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +143,7 @@ function CodeInput() {
 
   const validateCodeDirect = async (code: string) => {
     if (code.length !== 6) {
-      setError('Entrez les 6 caracteres');
+      setError(t('media:display.enterAllChars'));
       return;
     }
 
@@ -152,7 +154,7 @@ function CodeInput() {
       const res = await fetch(`${API_BASE}/api/v1/display/${code}`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.detail || 'Code invalide');
+        setError(data.detail || t('media:display.invalidCode'));
         return;
       }
       // Unlock audio for later video playback (must happen within user gesture)
@@ -171,7 +173,7 @@ function CodeInput() {
       }
       navigate(`/display/${code}`);
     } catch {
-      setError('Erreur de connexion au serveur');
+      setError(t('media:display.connectionError'));
     } finally {
       setIsValidating(false);
     }
@@ -190,12 +192,12 @@ function CodeInput() {
       <div className="mb-12">
         <h1 className="text-5xl font-bold text-white/90 tracking-wider">THEATARR</h1>
         <p className="text-center text-white/40 mt-2 text-sm tracking-widest uppercase">
-          Session Display
+          {t('media:display.sessionDisplay')}
         </p>
       </div>
 
       {/* Code label */}
-      <p className="text-white/60 text-lg mb-6">Entrez le code de session</p>
+      <p className="text-white/60 text-lg mb-6">{t('media:display.enterCode')}</p>
 
       {/* Code inputs */}
       <div className="flex gap-3 mb-8" onPaste={handlePaste}>
@@ -233,13 +235,13 @@ function CodeInput() {
       {isValidating && (
         <div className="flex items-center gap-2 text-white/50">
           <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
-          <span>Validation...</span>
+          <span>{t('media:display.validating')}</span>
         </div>
       )}
 
       {/* Help */}
       <p className="text-white/20 text-xs mt-12">
-        Le code est affiche dans les details de la session
+        {t('media:display.codeHint')}
       </p>
     </div>
   );
@@ -250,6 +252,7 @@ function CodeInput() {
 // ============================================================================
 
 function SessionDisplay() {
+  const { t } = useTranslation(['media', 'common']);
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const audioEngine = useAudioEngine();
@@ -312,13 +315,13 @@ function SessionDisplay() {
       try {
         const res = await fetch(`${API_BASE}/api/v1/display/${code.toUpperCase()}`);
         if (!res.ok) {
-          setError('Code invalide ou session introuvable');
+          setError(t('media:display.invalidOrNotFound'));
           return;
         }
         const data = await res.json();
         setSession(data);
       } catch {
-        setError('Erreur de connexion au serveur');
+        setError(t('media:display.connectionError'));
       } finally {
         setIsLoading(false);
       }
@@ -1214,12 +1217,12 @@ function SessionDisplay() {
   if (error || !session) {
     return (
       <div className="w-screen h-screen bg-gradient-to-b from-[#0a0a1a] to-[#0f0f2a] flex flex-col items-center justify-center gap-4">
-        <p className="text-red-400 text-lg">{error || 'Session introuvable'}</p>
+        <p className="text-red-400 text-lg">{error || t('media:display.sessionNotFound')}</p>
         <button
           onClick={() => navigate('/display')}
           className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
         >
-          Retour
+          {t('media:display.back')}
         </button>
       </div>
     );
@@ -1275,7 +1278,7 @@ function SessionDisplay() {
               className="absolute bottom-8 right-8 px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-full transition-all flex items-center gap-2 text-lg"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-              Activer le son
+              {t('media:display.enableSound')}
             </button>
           )}
         </div>
@@ -1297,13 +1300,13 @@ function SessionDisplay() {
           <div className="text-center">
             <p className="text-white/30 text-sm uppercase tracking-widest mb-2">
               {session.session_status === 'draft'
-                ? 'En attente du lancement'
+                ? t('media:display.status.draft')
                 : session.session_status === 'scheduled'
-                  ? 'Session programmee'
+                  ? t('media:display.status.scheduled')
                   : session.session_status === 'paused'
-                    ? 'Session en pause'
+                    ? t('media:display.status.paused')
                     : session.session_status === 'completed'
-                      ? 'Session terminee'
+                      ? t('media:display.status.completed')
                       : ''}
             </p>
             <h2 className="text-2xl font-semibold text-white/50">
@@ -1323,7 +1326,7 @@ function SessionDisplay() {
               : 'bottom-4 left-4 px-4 py-2 bg-black/60 hover:bg-black/80 border border-white/10 text-white/60 hover:text-white rounded-lg text-sm'
           }`}
         >
-          Plein ecran
+          {t('media:display.fullscreen')}
         </button>
       )}
 
@@ -1331,7 +1334,7 @@ function SessionDisplay() {
       {session.session_status === 'paused' && displayLayers.length > 0 && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
           <p className="text-white/60 text-lg uppercase tracking-widest">
-            Session en pause
+            {t('media:display.sessionPaused')}
           </p>
         </div>
       )}
@@ -1344,7 +1347,7 @@ function SessionDisplay() {
           }`}
         />
         <span className="text-white/50 text-xs">
-          {isConnected ? 'Connecte' : 'Connexion...'}
+          {isConnected ? t('media:display.connected') : t('media:display.connecting')}
         </span>
         {audioEngine.isPlaying && (
           <span className="text-blue-400/60 text-xs ml-1">&#9835;</span>

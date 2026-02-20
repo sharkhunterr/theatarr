@@ -5,9 +5,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, Globe, Sun, Moon, User, LogOut, ChevronDown, UserCircle, Monitor } from 'lucide-react';
+import { Menu, Sun, Moon, User, LogOut, ChevronDown, UserCircle, Monitor } from 'lucide-react';
 import clsx from 'clsx';
-import { useLayoutStore } from '../../stores/layoutStore';
+import { useTranslation } from 'react-i18next';
+import { useLayoutStore, type Language } from '../../stores/layoutStore';
 import { useAuthStore } from '../../stores/authStore';
 
 interface TopBarProps {
@@ -43,7 +44,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
       <div className="flex items-center gap-1">
         <LanguageSelector language={language} setLanguage={setLanguage} />
         <ThemeToggle theme={theme} setTheme={setTheme} />
-        <UserDropdown user={user} logout={logout} language={language} />
+        <UserDropdown user={user} logout={logout} />
       </div>
     </header>
   );
@@ -51,8 +52,8 @@ export function TopBar({ onMenuClick }: TopBarProps) {
 
 // Language Selector Component
 interface LanguageSelectorProps {
-  language: 'en' | 'fr';
-  setLanguage: (lang: 'en' | 'fr') => void;
+  language: string;
+  setLanguage: (lang: Language) => void;
 }
 
 function LanguageSelector({ language, setLanguage }: LanguageSelectorProps) {
@@ -69,9 +70,12 @@ function LanguageSelector({ language, setLanguage }: LanguageSelectorProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const languages = [
-    { code: 'en' as const, label: 'English', flag: 'EN' },
-    { code: 'fr' as const, label: 'Francais', flag: 'FR' },
+  const languages: { code: Language; label: string; flag: string }[] = [
+    { code: 'fr', label: 'Français', flag: '\u{1F1EB}\u{1F1F7}' },
+    { code: 'en', label: 'English', flag: '\u{1F1EC}\u{1F1E7}' },
+    { code: 'it', label: 'Italiano', flag: '\u{1F1EE}\u{1F1F9}' },
+    { code: 'es', label: 'Español', flag: '\u{1F1EA}\u{1F1F8}' },
+    { code: 'de', label: 'Deutsch', flag: '\u{1F1E9}\u{1F1EA}' },
   ];
 
   const current = languages.find((l) => l.code === language);
@@ -82,8 +86,7 @@ function LanguageSelector({ language, setLanguage }: LanguageSelectorProps) {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 h-9 px-2.5 rounded-lg hover:bg-dark-border/50 transition-colors text-sm font-medium"
       >
-        <Globe className="h-4 w-4" />
-        <span className="hidden sm:inline">{current?.flag}</span>
+        <span className="text-base">{current?.flag}</span>
       </button>
 
       {open && (
@@ -96,10 +99,11 @@ function LanguageSelector({ language, setLanguage }: LanguageSelectorProps) {
                 setOpen(false);
               }}
               className={clsx(
-                'w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors',
+                'w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2',
                 language === lang.code && 'text-theatarr-500'
               )}
             >
+              <span>{lang.flag}</span>
               {lang.label}
             </button>
           ))}
@@ -116,6 +120,7 @@ interface ThemeToggleProps {
 }
 
 function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
+  const { t } = useTranslation('admin');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -130,9 +135,9 @@ function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
   }, []);
 
   const options = [
-    { key: 'light' as const, label: 'Clair', icon: Sun },
-    { key: 'dark' as const, label: 'Sombre', icon: Moon },
-    { key: 'system' as const, label: 'Systeme', icon: Monitor },
+    { key: 'light' as const, label: t('topBar.themeLight'), icon: Sun },
+    { key: 'dark' as const, label: t('topBar.themeDark'), icon: Moon },
+    { key: 'system' as const, label: t('topBar.themeSystem'), icon: Monitor },
   ];
 
   const currentIcon = theme === 'system' ? Monitor : theme === 'dark' ? Moon : Sun;
@@ -176,10 +181,10 @@ function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
 interface UserDropdownProps {
   user: { username: string } | null;
   logout: () => void;
-  language: 'en' | 'fr';
 }
 
-function UserDropdown({ user, logout, language }: UserDropdownProps) {
+function UserDropdown({ user, logout }: UserDropdownProps) {
+  const { t } = useTranslation('admin');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -192,10 +197,6 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const logoutLabel = language === 'fr' ? 'Deconnexion' : 'Logout';
-  const portalLabel = language === 'fr' ? 'Portail Utilisateur' : 'User Portal';
-  const wallmountLabel = language === 'fr' ? 'Wallmount' : 'Wallmount';
 
   return (
     <div ref={ref} className="relative">
@@ -214,7 +215,7 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
         <div className="absolute right-0 mt-2 w-48 bg-dark-surface border border-dark-border rounded-lg shadow-lg py-1 z-50">
           <div className="px-4 py-2 border-b border-dark-border">
             <p className="text-sm font-medium text-dark-text">{user?.username}</p>
-            <p className="text-xs text-dark-muted">Administrator</p>
+            <p className="text-xs text-dark-muted">{t('topBar.administrator')}</p>
           </div>
           <Link
             to="/portal"
@@ -222,7 +223,7 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
             className="w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2 text-theatarr-500"
           >
             <UserCircle className="h-4 w-4" />
-            {portalLabel}
+            {t('topBar.userPortal')}
           </Link>
           <a
             href="/wallmount"
@@ -232,7 +233,7 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
             className="w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2 text-dark-text"
           >
             <Monitor className="h-4 w-4" />
-            {wallmountLabel}
+            Wallmount
           </a>
           <div className="border-t border-dark-border my-1" />
           <button
@@ -243,7 +244,7 @@ function UserDropdown({ user, logout, language }: UserDropdownProps) {
             className="w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2 text-red-400"
           >
             <LogOut className="h-4 w-4" />
-            {logoutLabel}
+            {t('topBar.logout')}
           </button>
         </div>
       )}

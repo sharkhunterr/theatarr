@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Zap, Eye, EyeOff, UserCheck, Lock, Users, Vote, Clock, Calendar,
   Search, Check, Link2, UserPlus,
@@ -24,6 +25,7 @@ interface UserItem {
 }
 
 export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
+  const { t } = useTranslation('votes');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [movieOptions, setMovieOptions] = useState<MovieOption[]>([]);
@@ -107,7 +109,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
     },
     onError: (error: any) => {
       console.error('Create vote session error:', error);
-      const message = error?.message || 'Erreur lors de la création du vote';
+      const message = error?.message || t('voteForm.errorCreate');
       setErrorMessage(message);
     },
   });
@@ -127,12 +129,12 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
     setErrorMessage(null);
 
     if (!name.trim()) {
-      setErrorMessage('Le nom de la session est requis');
+      setErrorMessage(t('voteForm.nameRequired'));
       return;
     }
 
     if (movieOptions.length < 2) {
-      setErrorMessage('Veuillez ajouter au moins 2 films');
+      setErrorMessage(t('voteForm.minMoviesError'));
       return;
     }
 
@@ -158,28 +160,28 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
         {/* Error Message */}
         {(createMutation.error || errorMessage) && (
           <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
-            {errorMessage || 'Erreur lors de la création. Veuillez réessayer.'}
+            {errorMessage || t('voteForm.errorRetry')}
           </div>
         )}
 
       {/* Basic Info */}
       <div className="space-y-4">
         <Input
-          label="Nom de la session"
+          label={t('voteForm.name')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
-          placeholder="Ex: Soirée film du samedi"
+          placeholder={t('voteForm.namePlaceholder')}
         />
 
         <div>
           <label className="block text-sm font-medium text-dark-text mb-1">
-            Description (optionnel)
+            {t('voteForm.description')}
           </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Quel film voulez-vous regarder ce soir ?"
+            placeholder={t('voteForm.descriptionPlaceholder')}
             className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:ring-2 focus:ring-theatarr-500 focus:border-transparent"
             rows={2}
           />
@@ -188,7 +190,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
 
       {/* Movie Selection */}
       <div>
-        <h3 className="text-lg font-semibold text-dark-text mb-4">Films</h3>
+        <h3 className="text-lg font-semibold text-dark-text mb-4">{t('voteForm.movies')}</h3>
         <MovieSelector
           selectedMovies={movieOptions}
           onSelect={handleAddMovie}
@@ -201,17 +203,17 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
       <div className="border-t border-dark-border pt-6">
         <h3 className="flex items-center gap-2 text-lg font-semibold text-dark-text mb-4">
           <Users size={16} />
-          Participants
+          {t('voteForm.participants')}
         </h3>
 
         {/* Registered Users */}
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <UserPlus size={14} className="text-dark-muted" />
-            <span className="text-sm font-medium text-dark-text">Utilisateurs enregistres</span>
+            <span className="text-sm font-medium text-dark-text">{t('voteForm.registeredUsers')}</span>
             {selectedUserIds.size > 0 && (
               <span className="text-xs bg-theatarr-500/20 text-theatarr-400 px-2 py-0.5 rounded-full">
-                {selectedUserIds.size} selectionne{selectedUserIds.size > 1 ? 's' : ''}
+                {selectedUserIds.size} {selectedUserIds.size > 1 ? t('voteForm.selectedPlural') : t('voteForm.selected')}
               </span>
             )}
           </div>
@@ -223,7 +225,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
               type="text"
               value={userSearch}
               onChange={(e) => setUserSearch(e.target.value)}
-              placeholder="Rechercher un utilisateur..."
+              placeholder={t('voteForm.searchUser')}
               className="w-full pl-9 pr-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm text-dark-text placeholder-dark-muted focus:outline-none focus:ring-2 focus:ring-theatarr-500 focus:border-transparent"
             />
           </div>
@@ -235,7 +237,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
               onClick={selectAllFiltered}
               className="text-xs text-theatarr-400 hover:text-theatarr-300 transition-colors"
             >
-              Tout selectionner
+              {t('voteForm.selectAll')}
             </button>
             {selectedUserIds.size > 0 && (
               <>
@@ -245,7 +247,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
                   onClick={deselectAll}
                   className="text-xs text-dark-muted hover:text-dark-text transition-colors"
                 >
-                  Tout deselectionner
+                  {t('voteForm.deselectAll')}
                 </button>
               </>
             )}
@@ -295,7 +297,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
               })
             ) : (
               <div className="px-3 py-4 text-sm text-dark-muted text-center">
-                {userSearch ? 'Aucun utilisateur trouve' : 'Aucun utilisateur enregistre'}
+                {userSearch ? t('voteForm.noUserFound') : t('voteForm.noRegisteredUser')}
               </div>
             )}
           </div>
@@ -305,10 +307,10 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Link2 size={14} className="text-dark-muted" />
-            <span className="text-sm font-medium text-dark-text">Liens de vote (tokens)</span>
+            <span className="text-sm font-medium text-dark-text">{t('voteForm.voteLinks')}</span>
           </div>
           <p className="text-[10px] text-dark-muted mb-2">
-            Generez des liens partageables pour inviter des votants sans compte
+            {t('voteForm.voteLinksHelp')}
           </p>
           <div className="flex items-center gap-3">
             <input
@@ -320,7 +322,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
               className="w-20 bg-dark-surface border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text text-center focus:outline-none focus:ring-2 focus:ring-theatarr-500 focus:border-transparent"
             />
             <span className="text-sm text-dark-muted">
-              {generateTokenCount === 0 ? 'Aucun lien' : `${generateTokenCount} lien${generateTokenCount > 1 ? 's' : ''} a generer`}
+              {generateTokenCount === 0 ? t('voteForm.noLinks') : `${generateTokenCount} ${t('voteForm.linksToGenerate')}`}
             </span>
           </div>
         </div>
@@ -328,7 +330,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
 
       {/* Voting Options */}
       <div className="border-t border-dark-border pt-6">
-        <h3 className="text-lg font-semibold text-dark-text mb-4">Parametres</h3>
+        <h3 className="text-lg font-semibold text-dark-text mb-4">{t('voteForm.settings')}</h3>
 
         {/* Options grid */}
         <div className="grid grid-cols-2 gap-2">
@@ -355,8 +357,8 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
                 )} />
               </div>
             </div>
-            <div className="text-xs font-medium text-dark-text">Ouvrir immediatement</div>
-            <div className="text-[10px] text-dark-muted">Le vote demarre des la creation</div>
+            <div className="text-xs font-medium text-dark-text">{t('voteForm.openImmediately')}</div>
+            <div className="text-[10px] text-dark-muted">{t('voteForm.openImmediatelyHelp')}</div>
           </button>
 
           {/* Show Results */}
@@ -386,8 +388,8 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
                 )} />
               </div>
             </div>
-            <div className="text-xs font-medium text-dark-text">Resultats visibles</div>
-            <div className="text-[10px] text-dark-muted">Afficher pendant le vote</div>
+            <div className="text-xs font-medium text-dark-text">{t('voteForm.showResults')}</div>
+            <div className="text-[10px] text-dark-muted">{t('voteForm.showResultsHelp')}</div>
           </button>
 
           {/* Anonymous */}
@@ -413,8 +415,8 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
                 )} />
               </div>
             </div>
-            <div className="text-xs font-medium text-dark-text">Vote anonyme</div>
-            <div className="text-[10px] text-dark-muted">Les votes sont anonymises</div>
+            <div className="text-xs font-medium text-dark-text">{t('voteForm.anonymous')}</div>
+            <div className="text-[10px] text-dark-muted">{t('voteForm.anonymousHelp')}</div>
           </button>
 
           {/* Require Token */}
@@ -440,8 +442,8 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
                 )} />
               </div>
             </div>
-            <div className="text-xs font-medium text-dark-text">Acces restreint</div>
-            <div className="text-[10px] text-dark-muted">Les votants doivent etre invites</div>
+            <div className="text-xs font-medium text-dark-text">{t('voteForm.restrictedAccess')}</div>
+            <div className="text-[10px] text-dark-muted">{t('voteForm.restrictedAccessHelp')}</div>
           </button>
 
           {/* Max Votes */}
@@ -457,8 +459,8 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
                 className="w-12 bg-dark-surface border border-dark-border rounded px-2 py-0.5 text-xs text-dark-text text-center"
               />
             </div>
-            <div className="text-xs font-medium text-dark-text">Votes max</div>
-            <div className="text-[10px] text-dark-muted">Par participant</div>
+            <div className="text-xs font-medium text-dark-text">{t('voteForm.maxVotes')}</div>
+            <div className="text-[10px] text-dark-muted">{t('voteForm.perParticipant')}</div>
           </div>
         </div>
       </div>
@@ -467,7 +469,7 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
       <div className="border-t border-dark-border pt-6">
         <h3 className="flex items-center gap-2 text-lg font-semibold text-dark-text mb-4">
           <Clock size={16} />
-          Cloture
+          {t('voteForm.closure')}
         </h3>
 
         {/* Close when all voted */}
@@ -483,8 +485,8 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
         >
           <Users size={16} className={closeWhenAllVoted ? 'text-blue-400 flex-shrink-0' : 'text-dark-muted flex-shrink-0'} />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-dark-text">Cloture automatique</div>
-            <div className="text-[10px] text-dark-muted">Fermer quand tous ont vote</div>
+            <div className="text-xs font-medium text-dark-text">{t('voteForm.autoCloseAllVoted')}</div>
+            <div className="text-[10px] text-dark-muted">{t('voteForm.autoCloseAllVotedHelp')}</div>
           </div>
           <div className={clsx(
             'w-8 h-4 rounded-full transition-colors relative flex-shrink-0',
@@ -501,14 +503,14 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-xs text-dark-muted">
             <Calendar size={12} />
-            Cloture programmee
+            {t('voteForm.scheduledClose')}
           </label>
           <Input
             type="datetime-local"
             value={closesAt}
             onChange={(e) => setClosesAt(e.target.value)}
           />
-          <p className="text-[10px] text-dark-muted">Cloturer le vote a cette date/heure</p>
+          <p className="text-[10px] text-dark-muted">{t('voteForm.scheduledCloseHelp')}</p>
         </div>
       </div>
 
@@ -517,13 +519,13 @@ export function VoteSessionForm({ onSave, onCancel }: VoteSessionFormProps) {
       {/* Actions - Sticky at bottom */}
       <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 mt-6 border-t border-dark-border bg-dark-surface sticky bottom-0">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Annuler
+          {t('voteForm.cancel')}
         </Button>
         <Button
           type="submit"
           disabled={createMutation.isPending || !name || movieOptions.length < 2}
         >
-          {createMutation.isPending ? 'Création...' : 'Créer le vote'}
+          {createMutation.isPending ? t('voteForm.creating') : t('voteForm.createVote')}
         </Button>
       </div>
     </form>

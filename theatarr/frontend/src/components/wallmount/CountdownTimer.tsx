@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface CountdownTimerProps {
   targetDate: string | Date;
@@ -31,6 +32,7 @@ export function CountdownTimer({
   showLabels = true,
   animate = true,
 }: CountdownTimerProps) {
+  const { t } = useTranslation(['portal']);
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0, total: 0 });
   const [prevSeconds, setPrevSeconds] = useState(0);
 
@@ -82,8 +84,9 @@ export function CountdownTimer({
 
   const padNumber = (num: number) => num.toString().padStart(2, '0');
 
+  const secLabel = t('portal:wallmount.countdown.seconds');
   const renderDigit = (value: number, label: string) => {
-    const isChanging = animate && label === 'sec' && value !== prevSeconds;
+    const isChanging = animate && label === secLabel && value !== prevSeconds;
 
     return (
       <div className="flex flex-col items-center">
@@ -122,7 +125,7 @@ export function CountdownTimer({
         className={`${sizeClasses[size]} font-bold animate-pulse`}
         style={{ color: palette?.accent || '#22c55e' }}
       >
-        Starting...
+        {t('portal:wallmount.countdown.starting')}
       </div>
     );
   }
@@ -131,17 +134,17 @@ export function CountdownTimer({
     <div className="flex items-center justify-center">
       {timeLeft.days > 0 && (
         <>
-          {renderDigit(timeLeft.days, 'days')}
+          {renderDigit(timeLeft.days, t('portal:wallmount.countdown.days'))}
           {renderSeparator()}
         </>
       )}
-      {renderDigit(timeLeft.hours, 'hrs')}
+      {renderDigit(timeLeft.hours, t('portal:wallmount.countdown.hours'))}
       {renderSeparator()}
-      {renderDigit(timeLeft.minutes, 'min')}
+      {renderDigit(timeLeft.minutes, t('portal:wallmount.countdown.minutes'))}
       {showSeconds && (
         <>
           {renderSeparator()}
-          {renderDigit(timeLeft.seconds, 'sec')}
+          {renderDigit(timeLeft.seconds, t('portal:wallmount.countdown.seconds'))}
         </>
       )}
     </div>

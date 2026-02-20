@@ -1,10 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, Input } from '../common';
 import { LightingActionForm } from './actions/LightingActionForm';
 import { AudioActionForm } from './actions/AudioActionForm';
 import { MediaActionForm } from './actions/MediaActionForm';
 import { DisplayActionForm } from './actions/DisplayActionForm';
-import { useLayoutStore } from '../../stores/layoutStore';
 import type { Action } from './SequenceEditor';
 
 interface ActionEditorProps {
@@ -14,34 +14,22 @@ interface ActionEditorProps {
   compact?: boolean;
 }
 
-const actionTypeLabels = {
-  lighting: { en: 'Lighting', fr: 'Éclairage' },
-  audio: { en: 'Audio', fr: 'Audio' },
-  display: { en: 'Display', fr: 'Affichage' },
-  media: { en: 'Media', fr: 'Média' },
-  actuator: { en: 'Actuator', fr: 'Actionneur' },
+const actionTypeKeys: Record<string, string> = {
+  lighting: 'sessions:actionTypes.lighting',
+  audio: 'sessions:actionTypes.audio',
+  display: 'sessions:actionTypes.display',
+  media: 'sessions:actionTypes.media',
+  actuator: 'sessions:actionTypes.actuator',
 };
 
-const onFailureOptions = [
-  { value: 'warn', en: 'Warn and continue', fr: 'Avertir et continuer' },
-  { value: 'skip', en: 'Skip silently', fr: 'Ignorer' },
-  { value: 'abort', en: 'Abort session', fr: 'Interrompre' },
+const onFailureKeys: { value: string; key: string }[] = [
+  { value: 'warn', key: 'sessions:actionEditor.warn' },
+  { value: 'skip', key: 'sessions:actionEditor.skip' },
+  { value: 'abort', key: 'sessions:actionEditor.abort' },
 ];
 
 export function ActionEditor({ action, onUpdate, onDelete, compact = false }: ActionEditorProps) {
-  const { language } = useLayoutStore();
-
-  const t = {
-    editAction: language === 'fr' ? 'Modifier l\'action' : 'Edit Action',
-    delete: language === 'fr' ? 'Supprimer' : 'Delete',
-    basicSettings: language === 'fr' ? 'Paramètres de base' : 'Basic Settings',
-    actionType: language === 'fr' ? 'Type d\'action' : 'Action Type',
-    delay: language === 'fr' ? 'Délai (ms)' : 'Delay (ms)',
-    onFailure: language === 'fr' ? 'En cas d\'échec' : 'On Failure',
-    parameters: language === 'fr' ? 'Paramètres' : 'Parameters',
-    device: language === 'fr' ? 'Appareil' : 'Device',
-    command: language === 'fr' ? 'Commande' : 'Command',
-  };
+  const { t } = useTranslation(['sessions', 'common']);
 
   const handleTypeChange = (action_type: Action['action_type']) => {
     const defaultCommands = {
@@ -62,14 +50,11 @@ export function ActionEditor({ action, onUpdate, onDelete, compact = false }: Ac
     onUpdate({ parameters });
   };
 
-  const getLabel = (type: keyof typeof actionTypeLabels) =>
-    language === 'fr' ? actionTypeLabels[type].fr : actionTypeLabels[type].en;
-
   if (compact) {
     return (
       <div className="p-2 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-dark-text">{t.editAction}</span>
+          <span className="text-xs font-medium text-dark-text">{t('sessions:actionEditor.editAction')}</span>
           <Button variant="danger" size="sm" onClick={onDelete} className="!p-1">
             <Trash2 size={12} />
           </Button>
@@ -81,9 +66,9 @@ export function ActionEditor({ action, onUpdate, onDelete, compact = false }: Ac
             onChange={(e) => handleTypeChange(e.target.value as Action['action_type'])}
             className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-dark-text"
           >
-            {Object.entries(actionTypeLabels).map(([value, labels]) => (
+            {Object.entries(actionTypeKeys).map(([value, key]) => (
               <option key={value} value={value}>
-                {language === 'fr' ? labels.fr : labels.en}
+                {t(key)}
               </option>
             ))}
           </select>
@@ -96,16 +81,16 @@ export function ActionEditor({ action, onUpdate, onDelete, compact = false }: Ac
               className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-dark-text"
               min="0"
               step="100"
-              placeholder={t.delay}
+              placeholder={t('sessions:actionEditor.delayMs')}
             />
             <select
               value={action.on_failure}
               onChange={(e) => onUpdate({ on_failure: e.target.value as Action['on_failure'] })}
               className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-dark-text"
             >
-              {onFailureOptions.map((opt) => (
+              {onFailureKeys.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {language === 'fr' ? opt.fr : opt.en}
+                  {t(opt.key)}
                 </option>
               ))}
             </select>
@@ -119,30 +104,30 @@ export function ActionEditor({ action, onUpdate, onDelete, compact = false }: Ac
     <div className="p-3 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-dark-text">{t.editAction}</h3>
+        <h3 className="text-sm font-semibold text-dark-text">{t('sessions:actionEditor.editAction')}</h3>
         <Button variant="danger" size="sm" onClick={onDelete} className="!px-2 !py-1 text-xs">
           <Trash2 size={12} className="mr-1" />
-          {t.delete}
+          {t('common:actions.delete')}
         </Button>
       </div>
 
       {/* Basic Settings */}
       <Card>
         <CardHeader className="!py-2">
-          <h4 className="text-xs font-medium text-dark-text">{t.basicSettings}</h4>
+          <h4 className="text-xs font-medium text-dark-text">{t('sessions:actionEditor.basicSettings')}</h4>
         </CardHeader>
         <CardContent className="space-y-3 !p-3">
           {/* Action Type */}
           <div>
-            <label className="block text-xs font-medium text-dark-text mb-1">{t.actionType}</label>
+            <label className="block text-xs font-medium text-dark-text mb-1">{t('sessions:actionEditor.actionType')}</label>
             <select
               value={action.action_type}
               onChange={(e) => handleTypeChange(e.target.value as Action['action_type'])}
               className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1.5 text-xs text-dark-text"
             >
-              {Object.entries(actionTypeLabels).map(([value, labels]) => (
+              {Object.entries(actionTypeKeys).map(([value, key]) => (
                 <option key={value} value={value}>
-                  {language === 'fr' ? labels.fr : labels.en}
+                  {t(key)}
                 </option>
               ))}
             </select>
@@ -151,7 +136,7 @@ export function ActionEditor({ action, onUpdate, onDelete, compact = false }: Ac
           {/* Delay & On Failure */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-dark-text mb-1">{t.delay}</label>
+              <label className="block text-xs font-medium text-dark-text mb-1">{t('sessions:actionEditor.delayMs')}</label>
               <input
                 type="number"
                 value={action.delay_ms}
@@ -163,15 +148,15 @@ export function ActionEditor({ action, onUpdate, onDelete, compact = false }: Ac
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-dark-text mb-1">{t.onFailure}</label>
+              <label className="block text-xs font-medium text-dark-text mb-1">{t('sessions:actionEditor.onFailure')}</label>
               <select
                 value={action.on_failure}
                 onChange={(e) => onUpdate({ on_failure: e.target.value as Action['on_failure'] })}
                 className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1.5 text-xs text-dark-text"
               >
-                {onFailureOptions.map((opt) => (
+                {onFailureKeys.map((opt) => (
                   <option key={opt.value} value={opt.value}>
-                    {language === 'fr' ? opt.fr : opt.en}
+                    {t(opt.key)}
                   </option>
                 ))}
               </select>
@@ -183,7 +168,7 @@ export function ActionEditor({ action, onUpdate, onDelete, compact = false }: Ac
       {/* Type-specific Parameters */}
       <Card>
         <CardHeader className="!py-2">
-          <h4 className="text-xs font-medium text-dark-text">{getLabel(action.action_type)} {t.parameters}</h4>
+          <h4 className="text-xs font-medium text-dark-text">{t(actionTypeKeys[action.action_type])} {t('sessions:actionEditor.parameters')}</h4>
         </CardHeader>
         <CardContent className="!p-3">
           {action.action_type === 'lighting' && (
@@ -221,7 +206,7 @@ export function ActionEditor({ action, onUpdate, onDelete, compact = false }: Ac
           {action.action_type === 'actuator' && (
             <div className="space-y-3">
               <Input
-                label={t.device}
+                label={t('sessions:actionEditor.device')}
                 value={(action.parameters.device as string) || ''}
                 onChange={(e) =>
                   handleParametersChange({ ...action.parameters, device: e.target.value })
@@ -229,7 +214,7 @@ export function ActionEditor({ action, onUpdate, onDelete, compact = false }: Ac
                 placeholder="e.g., projector"
               />
               <Input
-                label={t.command}
+                label={t('sessions:actionEditor.command')}
                 value={action.command}
                 onChange={(e) => onUpdate({ command: e.target.value })}
                 placeholder="e.g., power_on"

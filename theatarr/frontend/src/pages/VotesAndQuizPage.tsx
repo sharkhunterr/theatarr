@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { PageHeader, ButtonGroup, Button } from '../components/common';
 import { VoteSessionManager } from './VoteSessionManager';
 import { QuizSessionManager } from './QuizSessionManager';
-import { useLayoutStore } from '../stores/layoutStore';
 
 type Tab = 'votes' | 'quiz';
 
 export function VotesAndQuizPage() {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['votes', 'common']);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as Tab) || 'votes';
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -30,27 +30,18 @@ export function VotesAndQuizPage() {
     setAiQuizOpen(false);
   }, [tab]);
 
-  const t = {
-    title: 'Votes & Quiz',
-    subtitle: language === 'fr'
-      ? 'Gérez vos sessions de vote et quiz interactifs'
-      : 'Manage your vote sessions and interactive quizzes',
-    newVote: language === 'fr' ? 'Nouveau vote' : 'New vote',
-    newQuiz: language === 'fr' ? 'Nouveau quiz' : 'New quiz',
-  };
-
   return (
     <div>
       <PageHeader
-        title={t.title}
-        subtitle={t.subtitle}
+        title={t('votes:page.title')}
+        subtitle={t('votes:page.subtitle')}
       />
 
       <div className="flex items-center justify-between mb-6">
         <ButtonGroup
           options={[
-            { key: 'votes' as Tab, label: language === 'fr' ? 'Votes' : 'Votes' },
-            { key: 'quiz' as Tab, label: 'Quiz' },
+            { key: 'votes' as Tab, label: t('votes:page.tabVotes') },
+            { key: 'quiz' as Tab, label: t('votes:page.tabQuiz') },
           ]}
           value={tab}
           onChange={setTab}
@@ -59,12 +50,12 @@ export function VotesAndQuizPage() {
           {tab === 'quiz' && (
             <Button size="sm" variant="secondary" onClick={() => setAiQuizOpen(true)} className="h-9">
               <Sparkles className="h-4 w-4" />
-              <span className="ml-1.5">IA</span>
+              <span className="ml-1.5">{t('votes:page.ai')}</span>
             </Button>
           )}
           <Button size="sm" onClick={() => setCreateOpen(true)} className="h-9">
             <Plus className="h-4 w-4" />
-            <span className="ml-1.5">{tab === 'votes' ? t.newVote : t.newQuiz}</span>
+            <span className="ml-1.5">{tab === 'votes' ? t('votes:page.newVote') : t('votes:page.newQuiz')}</span>
           </Button>
         </div>
       </div>

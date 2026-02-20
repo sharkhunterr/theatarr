@@ -26,11 +26,13 @@
     "date-fns": "^3.3.1",
     "hls.js": "^1.6.15",
     "html5-qrcode": "^2.3.8",
+    "i18next": "^25.8.11",
     "lucide-react": "^0.312.0",
     "node-vibrant": "^3.1.6",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-i18next": "^16.5.4",
     "react-router-dom": "^6.21.3",
     "reactflow": "^11.10.3",
     "zustand": "^4.5.0"

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Search, Film, X, Plus, Vote, Link as LinkIcon, Zap, Eye, EyeOff, UserCheck, Lock, Users, Calendar, Clock } from 'lucide-react';
 import clsx from 'clsx';
 import { Spinner } from '../common';
 import { apiClient } from '../../api/client';
-import { useLayoutStore } from '../../stores/layoutStore';
 
 interface MovieOption {
   title: string;
@@ -67,48 +67,13 @@ export function VoteModeConfig({
 }: VoteModeConfigProps) {
   // sessionName is available for future use (e.g., auto-naming vote session)
   void _sessionName;
-  const { language } = useLayoutStore();
+  const { t } = useTranslation('sessions');
   const [movieSearchQuery, setMovieSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   // When editing, config is pre-loaded from linked vote → show full edit view
   const [showLinkExisting, setShowLinkExisting] = useState(
     !!linkedVoteSessionId && config.movie_options.length === 0
   );
-
-  const t = {
-    title: language === 'fr' ? 'Configuration du vote' : 'Vote Configuration',
-    addMovies: language === 'fr' ? 'Ajouter des films au vote' : 'Add movies to vote',
-    searchPlaceholder: language === 'fr' ? 'Rechercher un film...' : 'Search for a movie...',
-    noResults: language === 'fr' ? 'Aucun résultat' : 'No results',
-    movieOptions: language === 'fr' ? 'Options de film' : 'Movie Options',
-    minMovies: language === 'fr' ? 'Minimum 2 films requis' : 'Minimum 2 movies required',
-    settings: language === 'fr' ? 'Paramètres' : 'Settings',
-    maxVotes: language === 'fr' ? 'Votes max par personne' : 'Max votes per person',
-    allowMultiple: language === 'fr' ? 'Autoriser plusieurs votes' : 'Allow multiple votes',
-    requireToken: language === 'fr' ? 'Requiert un token' : 'Require token',
-    requireTokenDesc: language === 'fr' ? 'Les votants doivent etre invites' : 'Voters must be invited',
-    showResults: language === 'fr' ? 'Resultats visibles' : 'Show results',
-    showResultsDesc: language === 'fr' ? 'Afficher les resultats pendant le vote' : 'Display results during voting',
-    anonymous: language === 'fr' ? 'Vote anonyme' : 'Anonymous voting',
-    anonymousDesc: language === 'fr' ? 'Les votes sont anonymises' : 'Votes are anonymized',
-    linkExisting: language === 'fr' ? 'Lier un vote existant' : 'Link existing vote',
-    createNew: language === 'fr' ? 'Créer un nouveau vote' : 'Create new vote',
-    selectVoteSession: language === 'fr' ? 'Sélectionner un vote' : 'Select a vote',
-    noVoteSessions: language === 'fr' ? 'Aucun vote disponible' : 'No votes available',
-    unlink: language === 'fr' ? 'Délier' : 'Unlink',
-    linkedTo: language === 'fr' ? 'Lié à' : 'Linked to',
-    openImmediately: language === 'fr' ? 'Ouvrir immediatement' : 'Open immediately',
-    openImmediatelyDesc: language === 'fr' ? 'Le vote demarre des la creation' : 'Voting starts on creation',
-    closeWhenAllVoted: language === 'fr' ? 'Cloture automatique' : 'Auto-close',
-    closeWhenAllVotedDesc: language === 'fr' ? 'Fermer quand tous ont vote' : 'Close when everyone voted',
-    closesAt: language === 'fr' ? 'Cloture programmee' : 'Scheduled close',
-    closesAtHelp: language === 'fr' ? 'Cloturer le vote a cette date/heure' : 'Close voting at this date/time',
-    revealTiming: language === 'fr' ? 'Revelation du resultat' : 'Result reveal timing',
-    revealImmediate: language === 'fr' ? 'Immediate' : 'Immediate',
-    revealImmediateDesc: language === 'fr' ? 'Reveler le film des la cloture' : 'Reveal movie as soon as vote closes',
-    revealScheduled: language === 'fr' ? 'Programmee' : 'Scheduled',
-    revealScheduledDesc: language === 'fr' ? 'Reveler le film a une date precise' : 'Reveal movie at a specific date',
-  };
 
   // Movie search query
   const { data: movieSearchResults, isLoading: isSearchingMovies } = useQuery<Array<{
@@ -227,7 +192,7 @@ export function VoteModeConfig({
             }`}
           >
             <Plus size={14} />
-            {t.createNew}
+            {t('sessions:voteMode.createNew')}
           </button>
           <button
             type="button"
@@ -239,7 +204,7 @@ export function VoteModeConfig({
             }`}
           >
             <LinkIcon size={14} />
-            {t.linkExisting}
+            {t('sessions:voteMode.linkExisting')}
           </button>
         </div>
       )}
@@ -250,7 +215,7 @@ export function VoteModeConfig({
           <div className="flex items-center gap-2">
             <LinkIcon size={14} className="text-theatarr-500" />
             <span className="text-xs text-dark-text">
-              {t.linkedTo}: <span className="font-mono text-dark-muted">{linkedVoteSessionId.slice(0, 8)}...</span>
+              {t('sessions:voteMode.linkedTo')}: <span className="font-mono text-dark-muted">{linkedVoteSessionId.slice(0, 8)}...</span>
             </span>
           </div>
           <button
@@ -258,7 +223,7 @@ export function VoteModeConfig({
             onClick={() => onLinkVoteSession?.(null)}
             className="text-xs text-red-400 hover:text-red-300"
           >
-            {t.unlink}
+            {t('sessions:voteMode.unlink')}
           </button>
         </div>
       )}
@@ -271,20 +236,20 @@ export function VoteModeConfig({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Vote size={16} className="text-theatarr-500" />
-                  <span className="text-sm text-dark-text">{t.linkedTo}: {linkedVoteSessionId}</span>
+                  <span className="text-sm text-dark-text">{t('sessions:voteMode.linkedTo')}: {linkedVoteSessionId}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => onLinkVoteSession?.(null)}
                   className="text-xs text-red-400 hover:text-red-300"
                 >
-                  {t.unlink}
+                  {t('sessions:voteMode.unlink')}
                 </button>
               </div>
             </div>
           ) : (
             <div className="space-y-2">
-              <label className="text-sm text-dark-muted">{t.selectVoteSession}</label>
+              <label className="text-sm text-dark-muted">{t('sessions:voteMode.selectVoteSession')}</label>
               {voteSessions?.items && voteSessions.items.length > 0 ? (
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {voteSessions.items
@@ -313,7 +278,7 @@ export function VoteModeConfig({
                 </div>
               ) : (
                 <div className="text-sm text-dark-muted text-center py-4">
-                  {t.noVoteSessions}
+                  {t('sessions:voteMode.noVoteSessions')}
                 </div>
               )}
             </div>
@@ -324,12 +289,12 @@ export function VoteModeConfig({
         <>
           {/* Movie Search */}
           <div className="space-y-2">
-            <label className="text-sm text-dark-muted">{t.addMovies}</label>
+            <label className="text-sm text-dark-muted">{t('sessions:voteMode.addMovies')}</label>
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
               <input
                 type="text"
-                placeholder={t.searchPlaceholder}
+                placeholder={t('sessions:voteMode.searchPlaceholder')}
                 value={movieSearchQuery}
                 onChange={(e) => { setMovieSearchQuery(e.target.value); setIsSearchOpen(true); }}
                 onFocus={() => setIsSearchOpen(true)}
@@ -364,7 +329,7 @@ export function VoteModeConfig({
                       ))}
                     </div>
                   ) : (
-                    <div className="p-4 text-center text-dark-muted text-sm">{t.noResults}</div>
+                    <div className="p-4 text-center text-dark-muted text-sm">{t('sessions:voteMode.noResults')}</div>
                   )}
                 </div>
               )}
@@ -374,9 +339,9 @@ export function VoteModeConfig({
           {/* Movie Options List */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm text-dark-muted">{t.movieOptions}</label>
+              <label className="text-sm text-dark-muted">{t('sessions:voteMode.movieOptions')}</label>
               {config.movie_options.length < 2 && (
-                <span className="text-xs text-yellow-500">{t.minMovies}</span>
+                <span className="text-xs text-yellow-500">{t('sessions:voteMode.minMovies')}</span>
               )}
             </div>
             {config.movie_options.length > 0 ? (
@@ -409,14 +374,14 @@ export function VoteModeConfig({
               </div>
             ) : (
               <div className="text-sm text-dark-muted text-center py-4 border border-dashed border-dark-border rounded-lg">
-                {t.addMovies}
+                {t('sessions:voteMode.addMovies')}
               </div>
             )}
           </div>
 
           {/* Vote Settings */}
           <div className="space-y-3 pt-3 border-t border-dark-border">
-            <h4 className="text-sm font-medium text-dark-text">{t.settings}</h4>
+            <h4 className="text-sm font-medium text-dark-text">{t('sessions:voteMode.settings')}</h4>
 
             {/* Options grid */}
             <div className="grid grid-cols-2 gap-2">
@@ -443,8 +408,8 @@ export function VoteModeConfig({
                     )} />
                   </div>
                 </div>
-                <div className="text-xs font-medium text-dark-text">{t.openImmediately}</div>
-                <div className="text-[10px] text-dark-muted">{t.openImmediatelyDesc}</div>
+                <div className="text-xs font-medium text-dark-text">{t('sessions:voteMode.openImmediately')}</div>
+                <div className="text-[10px] text-dark-muted">{t('sessions:voteMode.openImmediatelyDesc')}</div>
               </button>
 
               {/* Show Results */}
@@ -474,8 +439,8 @@ export function VoteModeConfig({
                     )} />
                   </div>
                 </div>
-                <div className="text-xs font-medium text-dark-text">{t.showResults}</div>
-                <div className="text-[10px] text-dark-muted">{t.showResultsDesc}</div>
+                <div className="text-xs font-medium text-dark-text">{t('sessions:voteMode.showResults')}</div>
+                <div className="text-[10px] text-dark-muted">{t('sessions:voteMode.showResultsDesc')}</div>
               </button>
 
               {/* Anonymous */}
@@ -501,8 +466,8 @@ export function VoteModeConfig({
                     )} />
                   </div>
                 </div>
-                <div className="text-xs font-medium text-dark-text">{t.anonymous}</div>
-                <div className="text-[10px] text-dark-muted">{t.anonymousDesc}</div>
+                <div className="text-xs font-medium text-dark-text">{t('sessions:voteMode.anonymous')}</div>
+                <div className="text-[10px] text-dark-muted">{t('sessions:voteMode.anonymousDesc')}</div>
               </button>
 
               {/* Require Token */}
@@ -528,8 +493,8 @@ export function VoteModeConfig({
                     )} />
                   </div>
                 </div>
-                <div className="text-xs font-medium text-dark-text">{t.requireToken}</div>
-                <div className="text-[10px] text-dark-muted">{t.requireTokenDesc}</div>
+                <div className="text-xs font-medium text-dark-text">{t('sessions:voteMode.requireToken')}</div>
+                <div className="text-[10px] text-dark-muted">{t('sessions:voteMode.requireTokenDesc')}</div>
               </button>
 
               {/* Max Votes */}
@@ -545,9 +510,9 @@ export function VoteModeConfig({
                     className="w-12 bg-dark-surface border border-dark-border rounded px-2 py-0.5 text-xs text-dark-text text-center"
                   />
                 </div>
-                <div className="text-xs font-medium text-dark-text">{t.maxVotes}</div>
+                <div className="text-xs font-medium text-dark-text">{t('sessions:voteMode.maxVotes')}</div>
                 <div className="text-[10px] text-dark-muted">
-                  {language === 'fr' ? 'Par participant' : 'Per participant'}
+                  {t('sessions:voteMode.perParticipant')}
                 </div>
               </div>
             </div>
@@ -557,7 +522,7 @@ export function VoteModeConfig({
           <div className="space-y-3 pt-3 border-t border-dark-border">
             <h4 className="flex items-center gap-2 text-sm font-medium text-dark-text">
               <Clock size={14} />
-              {language === 'fr' ? 'Cloture & Revelation' : 'Closing & Reveal'}
+              {t('sessions:voteMode.closingAndReveal')}
             </h4>
 
             {/* Close when all voted */}
@@ -573,8 +538,8 @@ export function VoteModeConfig({
             >
               <Users size={16} className={config.close_when_all_voted ? 'text-blue-400 flex-shrink-0' : 'text-dark-muted flex-shrink-0'} />
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-dark-text">{t.closeWhenAllVoted}</div>
-                <div className="text-[10px] text-dark-muted">{t.closeWhenAllVotedDesc}</div>
+                <div className="text-xs font-medium text-dark-text">{t('sessions:voteMode.closeWhenAllVoted')}</div>
+                <div className="text-[10px] text-dark-muted">{t('sessions:voteMode.closeWhenAllVotedDesc')}</div>
               </div>
               <div className={clsx(
                 'w-8 h-4 rounded-full transition-colors relative flex-shrink-0',
@@ -591,7 +556,7 @@ export function VoteModeConfig({
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-xs text-dark-muted">
                 <Calendar size={12} />
-                {t.closesAt}
+                {t('sessions:voteMode.closesAt')}
               </label>
               <input
                 type="datetime-local"
@@ -602,7 +567,7 @@ export function VoteModeConfig({
                 })}
                 className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text text-sm"
               />
-              <p className="text-[10px] text-dark-muted">{t.closesAtHelp}</p>
+              <p className="text-[10px] text-dark-muted">{t('sessions:voteMode.closesAtHelp')}</p>
             </div>
 
             {/* Reveal Timing */}
@@ -610,7 +575,7 @@ export function VoteModeConfig({
               <div className="space-y-2 pt-2 border-t border-dark-border/50">
                 <label className="flex items-center gap-2 text-xs text-dark-muted">
                   <Eye size={12} />
-                  {t.revealTiming}
+                  {t('sessions:voteMode.revealTiming')}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -624,8 +589,8 @@ export function VoteModeConfig({
                     )}
                   >
                     <Zap size={16} className={!revealAt ? 'text-green-400 mb-1' : 'text-dark-muted mb-1'} />
-                    <div className="text-xs font-medium text-dark-text">{t.revealImmediate}</div>
-                    <div className="text-[10px] text-dark-muted">{t.revealImmediateDesc}</div>
+                    <div className="text-xs font-medium text-dark-text">{t('sessions:voteMode.revealImmediate')}</div>
+                    <div className="text-[10px] text-dark-muted">{t('sessions:voteMode.revealImmediateDesc')}</div>
                   </button>
                   <button
                     type="button"
@@ -638,8 +603,8 @@ export function VoteModeConfig({
                     )}
                   >
                     <Calendar size={16} className={revealAt ? 'text-blue-400 mb-1' : 'text-dark-muted mb-1'} />
-                    <div className="text-xs font-medium text-dark-text">{t.revealScheduled}</div>
-                    <div className="text-[10px] text-dark-muted">{t.revealScheduledDesc}</div>
+                    <div className="text-xs font-medium text-dark-text">{t('sessions:voteMode.revealScheduled')}</div>
+                    <div className="text-[10px] text-dark-muted">{t('sessions:voteMode.revealScheduledDesc')}</div>
                   </button>
                 </div>
                 {revealAt && (

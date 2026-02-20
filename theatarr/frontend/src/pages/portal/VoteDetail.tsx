@@ -7,6 +7,7 @@ import { ArrowLeft, Check, Clock, Lock, Trophy } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../api/client';
 
 interface MovieOption {
@@ -34,6 +35,7 @@ interface VoteSessionDetail {
 }
 
 export function VoteDetail() {
+  const { t } = useTranslation(['portal', 'common']);
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -60,30 +62,30 @@ export function VoteDetail() {
 
   const getStatusBadge = () => {
     if (!vote?.is_open) {
-      return { text: 'Cloture', color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
+      return { text: t('portal:voteDetail.status.closed'), color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
     }
     if (!vote?.closes_at) {
-      return { text: 'Ouvert', color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
+      return { text: t('portal:voteDetail.status.open'), color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
     }
     const diff = new Date(vote.closes_at).getTime() - Date.now();
     if (diff <= 0) {
-      return { text: 'Cloture', color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
+      return { text: t('portal:voteDetail.status.closed'), color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
     }
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
     if (days >= 2) {
-      return { text: `${days}j restants`, color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
+      return { text: t('portal:voteDetail.status.daysRemaining', { count: days }), color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
     }
     if (hours >= 6) {
-      return { text: `${hours}h restantes`, color: 'bg-blue-500/20 text-blue-400', icon: Clock, pulse: false };
+      return { text: t('portal:voteDetail.status.hoursRemaining', { count: hours }), color: 'bg-blue-500/20 text-blue-400', icon: Clock, pulse: false };
     }
     if (hours >= 1) {
       const m = minutes % 60;
-      return { text: `${hours}h${m > 0 ? `${m.toString().padStart(2, '0')}` : ''} restantes`, color: 'bg-orange-500/20 text-orange-400', icon: Clock, pulse: false };
+      return { text: t('portal:voteDetail.status.hoursMinutesRemaining', { hours, minutes: m > 0 ? m.toString().padStart(2, '0') : '' }), color: 'bg-orange-500/20 text-orange-400', icon: Clock, pulse: false };
     }
-    return { text: `${minutes}min restantes`, color: 'bg-red-500/20 text-red-400', icon: Clock, pulse: true };
+    return { text: t('portal:voteDetail.status.minutesRemaining', { count: minutes }), color: 'bg-red-500/20 text-red-400', icon: Clock, pulse: true };
   };
 
   const getTotalVotes = () => {
@@ -128,9 +130,9 @@ export function VoteDetail() {
   if (!vote) {
     return (
       <div className="text-center py-12">
-        <p className="text-dark-muted">Vote non trouve</p>
+        <p className="text-dark-muted">{t('portal:voteDetail.notFound')}</p>
         <Link to="/portal/votes" className="text-theatarr-500 hover:underline mt-2 inline-block">
-          Retour aux votes
+          {t('portal:voteDetail.backToVotes')}
         </Link>
       </div>
     );
@@ -146,7 +148,7 @@ export function VoteDetail() {
         className="inline-flex items-center gap-2 text-dark-muted hover:text-dark-text transition-colors"
       >
         <ArrowLeft size={18} />
-        <span>Retour</span>
+        <span>{t('portal:voteDetail.back')}</span>
       </Link>
 
       {/* Header */}
@@ -174,11 +176,11 @@ export function VoteDetail() {
           {vote.has_voted ? (
             <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-green-500/20 text-green-400">
               <Check size={12} />
-              Vote
+              {t('portal:voteDetail.voted')}
             </span>
           ) : vote.is_open ? (
             <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-400">
-              A voter
+              {t('portal:voteDetail.toVote')}
             </span>
           ) : null}
         </div>
@@ -238,7 +240,7 @@ export function VoteDetail() {
                 {vote.show_results && (
                   <div className="mt-2">
                     <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-dark-muted">{vote.results?.[index] || 0} votes</span>
+                      <span className="text-dark-muted">{vote.results?.[index] || 0} {t('portal:voteDetail.votes')}</span>
                       <span className="text-dark-text font-medium">{percentage}%</span>
                     </div>
                     <div className="h-1.5 bg-dark-border rounded-full overflow-hidden">
@@ -288,17 +290,19 @@ export function VoteDetail() {
           )}
         >
           {castVoteMutation.isPending
-            ? 'Vote en cours...'
+            ? t('portal:voteDetail.votingInProgress')
             : selectedIndex !== null
-              ? `Voter pour "${vote.movie_options[selectedIndex].title}"`
-              : 'Selectionnez un film'}
+              ? t('portal:voteDetail.voteFor', { title: vote.movie_options[selectedIndex].title })
+              : t('portal:voteDetail.selectMovie')}
         </button>
       )}
 
       {/* Total votes */}
       {vote.show_results && (
         <p className="text-center text-sm text-dark-muted">
-          {getTotalVotes()} vote{getTotalVotes() !== 1 ? 's' : ''} au total
+          {getTotalVotes() !== 1
+            ? t('portal:voteDetail.totalVotesPlural', { count: getTotalVotes() })
+            : t('portal:voteDetail.totalVotes', { count: getTotalVotes() })}
         </p>
       )}
     </div>

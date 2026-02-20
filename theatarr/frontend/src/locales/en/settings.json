@@ -1,0 +1,273 @@
+{
+  "config": {
+    "title": "Settings",
+    "subtitle": "General application configuration",
+    "tabs": {
+      "settings": "Settings",
+      "export": "Export",
+      "import": "Import"
+    },
+    "actions": {
+      "reset": "Reset",
+      "save": "Save",
+      "saving": "Saving..."
+    },
+    "settings": {
+      "enabled": "Enabled",
+      "customSettings": "Custom Settings",
+      "noCustomSettings": "No custom settings. Click \"Add\" to create one.",
+      "settingKey": "Setting key",
+      "settingValue": "Value (JSON or text)",
+      "unsavedChanges": "Unsaved changes",
+      "allSaved": "All changes are saved",
+      "emailTestPlaceholder": "Test email address",
+      "emailSending": "Sending...",
+      "emailTest": "Test",
+      "emailSuccess": "Email sent successfully",
+      "emailSaveFirst": "Save your SMTP settings first, then enter an address and click Test."
+    },
+    "export": {
+      "title": "Export configuration",
+      "description": "Export your configuration including sessions, services, templates and settings.",
+      "items": {
+        "sessions": "Sessions",
+        "services": "Services",
+        "templates": "Templates",
+        "trailers": "Trailers"
+      },
+      "includeInExport": "Include in Export",
+      "optionSessions": "Sessions",
+      "optionSessionsDesc": "Session configurations and sequences",
+      "optionServices": "Services",
+      "optionServicesDesc": "Connected services and credentials",
+      "optionTemplates": "Templates",
+      "optionTemplatesDesc": "Custom wallmount templates",
+      "optionTrailerRules": "Trailer Rules",
+      "optionTrailerRulesDesc": "Auto-download configurations",
+      "optionSettings": "Settings",
+      "optionSettingsDesc": "Application settings",
+      "encryptSensitiveData": "Encrypt Sensitive Data",
+      "encryptedDesc": "API keys and passwords will be encrypted",
+      "unencryptedWarning": "WARNING: Sensitive data will be exported in plain text",
+      "encryptionPassword": "Encryption Password",
+      "enterStrongPassword": "Enter a strong password",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordPlaceholder": "Confirm password",
+      "passwordRequired": "Password is required for encryption",
+      "passwordMinLength": "Password must be at least 8 characters",
+      "passwordMismatch": "Passwords do not match",
+      "passwordNote": "This password will be required to import the configuration with decrypted secrets. Store it securely.",
+      "exporting": "Exporting...",
+      "exportConfiguration": "Export Configuration",
+      "exportFailed": "Export failed. Please try again."
+    },
+    "import": {
+      "title": "Import configuration",
+      "description": "Restore configuration from an exported backup.",
+      "startImport": "Start import",
+      "processTitle": "Import process",
+      "steps": {
+        "selectFile": "1. Select the file",
+        "selectFileDesc": "Exported configuration file",
+        "preview": "2. Preview changes",
+        "previewDesc": "Review the modifications",
+        "resolve": "3. Resolve conflicts",
+        "resolveDesc": "Handle existing items",
+        "apply": "4. Apply import",
+        "applyDesc": "Configuration imported"
+      },
+      "results": {
+        "sessions": "Sessions",
+        "services": "Services",
+        "templates": "Templates",
+        "trailerRules": "Trailer Rules",
+        "created": "Created:",
+        "updated": "Updated:",
+        "skipped": "Skipped:",
+        "settingsUpdated": "settings updated",
+        "errors": "Errors",
+        "done": "Done"
+      },
+      "dropZone": "Drop configuration file here",
+      "or": "or",
+      "browseFiles": "Browse Files",
+      "validFile": "Valid configuration file",
+      "remove": "Remove",
+      "encryptedConfig": "Encrypted Configuration",
+      "encryptedConfigDesc": "This configuration contains encrypted secrets. Enter the password to decrypt them during import.",
+      "decryptionPassword": "Decryption Password",
+      "enterExportPassword": "Enter the export password",
+      "cancel": "Cancel",
+      "analyzing": "Analyzing...",
+      "previewImport": "Preview Import",
+      "analysisFailed": "Failed to analyze file. Make sure it's a valid Theatarr configuration export.",
+      "readyToImport": "Ready to Import",
+      "noConflicts": "No conflicts detected. Review the changes below and proceed with import.",
+      "toCreate": "to create",
+      "toUpdate": "to update",
+      "settingsWillBeUpdated": "Application settings will be updated",
+      "importConfiguration": "Import Configuration",
+      "back": "Back",
+      "conflictsDetected": "{{count}} Conflict Detected",
+      "conflictsDetected_other": "{{count}} Conflicts Detected",
+      "conflictsDescription": "Some items in the import already exist. Choose how to handle each conflict.",
+      "applyAndImport": "Apply & Import",
+      "importingConfig": "Importing configuration...",
+      "importingWait": "This may take a moment",
+      "importComplete": "Import Complete",
+      "importSuccess": "Configuration has been successfully imported.",
+      "importWithWarnings": "Import Completed with Warnings",
+      "importPartial": "Some items could not be imported. See details below.",
+      "modalTitle": "Import Configuration"
+    }
+  },
+  "users": {
+    "title": "Users",
+    "subtitle": "Manage accounts and permissions",
+    "filters": {
+      "all": "All",
+      "admin": "Admin",
+      "user": "User"
+    },
+    "newUser": "New user",
+    "roles": {
+      "user": "User",
+      "admin": "Administrator"
+    },
+    "badges": {
+      "admin": "Admin",
+      "inactive": "Inactive"
+    },
+    "neverConnected": "Never logged in",
+    "empty": {
+      "title": "No users",
+      "description": "Create your first user to get started."
+    },
+    "form": {
+      "username": "Username *",
+      "password": "Password *",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "role": "Role"
+    },
+    "validation": {
+      "usernameRequired": "Username is required",
+      "passwordRequired": "Password is required",
+      "passwordMinLength": "Password must be at least 6 characters"
+    },
+    "modal": {
+      "editTitle": "Edit user",
+      "createTitle": "New user",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "edit": "Edit",
+      "create": "Create"
+    },
+    "passwordModal": {
+      "title": "Change password",
+      "newPassword": "New password",
+      "minChars": "Minimum 6 characters",
+      "cancel": "Cancel",
+      "changing": "Changing...",
+      "change": "Change"
+    },
+    "actions": {
+      "edit": "Edit",
+      "changePassword": "Change password",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "delete": "Delete"
+    },
+    "deleteConfirm": "Delete user \"{{username}}\"?"
+  },
+  "logs": {
+    "title": "System Logs",
+    "entries": "entries",
+    "autoRefresh": "Auto-refresh",
+    "live": "Live",
+    "paused": "Paused",
+    "search": "Search...",
+    "noLogs": "No logs",
+    "loadingEvents": "Loading events...",
+    "categories": {
+      "all": "All",
+      "scheduler": "Scheduler",
+      "sessions": "Sessions",
+      "vote": "Vote",
+      "services": "Services",
+      "enrichment": "Enrichment",
+      "movies": "Movies",
+      "auth": "Auth",
+      "system": "System"
+    },
+    "levels": {
+      "all": "All",
+      "debug": "DEBUG",
+      "info": "INFO",
+      "warning": "WARN",
+      "error": "ERROR"
+    }
+  },
+  "history": {
+    "title": "History",
+    "totalPlayback": "{{hours}}h total playback",
+    "last7days": "Last 7 days",
+    "filters": {
+      "all": "All",
+      "completed": "Completed",
+      "running": "Running",
+      "paused": "Paused",
+      "interrupted": "Interrupted"
+    },
+    "status": {
+      "completed": "Completed",
+      "running": "Running",
+      "paused": "Paused",
+      "stopped": "Stopped",
+      "interrupted": "Interrupted",
+      "draft": "Draft",
+      "scheduled": "Scheduled"
+    },
+    "labels": {
+      "start": "Start:",
+      "duration": "Duration:",
+      "end": "End:",
+      "sequences": "Sequences:",
+      "id": "ID:"
+    },
+    "noEvents": "No events recorded (session ran before tracking was enabled)",
+    "events": {
+      "sessionStarted": "Session started",
+      "sessionPaused": "Session paused",
+      "sessionResumed": "Session resumed",
+      "sessionStopped": "Session stopped",
+      "sessionCompleted": "Session completed",
+      "sessionInterrupted": "Session interrupted",
+      "sequenceStarted": "Sequence started",
+      "sequenceCompleted": "Sequence completed",
+      "sequenceSkipped": "Sequence skipped",
+      "actionExecuted": "Action executed",
+      "trailerResolved": "Trailer resolved",
+      "prerollResolved": "Pre-roll resolved",
+      "playbackEnded": "Playback ended",
+      "displayConnected": "Display connected",
+      "displayDisconnected": "Display disconnected",
+      "noEventsForSession": "No events recorded for this session"
+    },
+    "empty": "No history found",
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{total}}"
+    }
+  },
+  "login": {
+    "subtitle": "Home Cinema Orchestration",
+    "username": "Username",
+    "usernamePlaceholder": "Enter your username",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "signIn": "Sign In"
+  }
+}

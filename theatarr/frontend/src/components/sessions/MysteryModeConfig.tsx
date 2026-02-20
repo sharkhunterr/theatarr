@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Search, Film, X, Shuffle, Filter, ListOrdered, Calendar } from 'lucide-react';
 import { Spinner } from '../common';
 import { apiClient } from '../../api/client';
-import { useLayoutStore } from '../../stores/layoutStore';
 import type { MysteryConfig, MysteryFilters, MysterySource } from '../../stores/sessionStore';
 
 interface MysteryModeConfigProps {
@@ -25,7 +25,7 @@ export function MysteryModeConfig({
   revealAt,
   onRevealAtChange,
 }: MysteryModeConfigProps) {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation('sessions');
   const [movieSearchQuery, setMovieSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -36,28 +36,6 @@ export function MysteryModeConfig({
     staleTime: 5 * 60 * 1000,
   });
   const GENRES = serviceGenres && serviceGenres.length > 0 ? serviceGenres : FALLBACK_GENRES;
-
-  const t = {
-    title: language === 'fr' ? 'Configuration Mystère' : 'Mystery Configuration',
-    revealAt: language === 'fr' ? 'Révélation automatique' : 'Automatic reveal',
-    revealAtHelp: language === 'fr' ? 'Date et heure de révélation du film' : 'Date and time to reveal the movie',
-    source: language === 'fr' ? 'Source du film' : 'Movie source',
-    random: language === 'fr' ? 'Aléatoire' : 'Random',
-    randomDesc: language === 'fr' ? 'Film choisi au hasard dans la bibliothèque' : 'Random movie from library',
-    filtered: language === 'fr' ? 'Avec filtres' : 'Filtered',
-    filteredDesc: language === 'fr' ? 'Film filtré par genre, année, note' : 'Movie filtered by genre, year, rating',
-    curated: language === 'fr' ? 'Liste personnalisée' : 'Curated list',
-    curatedDesc: language === 'fr' ? 'Film choisi parmi une liste définie' : 'Movie chosen from defined list',
-    filters: language === 'fr' ? 'Filtres' : 'Filters',
-    genres: language === 'fr' ? 'Genres' : 'Genres',
-    yearRange: language === 'fr' ? 'Années' : 'Year range',
-    minRating: language === 'fr' ? 'Note minimum' : 'Minimum rating',
-    curatedMovies: language === 'fr' ? 'Films de la liste' : 'Curated movies',
-    addMovie: language === 'fr' ? 'Ajouter un film' : 'Add movie',
-    searchPlaceholder: language === 'fr' ? 'Rechercher un film...' : 'Search for a movie...',
-    noResults: language === 'fr' ? 'Aucun résultat' : 'No results',
-    minMovies: language === 'fr' ? 'Minimum 1 film requis' : 'Minimum 1 movie required',
-  };
 
   // Movie search query
   const { data: movieSearchResults, isLoading: isSearchingMovies } = useQuery<Array<{
@@ -143,21 +121,21 @@ export function MysteryModeConfig({
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm text-dark-muted">
             <Calendar size={14} />
-            {t.revealAt}
+            {t('sessions:mysteryMode.revealAt')}
           </label>
           <input
             type="datetime-local"
             value={revealAt ? revealAt.slice(0, 16) : ''}
             onChange={(e) => onRevealAtChange(e.target.value ? new Date(e.target.value).toISOString() : null)}
             className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text text-sm"
-            title={t.revealAtHelp}
+            title={t('sessions:mysteryMode.revealAtHelp')}
           />
         </div>
       )}
 
       {/* Source Selection */}
       <div className="space-y-2">
-        <label className="text-sm text-dark-muted">{t.source}</label>
+        <label className="text-sm text-dark-muted">{t('sessions:mysteryMode.source')}</label>
         <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
@@ -169,7 +147,7 @@ export function MysteryModeConfig({
             }`}
           >
             <Shuffle size={20} className="mx-auto mb-1" />
-            <div className="text-xs font-medium">{t.random}</div>
+            <div className="text-xs font-medium">{t('sessions:mysteryMode.random')}</div>
           </button>
           <button
             type="button"
@@ -181,7 +159,7 @@ export function MysteryModeConfig({
             }`}
           >
             <Filter size={20} className="mx-auto mb-1" />
-            <div className="text-xs font-medium">{t.filtered}</div>
+            <div className="text-xs font-medium">{t('sessions:mysteryMode.filtered')}</div>
           </button>
           <button
             type="button"
@@ -193,7 +171,7 @@ export function MysteryModeConfig({
             }`}
           >
             <ListOrdered size={20} className="mx-auto mb-1" />
-            <div className="text-xs font-medium">{t.curated}</div>
+            <div className="text-xs font-medium">{t('sessions:mysteryMode.curated')}</div>
           </button>
         </div>
       </div>
@@ -201,11 +179,11 @@ export function MysteryModeConfig({
       {/* Filtered Source Config */}
       {config.source === 'filtered' && (
         <div className="space-y-4 p-3 bg-dark-bg rounded-lg">
-          <h4 className="text-sm font-medium text-dark-text">{t.filters}</h4>
+          <h4 className="text-sm font-medium text-dark-text">{t('sessions:mysteryMode.filters')}</h4>
 
           {/* Genre Selection */}
           <div className="space-y-2">
-            <label className="text-xs text-dark-muted">{t.genres}</label>
+            <label className="text-xs text-dark-muted">{t('sessions:mysteryMode.genres')}</label>
             <div className="flex flex-wrap gap-1.5">
               {GENRES.map(genre => (
                 <button
@@ -226,7 +204,7 @@ export function MysteryModeConfig({
 
           {/* Year Range */}
           <div className="space-y-2">
-            <label className="text-xs text-dark-muted">{t.yearRange}</label>
+            <label className="text-xs text-dark-muted">{t('sessions:mysteryMode.yearRange')}</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -252,7 +230,7 @@ export function MysteryModeConfig({
 
           {/* Minimum Rating */}
           <div className="space-y-2">
-            <label className="text-xs text-dark-muted">{t.minRating}</label>
+            <label className="text-xs text-dark-muted">{t('sessions:mysteryMode.minRating')}</label>
             <input
               type="number"
               step={0.5}
@@ -275,7 +253,7 @@ export function MysteryModeConfig({
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
             <input
               type="text"
-              placeholder={t.searchPlaceholder}
+              placeholder={t('sessions:mysteryMode.searchPlaceholder')}
               value={movieSearchQuery}
               onChange={(e) => { setMovieSearchQuery(e.target.value); setIsSearchOpen(true); }}
               onFocus={() => setIsSearchOpen(true)}
@@ -310,7 +288,7 @@ export function MysteryModeConfig({
                     ))}
                   </div>
                 ) : (
-                  <div className="p-4 text-center text-dark-muted text-sm">{t.noResults}</div>
+                  <div className="p-4 text-center text-dark-muted text-sm">{t('sessions:mysteryMode.noResults')}</div>
                 )}
               </div>
             )}
@@ -319,9 +297,9 @@ export function MysteryModeConfig({
           {/* Curated Movies List */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm text-dark-muted">{t.curatedMovies}</label>
+              <label className="text-sm text-dark-muted">{t('sessions:mysteryMode.curatedMovies')}</label>
               {(config.curated_movies?.length || 0) < 1 && (
-                <span className="text-xs text-yellow-500">{t.minMovies}</span>
+                <span className="text-xs text-yellow-500">{t('sessions:mysteryMode.minMovies')}</span>
               )}
             </div>
             {config.curated_movies && config.curated_movies.length > 0 ? (
@@ -354,7 +332,7 @@ export function MysteryModeConfig({
               </div>
             ) : (
               <div className="text-sm text-dark-muted text-center py-4 border border-dashed border-dark-border rounded-lg">
-                {t.addMovie}
+                {t('sessions:mysteryMode.addMovie')}
               </div>
             )}
           </div>

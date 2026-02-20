@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Upload,
   FileText,
@@ -59,6 +60,7 @@ interface ImportResult {
 type Step = 'upload' | 'preview' | 'conflicts' | 'importing' | 'complete';
 
 export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps) {
+  const { t } = useTranslation('settings');
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [fileData, setFileData] = useState<Record<string, unknown> | null>(null);
@@ -183,7 +185,7 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
   const hasEncryptedSecrets = fileData && 'encrypted_secrets' in fileData;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Import Configuration" size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title={t('config.import.modalTitle')} size="lg">
       <div className="min-h-[400px]">
         {/* Step 1: Upload */}
         {step === 'upload' && (
@@ -202,7 +204,7 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
                     {(file.size / 1024).toFixed(1)} KB
                   </div>
                   {fileData && (
-                    <div className="text-sm text-green-400">Valid configuration file</div>
+                    <div className="text-sm text-green-400">{t('config.import.validFile')}</div>
                   )}
                   <Button
                     variant="ghost"
@@ -212,17 +214,17 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
                       setFileData(null);
                     }}
                   >
-                    Remove
+                    {t('config.import.remove')}
                   </Button>
                 </div>
               ) : (
                 <>
                   <Upload size={48} className="mx-auto text-gray-500 mb-4" />
-                  <div className="font-medium mb-2">Drop configuration file here</div>
-                  <div className="text-sm text-gray-500 mb-4">or</div>
+                  <div className="font-medium mb-2">{t('config.import.dropZone')}</div>
+                  <div className="text-sm text-gray-500 mb-4">{t('config.import.or')}</div>
                   <label className="cursor-pointer">
                     <span className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors">
-                      Browse Files
+                      {t('config.import.browseFiles')}
                     </span>
                     <input
                       type="file"
@@ -240,18 +242,17 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
               <div className="p-4 bg-yellow-500/20 rounded-lg">
                 <div className="flex items-center gap-2 text-yellow-400 mb-2">
                   <AlertTriangle size={16} />
-                  <span className="font-medium">Encrypted Configuration</span>
+                  <span className="font-medium">{t('config.import.encryptedConfig')}</span>
                 </div>
                 <p className="text-sm text-gray-400 mb-3">
-                  This configuration contains encrypted secrets. Enter the password to decrypt them
-                  during import.
+                  {t('config.import.encryptedConfigDesc')}
                 </p>
                 <Input
-                  label="Decryption Password"
+                  label={t('config.import.decryptionPassword')}
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter the export password"
+                  placeholder={t('config.import.enterExportPassword')}
                 />
               </div>
             )}
@@ -259,17 +260,17 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
             {/* Actions */}
             <div className="flex justify-end gap-4">
               <Button variant="ghost" onClick={handleClose}>
-                Cancel
+                {t('config.import.cancel')}
               </Button>
               <Button
                 onClick={handlePreview}
                 disabled={!file || !fileData || previewMutation.isPending}
               >
                 {previewMutation.isPending ? (
-                  'Analyzing...'
+                  t('config.import.analyzing')
                 ) : (
                   <>
-                    Preview Import
+                    {t('config.import.previewImport')}
                     <ChevronRight size={16} className="ml-1" />
                   </>
                 )}
@@ -278,7 +279,7 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
 
             {previewMutation.error && (
               <div className="p-4 bg-red-500/20 rounded-lg text-red-400 text-sm">
-                Failed to analyze file. Make sure it's a valid Theatarr configuration export.
+                {t('config.import.analysisFailed')}
               </div>
             )}
           </div>
@@ -290,49 +291,49 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
             <div className="p-4 bg-green-500/20 rounded-lg">
               <div className="flex items-center gap-2 text-green-400 mb-2">
                 <Check size={16} />
-                <span className="font-medium">Ready to Import</span>
+                <span className="font-medium">{t('config.import.readyToImport')}</span>
               </div>
               <p className="text-sm text-gray-400">
-                No conflicts detected. Review the changes below and proceed with import.
+                {t('config.import.noConflicts')}
               </p>
             </div>
 
             {/* Changes Summary */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-gray-800 rounded-lg p-4">
-                <div className="font-medium mb-2">Sessions</div>
+                <div className="font-medium mb-2">{t('config.import.results.sessions')}</div>
                 <div className="text-sm text-gray-400">
-                  <div className="text-green-400">{preview.sessions.create} to create</div>
-                  <div className="text-yellow-400">{preview.sessions.update} to update</div>
+                  <div className="text-green-400">{preview.sessions.create} {t('config.import.toCreate')}</div>
+                  <div className="text-yellow-400">{preview.sessions.update} {t('config.import.toUpdate')}</div>
                 </div>
               </div>
               <div className="bg-gray-800 rounded-lg p-4">
-                <div className="font-medium mb-2">Services</div>
+                <div className="font-medium mb-2">{t('config.import.results.services')}</div>
                 <div className="text-sm text-gray-400">
-                  <div className="text-green-400">{preview.services.create} to create</div>
-                  <div className="text-yellow-400">{preview.services.update} to update</div>
+                  <div className="text-green-400">{preview.services.create} {t('config.import.toCreate')}</div>
+                  <div className="text-yellow-400">{preview.services.update} {t('config.import.toUpdate')}</div>
                 </div>
               </div>
               <div className="bg-gray-800 rounded-lg p-4">
-                <div className="font-medium mb-2">Templates</div>
+                <div className="font-medium mb-2">{t('config.import.results.templates')}</div>
                 <div className="text-sm text-gray-400">
-                  <div className="text-green-400">{preview.templates.create} to create</div>
-                  <div className="text-yellow-400">{preview.templates.update} to update</div>
+                  <div className="text-green-400">{preview.templates.create} {t('config.import.toCreate')}</div>
+                  <div className="text-yellow-400">{preview.templates.update} {t('config.import.toUpdate')}</div>
                 </div>
               </div>
               <div className="bg-gray-800 rounded-lg p-4">
-                <div className="font-medium mb-2">Trailer Rules</div>
+                <div className="font-medium mb-2">{t('config.import.results.trailerRules')}</div>
                 <div className="text-sm text-gray-400">
-                  <div className="text-green-400">{preview.trailer_rules.create} to create</div>
-                  <div className="text-yellow-400">{preview.trailer_rules.update} to update</div>
+                  <div className="text-green-400">{preview.trailer_rules.create} {t('config.import.toCreate')}</div>
+                  <div className="text-yellow-400">{preview.trailer_rules.update} {t('config.import.toUpdate')}</div>
                 </div>
               </div>
             </div>
 
             {preview.settings && (
               <div className="p-4 bg-gray-800 rounded-lg">
-                <div className="font-medium">Settings</div>
-                <div className="text-sm text-gray-400">Application settings will be updated</div>
+                <div className="font-medium">{t('config.tabs.settings')}</div>
+                <div className="text-sm text-gray-400">{t('config.import.settingsWillBeUpdated')}</div>
               </div>
             )}
 
@@ -340,10 +341,10 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
             <div className="flex justify-between">
               <Button variant="ghost" onClick={() => setStep('upload')}>
                 <ChevronLeft size={16} className="mr-1" />
-                Back
+                {t('config.import.back')}
               </Button>
               <Button onClick={handleImport}>
-                Import Configuration
+                {t('config.import.importConfiguration')}
                 <ChevronRight size={16} className="ml-1" />
               </Button>
             </div>
@@ -357,12 +358,11 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
               <div className="flex items-center gap-2 text-yellow-400 mb-2">
                 <AlertTriangle size={16} />
                 <span className="font-medium">
-                  {preview.conflicts.length} Conflict{preview.conflicts.length !== 1 && 's'}{' '}
-                  Detected
+                  {t('config.import.conflictsDetected', { count: preview.conflicts.length })}
                 </span>
               </div>
               <p className="text-sm text-gray-400">
-                Some items in the import already exist. Choose how to handle each conflict.
+                {t('config.import.conflictsDescription')}
               </p>
             </div>
 
@@ -378,10 +378,10 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
             <div className="flex justify-between">
               <Button variant="ghost" onClick={() => setStep('upload')}>
                 <ChevronLeft size={16} className="mr-1" />
-                Back
+                {t('config.import.back')}
               </Button>
               <Button onClick={handleImport}>
-                Apply & Import
+                {t('config.import.applyAndImport')}
                 <ChevronRight size={16} className="ml-1" />
               </Button>
             </div>
@@ -392,8 +392,8 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
         {step === 'importing' && (
           <div className="flex flex-col items-center justify-center h-64">
             <Spinner size="lg" />
-            <div className="mt-4 font-medium">Importing configuration...</div>
-            <div className="text-sm text-gray-500">This may take a moment</div>
+            <div className="mt-4 font-medium">{t('config.import.importingConfig')}</div>
+            <div className="text-sm text-gray-500">{t('config.import.importingWait')}</div>
           </div>
         )}
 
@@ -404,20 +404,20 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
               <div className="p-4 bg-green-500/20 rounded-lg">
                 <div className="flex items-center gap-2 text-green-400 mb-2">
                   <Check size={16} />
-                  <span className="font-medium">Import Complete</span>
+                  <span className="font-medium">{t('config.import.importComplete')}</span>
                 </div>
                 <p className="text-sm text-gray-400">
-                  Configuration has been successfully imported.
+                  {t('config.import.importSuccess')}
                 </p>
               </div>
             ) : (
               <div className="p-4 bg-yellow-500/20 rounded-lg">
                 <div className="flex items-center gap-2 text-yellow-400 mb-2">
                   <AlertTriangle size={16} />
-                  <span className="font-medium">Import Completed with Warnings</span>
+                  <span className="font-medium">{t('config.import.importWithWarnings')}</span>
                 </div>
                 <p className="text-sm text-gray-400">
-                  Some items could not be imported. See details below.
+                  {t('config.import.importPartial')}
                 </p>
               </div>
             )}
@@ -425,49 +425,49 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
             {/* Results Summary */}
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="bg-gray-800 rounded-lg p-4">
-                <div className="font-medium mb-2">Sessions</div>
+                <div className="font-medium mb-2">{t('config.import.results.sessions')}</div>
                 <div className="space-y-1 text-gray-400">
-                  <div>Created: {result.sessions_created}</div>
-                  <div>Updated: {result.sessions_updated}</div>
-                  <div>Skipped: {result.sessions_skipped}</div>
+                  <div>{t('config.import.results.created')} {result.sessions_created}</div>
+                  <div>{t('config.import.results.updated')} {result.sessions_updated}</div>
+                  <div>{t('config.import.results.skipped')} {result.sessions_skipped}</div>
                 </div>
               </div>
               <div className="bg-gray-800 rounded-lg p-4">
-                <div className="font-medium mb-2">Services</div>
+                <div className="font-medium mb-2">{t('config.import.results.services')}</div>
                 <div className="space-y-1 text-gray-400">
-                  <div>Created: {result.services_created}</div>
-                  <div>Updated: {result.services_updated}</div>
-                  <div>Skipped: {result.services_skipped}</div>
+                  <div>{t('config.import.results.created')} {result.services_created}</div>
+                  <div>{t('config.import.results.updated')} {result.services_updated}</div>
+                  <div>{t('config.import.results.skipped')} {result.services_skipped}</div>
                 </div>
               </div>
               <div className="bg-gray-800 rounded-lg p-4">
-                <div className="font-medium mb-2">Templates</div>
+                <div className="font-medium mb-2">{t('config.import.results.templates')}</div>
                 <div className="space-y-1 text-gray-400">
-                  <div>Created: {result.templates_created}</div>
-                  <div>Updated: {result.templates_updated}</div>
-                  <div>Skipped: {result.templates_skipped}</div>
+                  <div>{t('config.import.results.created')} {result.templates_created}</div>
+                  <div>{t('config.import.results.updated')} {result.templates_updated}</div>
+                  <div>{t('config.import.results.skipped')} {result.templates_skipped}</div>
                 </div>
               </div>
               <div className="bg-gray-800 rounded-lg p-4">
-                <div className="font-medium mb-2">Trailer Rules</div>
+                <div className="font-medium mb-2">{t('config.import.results.trailerRules')}</div>
                 <div className="space-y-1 text-gray-400">
-                  <div>Created: {result.trailer_rules_created}</div>
-                  <div>Updated: {result.trailer_rules_updated}</div>
-                  <div>Skipped: {result.trailer_rules_skipped}</div>
+                  <div>{t('config.import.results.created')} {result.trailer_rules_created}</div>
+                  <div>{t('config.import.results.updated')} {result.trailer_rules_updated}</div>
+                  <div>{t('config.import.results.skipped')} {result.trailer_rules_skipped}</div>
                 </div>
               </div>
             </div>
 
             {result.settings_updated > 0 && (
               <div className="p-4 bg-gray-800 rounded-lg text-sm">
-                <div className="font-medium">Settings</div>
-                <div className="text-gray-400">{result.settings_updated} settings updated</div>
+                <div className="font-medium">{t('config.tabs.settings')}</div>
+                <div className="text-gray-400">{result.settings_updated} {t('config.import.results.settingsUpdated')}</div>
               </div>
             )}
 
             {result.errors.length > 0 && (
               <div className="p-4 bg-red-500/20 rounded-lg">
-                <div className="font-medium text-red-400 mb-2">Errors</div>
+                <div className="font-medium text-red-400 mb-2">{t('config.import.results.errors')}</div>
                 <div className="space-y-1 text-sm text-gray-400">
                   {result.errors.map((error, i) => (
                     <div key={i} className="flex items-start gap-2">
@@ -481,7 +481,7 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
 
             {/* Actions */}
             <div className="flex justify-end">
-              <Button onClick={handleComplete}>Done</Button>
+              <Button onClick={handleComplete}>{t('config.import.results.done')}</Button>
             </div>
           </div>
         )}

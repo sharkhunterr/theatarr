@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw, Library, Check } from 'lucide-react';
 import { Button, Input, Card, CardContent, CardHeader, Spinner } from '../common';
 import { apiClient } from '../../api/client';
@@ -45,6 +46,7 @@ function isSensitiveKey(key: string): boolean {
 }
 
 export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFormProps) {
+  const { t } = useTranslation('services');
   // Pre-fill config from existing service — show all values including sensitive ones
   const initialConfig: Record<string, unknown> = {};
   if (service?.config) {
@@ -81,7 +83,7 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
       const res = await apiClient.get<{ libraries?: typeof libraries }>(`/services/${service.id}/resources`);
       setLibraries(res.libraries || []);
     } catch (err) {
-      setLibrariesError('Impossible de charger les bibliothèques. Vérifiez la connexion.');
+      setLibrariesError(t('form.librariesError'));
     } finally {
       setLibrariesLoading(false);
     }
@@ -203,11 +205,11 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
       {/* Basic Info */}
       <Card>
         <CardHeader>
-          <h3 className="font-medium text-dark-text">Basic Information</h3>
+          <h3 className="font-medium text-dark-text">{t('form.basicInfo')}</h3>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
-            label="Name"
+            label={t('form.name')}
             value={formData.name}
             onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
             error={errors.name}
@@ -216,14 +218,14 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
           />
 
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">Description</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('form.description')}</label>
             <textarea
               value={formData.description || ''}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, description: e.target.value }))
               }
               className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text min-h-[80px]"
-              placeholder="Optional description"
+              placeholder={t('form.descriptionPlaceholder')}
             />
           </div>
 
@@ -238,7 +240,7 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
               className="w-4 h-4 accent-theatarr-500"
             />
             <label htmlFor="is_enabled" className="text-sm text-dark-text">
-              Enable this service
+              {t('form.enableService')}
             </label>
           </div>
         </CardContent>
@@ -247,12 +249,12 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
       {/* Adapter Selection */}
       <Card>
         <CardHeader>
-          <h3 className="font-medium text-dark-text">Adapter Configuration</h3>
+          <h3 className="font-medium text-dark-text">{t('form.adapterConfig')}</h3>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Category Selection */}
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">Category</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('form.category')}</label>
             <select
               value={formData.category}
               onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
@@ -269,7 +271,7 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
 
           {/* Adapter Type Selection */}
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">Adapter Type</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('form.adapterType')}</label>
             <select
               value={formData.adapter_type}
               onChange={(e) => handleAdapterChange(e.target.value)}
@@ -278,7 +280,7 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
               }`}
               disabled={!!service}
             >
-              <option value="">Select an adapter...</option>
+              <option value="">{t('form.selectAdapter')}</option>
               {filteredAdapters.map((adapter) => (
                 <option key={adapter.type} value={adapter.type}>
                   {adapter.display_name}
@@ -290,7 +292,7 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
             )}
             {filteredAdapters.length === 0 && (
               <p className="text-dark-muted text-sm mt-1">
-                No adapters available for this category
+                {t('form.noAdapters')}
               </p>
             )}
           </div>
@@ -301,7 +303,7 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
       {selectedAdapter && selectedAdapter.config_schema?.properties && (
         <Card>
           <CardHeader>
-            <h3 className="font-medium text-dark-text">{selectedAdapter.display_name} Settings</h3>
+            <h3 className="font-medium text-dark-text">{selectedAdapter.display_name} — {t('form.settings')}</h3>
           </CardHeader>
           <CardContent className="space-y-4">
             {Object.entries(selectedAdapter.config_schema.properties).map(([key, schema]) => {
@@ -331,7 +333,7 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Library size={18} className="text-theatarr-500" />
-                <h3 className="font-medium text-dark-text">Bibliothèques</h3>
+                <h3 className="font-medium text-dark-text">{t('form.libraries')}</h3>
               </div>
               <button
                 type="button"
@@ -348,18 +350,18 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
             {librariesLoading && libraries.length === 0 ? (
               <div className="flex items-center justify-center py-4">
                 <Spinner size="sm" />
-                <span className="ml-2 text-sm text-dark-muted">Chargement des bibliothèques...</span>
+                <span className="ml-2 text-sm text-dark-muted">{t('form.loadingLibraries')}</span>
               </div>
             ) : librariesError ? (
               <div className="text-sm text-red-400 py-2">{librariesError}</div>
             ) : libraries.length === 0 ? (
               <p className="text-sm text-dark-muted py-2">
-                Aucune bibliothèque trouvée. Testez la connexion du service d'abord.
+                {t('form.noLibraries')}
               </p>
             ) : (
               <div className="space-y-1">
                 <p className="text-xs text-dark-muted mb-3">
-                  Sélectionnez les bibliothèques à utiliser. Si aucune n'est sélectionnée, toutes les bibliothèques de films seront utilisées.
+                  {t('form.librariesHelp')}
                 </p>
                 {libraries.map((lib) => {
                   const libId = String(lib.id);
@@ -389,7 +391,7 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
                         <div className="text-sm font-medium text-dark-text truncate">{libName}</div>
                         <div className="text-xs text-dark-muted">
                           {lib.type || 'unknown'}
-                          {lib.count != null && lib.count > 0 && ` · ${lib.count} éléments`}
+                          {lib.count != null && lib.count > 0 && ` · ${lib.count} ${t('form.elements')}`}
                         </div>
                       </div>
                     </button>
@@ -404,10 +406,10 @@ export function ServiceForm({ service, adapters, onSubmit, onCancel }: ServiceFo
       {/* Actions */}
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
+          {t('form.cancel')}
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : service ? 'Update Service' : 'Create Service'}
+          {isSubmitting ? t('form.saving') : service ? t('form.updateService') : t('form.createService')}
         </Button>
       </div>
     </form>

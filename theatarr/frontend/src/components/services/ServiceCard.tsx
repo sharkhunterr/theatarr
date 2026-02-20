@@ -14,8 +14,8 @@ import {
   Cog,
   Database,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../common';
-import { useLayoutStore } from '../../stores/layoutStore';
 
 export interface Service {
   id: string;
@@ -91,36 +91,22 @@ export function ServiceCard({
   onTest,
   isTestLoading,
 }: ServiceCardProps) {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['services']);
   const status = statusConfig[service.connection_status];
 
-  const t = {
-    enabled: language === 'fr' ? 'Activé' : 'Enabled',
-    disabled: language === 'fr' ? 'Désactivé' : 'Disabled',
-    lastSeen: language === 'fr' ? 'Vu le' : 'Last seen',
-    capabilities: language === 'fr' ? 'capacités' : 'capabilities',
-    test: language === 'fr' ? 'Tester' : 'Test',
-    edit: language === 'fr' ? 'Modifier' : 'Edit',
-    delete: language === 'fr' ? 'Supprimer' : 'Delete',
-    connected: language === 'fr' ? 'Connecté' : 'Connected',
-    disconnected: language === 'fr' ? 'Déconnecté' : 'Disconnected',
-    error: language === 'fr' ? 'Erreur' : 'Error',
-    unknown: language === 'fr' ? 'Inconnu' : 'Unknown',
-  };
-
   const statusLabels: Record<string, string> = {
-    connected: t.connected,
-    disconnected: t.disconnected,
-    error: t.error,
-    unknown: t.unknown,
+    connected: t('services:card.connected'),
+    disconnected: t('services:card.disconnected'),
+    error: t('services:card.error'),
+    unknown: t('services:card.unknown'),
   };
 
   const categoryLabels: Record<string, string> = {
-    lighting: language === 'fr' ? 'Éclairage' : 'Lighting',
-    player: language === 'fr' ? 'Lecteur' : 'Player',
-    media_source: language === 'fr' ? 'Source média' : 'Media Source',
-    actuator: language === 'fr' ? 'Actionneur' : 'Actuator',
-    metadata: language === 'fr' ? 'Métadonnées' : 'Metadata',
+    lighting: t('services:card.lighting'),
+    player: t('services:card.player'),
+    media_source: t('services:card.media_source'),
+    actuator: t('services:card.actuator'),
+    metadata: t('services:card.metadata'),
   };
 
   return (
@@ -189,16 +175,16 @@ export function ServiceCard({
             {/* Status row */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-dark-muted">
               <span className={service.is_enabled ? 'text-green-400' : 'text-gray-400'}>
-                {service.is_enabled ? t.enabled : t.disabled}
+                {service.is_enabled ? t('services:card.enabled') : t('services:card.disabled')}
               </span>
               {service.last_seen_at && (
                 <span>
-                  {t.lastSeen} {new Date(service.last_seen_at).toLocaleDateString()}
+                  {t('services:card.lastSeen')} {new Date(service.last_seen_at).toLocaleDateString()}
                 </span>
               )}
               {service.capabilities && service.capabilities.length > 0 && (
                 <span>
-                  {service.capabilities.length} {t.capabilities}
+                  {service.capabilities.length} {t('services:card.capabilities')}
                 </span>
               )}
             </div>
@@ -211,17 +197,17 @@ export function ServiceCard({
               size="sm"
               onClick={onTest}
               disabled={isTestLoading}
-              title={t.test}
+              title={t('services:card.test')}
               className="flex-1 sm:flex-none"
             >
               <RefreshCw size={14} className={isTestLoading ? 'animate-spin' : ''} />
-              <span className="ml-1 sm:hidden">{t.test}</span>
+              <span className="ml-1 sm:hidden">{t('services:card.test')}</span>
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={onToggle}
-              title={service.is_enabled ? t.disabled : t.enabled}
+              title={service.is_enabled ? t('services:card.disabled') : t('services:card.enabled')}
               className="flex-1 sm:flex-none"
             >
               {service.is_enabled ? (
@@ -234,17 +220,17 @@ export function ServiceCard({
               variant="ghost"
               size="sm"
               onClick={onEdit}
-              title={t.edit}
+              title={t('services:card.edit')}
               className="flex-1 sm:flex-none"
             >
               <Settings size={14} />
-              <span className="ml-1 sm:hidden">{t.edit}</span>
+              <span className="ml-1 sm:hidden">{t('services:card.edit')}</span>
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={onDelete}
-              title={t.delete}
+              title={t('services:card.delete')}
               className="flex-1 sm:flex-none text-red-400 hover:text-red-300 hover:bg-red-500/10"
             >
               <Trash2 size={14} />

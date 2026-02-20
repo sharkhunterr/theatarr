@@ -1,11 +1,11 @@
 import { Node } from 'reactflow';
 import { Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../common';
 import { LightingActionForm } from '../sequences/actions/LightingActionForm';
 import { AudioActionForm } from '../sequences/actions/AudioActionForm';
 import { MediaActionForm } from '../sequences/actions/MediaActionForm';
 import { DisplayActionForm } from '../sequences/actions/DisplayActionForm';
-import { useLayoutStore } from '../../stores/layoutStore';
 import type { WorkflowNodeData, ActionType } from './WorkflowEditor';
 
 interface WorkflowNodeEditorProps {
@@ -14,38 +14,9 @@ interface WorkflowNodeEditorProps {
   onDelete: () => void;
 }
 
-const actionTypeLabels: Record<ActionType, { en: string; fr: string }> = {
-  lighting: { en: 'Lighting', fr: 'Éclairage' },
-  audio: { en: 'Audio', fr: 'Audio' },
-  display: { en: 'Display', fr: 'Affichage' },
-  media: { en: 'Media', fr: 'Média' },
-  actuator: { en: 'Actuator', fr: 'Actionneur' },
-  session: { en: 'Session', fr: 'Session' },
-};
-
-const onFailureOptions = [
-  { value: 'warn', en: 'Warn and continue', fr: 'Avertir et continuer' },
-  { value: 'skip', en: 'Skip silently', fr: 'Ignorer' },
-  { value: 'abort', en: 'Abort workflow', fr: 'Interrompre' },
-];
-
 export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEditorProps) {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['sessions']);
   const data = node.data;
-
-  const t = {
-    editNode: language === 'fr' ? 'Modifier le nœud' : 'Edit Node',
-    delete: language === 'fr' ? 'Supprimer' : 'Delete',
-    actionType: language === 'fr' ? 'Type d\'action' : 'Action Type',
-    delay: language === 'fr' ? 'Délai (ms)' : 'Delay (ms)',
-    onFailure: language === 'fr' ? 'En cas d\'échec' : 'On Failure',
-    parameters: language === 'fr' ? 'Paramètres' : 'Parameters',
-    condition: language === 'fr' ? 'Condition' : 'Condition',
-    conditionPlaceholder: language === 'fr' ? 'ex: projector.ready == true' : 'e.g., projector.ready == true',
-    device: language === 'fr' ? 'Appareil' : 'Device',
-    command: language === 'fr' ? 'Commande' : 'Command',
-    delayMs: language === 'fr' ? 'Délai (ms)' : 'Delay (ms)',
-  };
 
   const handleActionTypeChange = (actionType: ActionType) => {
     const defaultCommands: Record<ActionType, string> = {
@@ -72,7 +43,7 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
     return (
       <div className="p-3 space-y-3 overflow-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-dark-text">{t.editNode}</h3>
+          <h3 className="text-xs font-semibold text-dark-text">{t('sessions:workflowNodeEditor.editNode')}</h3>
           <Button variant="danger" size="sm" onClick={onDelete} className="!px-2 !py-1 text-xs">
             <Trash2 size={12} />
           </Button>
@@ -80,15 +51,15 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
 
         {/* Action Type */}
         <div>
-          <label className="block text-xs font-medium text-dark-text mb-1">{t.actionType}</label>
+          <label className="block text-xs font-medium text-dark-text mb-1">{t('sessions:actionEditor.actionType')}</label>
           <select
             value={data.actionType}
             onChange={(e) => handleActionTypeChange(e.target.value as ActionType)}
             className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-dark-text"
           >
-            {Object.entries(actionTypeLabels).map(([value, labels]) => (
+            {(['lighting', 'audio', 'display', 'media', 'actuator', 'session'] as ActionType[]).map((value) => (
               <option key={value} value={value}>
-                {language === 'fr' ? labels.fr : labels.en}
+                {t(`sessions:actionTypes.${value}`)}
               </option>
             ))}
           </select>
@@ -96,24 +67,22 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
 
         {/* On Failure */}
         <div>
-          <label className="block text-xs font-medium text-dark-text mb-1">{t.onFailure}</label>
+          <label className="block text-xs font-medium text-dark-text mb-1">{t('sessions:actionEditor.onFailure')}</label>
           <select
             value={data.on_failure || 'warn'}
             onChange={(e) => onUpdate({ on_failure: e.target.value as 'warn' | 'skip' | 'abort' })}
             className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-dark-text"
           >
-            {onFailureOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {language === 'fr' ? opt.fr : opt.en}
-              </option>
-            ))}
+            <option value="warn">{t('sessions:actionEditor.warn')}</option>
+            <option value="skip">{t('sessions:actionEditor.skip')}</option>
+            <option value="abort">{t('sessions:actionEditor.abort')}</option>
           </select>
         </div>
 
         {/* Type-specific Parameters */}
         <div className="border-t border-dark-border pt-3">
           <div className="text-xs font-medium text-dark-text mb-2">
-            {language === 'fr' ? actionTypeLabels[data.actionType].fr : actionTypeLabels[data.actionType].en} {t.parameters}
+            {t(`sessions:actionTypes.${data.actionType}`)} {t('sessions:actionEditor.parameters')}
           </div>
 
           {data.actionType === 'lighting' && (
@@ -151,7 +120,7 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
           {data.actionType === 'actuator' && (
             <div className="space-y-2">
               <div>
-                <label className="block text-xs text-dark-muted mb-1">{t.device}</label>
+                <label className="block text-xs text-dark-muted mb-1">{t('sessions:actionEditor.device')}</label>
                 <input
                   type="text"
                   value={(data.parameters?.device as string) || ''}
@@ -161,7 +130,7 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
                 />
               </div>
               <div>
-                <label className="block text-xs text-dark-muted mb-1">{t.command}</label>
+                <label className="block text-xs text-dark-muted mb-1">{t('sessions:actionEditor.command')}</label>
                 <input
                   type="text"
                   value={data.command || ''}
@@ -188,13 +157,13 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-dark-text mb-1">{t.condition}</label>
+          <label className="block text-xs font-medium text-dark-text mb-1">{t('sessions:workflowNodeEditor.condition')}</label>
           <input
             type="text"
             value={data.condition || ''}
             onChange={(e) => onUpdate({ condition: e.target.value })}
             className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-dark-text"
-            placeholder={t.conditionPlaceholder}
+            placeholder={t('sessions:workflowNodeEditor.conditionPlaceholder')}
           />
         </div>
       </div>
@@ -205,14 +174,14 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
     return (
       <div className="p-3 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-dark-text">{t.delayMs}</h3>
+          <h3 className="text-xs font-semibold text-dark-text">{t('sessions:workflowNodeEditor.delayMs')}</h3>
           <Button variant="danger" size="sm" onClick={onDelete} className="!px-2 !py-1 text-xs">
             <Trash2 size={12} />
           </Button>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-dark-text mb-1">{t.delayMs}</label>
+          <label className="block text-xs font-medium text-dark-text mb-1">{t('sessions:workflowNodeEditor.delayMs')}</label>
           <input
             type="number"
             value={data.delay_ms || 0}
@@ -232,8 +201,8 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-dark-text">
             {data.nodeType === 'parallel'
-              ? (language === 'fr' ? 'Parallèle' : 'Parallel')
-              : (language === 'fr' ? 'Fusionner' : 'Merge')}
+              ? t('sessions:workflowNodeEditor.parallelTitle')
+              : t('sessions:workflowNodeEditor.mergeTitle')}
           </h3>
           <Button variant="danger" size="sm" onClick={onDelete} className="!px-2 !py-1 text-xs">
             <Trash2 size={12} />
@@ -241,12 +210,8 @@ export function WorkflowNodeEditor({ node, onUpdate, onDelete }: WorkflowNodeEdi
         </div>
         <p className="text-xs text-dark-muted">
           {data.nodeType === 'parallel'
-            ? (language === 'fr'
-                ? 'Exécute les branches connectées en parallèle.'
-                : 'Executes connected branches in parallel.')
-            : (language === 'fr'
-                ? 'Attend que toutes les branches soient terminées.'
-                : 'Waits for all branches to complete.')}
+            ? t('sessions:workflowNodeEditor.parallelDesc')
+            : t('sessions:workflowNodeEditor.mergeDesc')}
         </p>
       </div>
     );

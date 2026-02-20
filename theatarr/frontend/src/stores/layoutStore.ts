@@ -4,9 +4,10 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import i18n from '../i18n';
 
 export type Theme = 'dark' | 'light' | 'system';
-export type Language = 'en' | 'fr';
+export type Language = 'en' | 'fr' | 'it' | 'es' | 'de';
 
 interface LayoutState {
   // Sidebar state
@@ -62,7 +63,10 @@ export const useLayoutStore = create<LayoutState>()(
         set({ theme });
         applyTheme(theme);
       },
-      setLanguage: (language) => set({ language }),
+      setLanguage: (language) => {
+        set({ language });
+        i18n.changeLanguage(language);
+      },
       getEffectiveTheme: () => {
         const { theme } = get();
         if (theme === 'system') {
@@ -83,6 +87,7 @@ export const useLayoutStore = create<LayoutState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyTheme(state.theme);
+          i18n.changeLanguage(state.language);
         }
       },
     }

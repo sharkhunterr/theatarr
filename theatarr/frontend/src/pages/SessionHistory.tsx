@@ -10,9 +10,11 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import { Button, Card, Spinner, PageHeader, ButtonGroup } from '../components/common';
+import { useTranslation } from 'react-i18next';
+import { Card, Spinner, PageHeader, ButtonGroup } from '../components/common';
 import { apiClient } from '../api/client';
 import { EventTimeline } from '../components/history/EventTimeline';
+import { useLocaleFormat } from '../hooks/useLocaleFormat';
 
 interface SessionHistoryItem {
   id: string;
@@ -62,6 +64,8 @@ interface SessionEvent {
 }
 
 function SessionRow({ session }: { session: SessionHistoryItem }) {
+  const { t } = useTranslation('settings');
+  const { formatDateTime } = useLocaleFormat();
   const [expanded, setExpanded] = useState(false);
 
   const { data: events, isLoading: eventsLoading } = useQuery<SessionEvent[]>({
@@ -98,19 +102,19 @@ function SessionRow({ session }: { session: SessionHistoryItem }) {
     return `${minutes}m`;
   };
 
-  const formatDate = (dateString: string | null) => {
+  const fmtDate = (dateString: string | null) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleString('fr-FR');
+    return formatDateTime(dateString);
   };
 
   const statusLabels: Record<string, string> = {
-    completed: 'Termine',
-    running: 'En cours',
-    paused: 'En pause',
-    stopped: 'Arrete',
-    interrupted: 'Interrompu',
-    draft: 'Brouillon',
-    scheduled: 'Planifie',
+    completed: t('history.status.completed'),
+    running: t('history.status.running'),
+    paused: t('history.status.paused'),
+    stopped: t('history.status.stopped'),
+    interrupted: t('history.status.interrupted'),
+    draft: t('history.status.draft'),
+    scheduled: t('history.status.scheduled'),
   };
 
   return (
@@ -132,11 +136,11 @@ function SessionRow({ session }: { session: SessionHistoryItem }) {
           </div>
           <div className="flex items-center gap-3 sm:gap-6 text-xs sm:text-sm text-dark-muted flex-shrink-0">
             <div className="hidden md:block">
-              <span className="text-dark-muted/60">Debut:</span>{' '}
-              {formatDate(session.started_at)}
+              <span className="text-dark-muted/60">{t('history.labels.start')}</span>{' '}
+              {fmtDate(session.started_at)}
             </div>
             <div>
-              <span className="hidden sm:inline text-dark-muted/60">Duree: </span>
+              <span className="hidden sm:inline text-dark-muted/60">{t('history.labels.duration')} </span>
               {formatDuration(session.duration_seconds)}
             </div>
             <div className="hidden sm:block">
@@ -172,31 +176,31 @@ function SessionRow({ session }: { session: SessionHistoryItem }) {
               <span className="font-mono">{session.id.slice(0, 8)}</span>
             </div>
             <div>
-              <span className="text-dark-muted/60">Debut:</span> {formatDate(session.started_at)}
+              <span className="text-dark-muted/60">{t('history.labels.start')}</span> {fmtDate(session.started_at)}
             </div>
             {session.completed_at && (
               <div>
-                <span className="text-dark-muted/60">Fin:</span> {formatDate(session.completed_at)}
+                <span className="text-dark-muted/60">{t('history.labels.end')}</span> {fmtDate(session.completed_at)}
               </div>
             )}
             <div>
-              <span className="text-dark-muted/60">Duree:</span> {formatDuration(session.duration_seconds)}
+              <span className="text-dark-muted/60">{t('history.labels.duration')}</span> {formatDuration(session.duration_seconds)}
             </div>
             <div>
-              <span className="text-dark-muted/60">Sequences:</span> {session.sequences_completed}/{session.total_sequences}
+              <span className="text-dark-muted/60">{t('history.labels.sequences')}</span> {session.sequences_completed}/{session.total_sequences}
             </div>
           </div>
 
           {eventsLoading ? (
             <div className="flex items-center justify-center py-6">
               <Spinner size="sm" />
-              <span className="ml-2 text-sm text-dark-muted">Chargement des evenements...</span>
+              <span className="ml-2 text-sm text-dark-muted">{t('logs.loadingEvents')}</span>
             </div>
           ) : events && events.length > 0 ? (
             <EventTimeline events={events} sessionStartedAt={session.started_at} />
           ) : (
             <div className="text-center py-4 text-sm text-dark-muted">
-              Aucun evenement enregistre (session executée avant l'activation du suivi)
+              {t('history.noEvents')}
             </div>
           )}
         </div>
@@ -206,6 +210,7 @@ function SessionRow({ session }: { session: SessionHistoryItem }) {
 }
 
 export function SessionHistory() {
+  const { t } = useTranslation('settings');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('');
 
@@ -235,15 +240,15 @@ export function SessionHistory() {
   return (
     <div>
       <PageHeader
-        title="Historique"
-        subtitle={statsData ? `${statsData.total_playback_hours.toFixed(1)}h de lecture totale` : undefined}
+        title={t('history.title')}
+        subtitle={statsData ? t('history.totalPlayback', { hours: statsData.total_playback_hours.toFixed(1) }) : undefined}
       />
 
       {/* Daily Chart */}
       {statsData && statsData.daily_stats.length > 0 && (
         <Card className="mb-6">
           <div className="p-4 sm:p-6">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-dark-muted mb-3">7 derniers jours</h2>
+            <h2 className="text-xs font-medium uppercase tracking-wider text-dark-muted mb-3">{t('history.last7days')}</h2>
             <div className="flex items-end gap-2 h-24">
               {statsData.daily_stats.map((day) => {
                 const maxSessions = Math.max(...statsData.daily_stats.map((d) => d.sessions_started), 1);
@@ -273,11 +278,11 @@ export function SessionHistory() {
       <div className="mb-6">
         <ButtonGroup
           options={[
-            { key: '', label: 'Tous' },
-            { key: 'completed', label: 'Termine' },
-            { key: 'running', label: 'En cours' },
-            { key: 'paused', label: 'En pause' },
-            { key: 'interrupted', label: 'Interrompu' },
+            { key: '', label: t('history.filters.all') },
+            { key: 'completed', label: t('history.filters.completed') },
+            { key: 'running', label: t('history.filters.running') },
+            { key: 'paused', label: t('history.filters.paused') },
+            { key: 'interrupted', label: t('history.filters.interrupted') },
           ]}
           value={statusFilter}
           onChange={(v) => { setStatusFilter(v); setPage(1); }}
@@ -305,17 +310,17 @@ export function SessionHistory() {
                 disabled={page === 1}
                 className="h-9 px-3 rounded-md border border-dark-border text-sm font-medium text-dark-text hover:bg-dark-border/50 transition-colors disabled:opacity-50"
               >
-                Precedent
+                {t('history.pagination.previous')}
               </button>
               <span className="text-sm text-dark-muted tabular-nums">
-                Page {page} sur {historyData.total_pages}
+                {t('history.pagination.pageOf', { page, total: historyData.total_pages })}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(historyData.total_pages, p + 1))}
                 disabled={page === historyData.total_pages}
                 className="h-9 px-3 rounded-md border border-dark-border text-sm font-medium text-dark-text hover:bg-dark-border/50 transition-colors disabled:opacity-50"
               >
-                Suivant
+                {t('history.pagination.next')}
               </button>
             </div>
           )}
@@ -323,7 +328,7 @@ export function SessionHistory() {
       ) : (
         <div className="text-center py-8">
           <History size={32} className="mx-auto text-dark-muted mb-3" />
-          <p className="text-sm text-dark-muted">Aucun historique trouve</p>
+          <p className="text-sm text-dark-muted">{t('history.empty')}</p>
         </div>
       )}
     </div>

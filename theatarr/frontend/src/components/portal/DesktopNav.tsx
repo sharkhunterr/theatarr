@@ -5,25 +5,27 @@
 import { Home, Play, Vote, HelpCircle, User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { usePortalNotifications } from '../../hooks/usePortalNotifications';
 
 interface NavItem {
   icon: typeof Home;
-  label: string;
+  labelKey: string;
   path: string;
   badgeKey?: 'sessions' | 'votes' | 'quiz';
 }
 
 const navItems: NavItem[] = [
-  { icon: Home, label: 'Accueil', path: '/portal' },
-  { icon: Play, label: 'Sessions', path: '/portal/sessions', badgeKey: 'sessions' },
-  { icon: Vote, label: 'Votes', path: '/portal/votes', badgeKey: 'votes' },
-  { icon: HelpCircle, label: 'Quiz', path: '/portal/quiz', badgeKey: 'quiz' },
-  { icon: User, label: 'Profil', path: '/portal/profile' },
+  { icon: Home, labelKey: 'portal:nav.home', path: '/portal' },
+  { icon: Play, labelKey: 'portal:nav.sessions', path: '/portal/sessions', badgeKey: 'sessions' },
+  { icon: Vote, labelKey: 'portal:nav.votes', path: '/portal/votes', badgeKey: 'votes' },
+  { icon: HelpCircle, labelKey: 'portal:nav.quiz', path: '/portal/quiz', badgeKey: 'quiz' },
+  { icon: User, labelKey: 'portal:nav.profile', path: '/portal/profile' },
 ];
 
 export function DesktopNav() {
   const location = useLocation();
+  const { t } = useTranslation();
   const { unseenSessions, unseenVotes, unseenQuiz } = usePortalNotifications();
 
   const badgeCounts: Record<string, number> = {
@@ -59,7 +61,7 @@ export function DesktopNav() {
               )}
             >
               <Icon size={16} />
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
               {badgeCount > 0 && (
                 <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
                   {badgeCount > 9 ? '9+' : badgeCount}

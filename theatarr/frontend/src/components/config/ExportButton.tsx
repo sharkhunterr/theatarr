@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Download, Lock, Unlock, CheckSquare, Square } from 'lucide-react';
 import { Button, Input } from '../common';
 import { apiClient } from '../../api/client';
@@ -15,6 +16,7 @@ interface ExportOptions {
 }
 
 export function ExportButton() {
+  const { t } = useTranslation('settings');
   const [options, setOptions] = useState<ExportOptions>({
     include_sessions: true,
     include_services: true,
@@ -62,15 +64,15 @@ export function ExportButton() {
   const handleExport = () => {
     if (options.encrypt_secrets) {
       if (!password) {
-        setPasswordError('Password is required for encryption');
+        setPasswordError(t('config.export.passwordRequired'));
         return;
       }
       if (password.length < 8) {
-        setPasswordError('Password must be at least 8 characters');
+        setPasswordError(t('config.export.passwordMinLength'));
         return;
       }
       if (password !== confirmPassword) {
-        setPasswordError('Passwords do not match');
+        setPasswordError(t('config.export.passwordMismatch'));
         return;
       }
     }
@@ -79,18 +81,18 @@ export function ExportButton() {
   };
 
   const optionItems = [
-    { key: 'include_sessions' as const, label: 'Sessions', description: 'Session configurations and sequences' },
-    { key: 'include_services' as const, label: 'Services', description: 'Connected services and credentials' },
-    { key: 'include_templates' as const, label: 'Templates', description: 'Custom wallmount templates' },
-    { key: 'include_trailer_rules' as const, label: 'Trailer Rules', description: 'Auto-download configurations' },
-    { key: 'include_settings' as const, label: 'Settings', description: 'Application settings' },
+    { key: 'include_sessions' as const, label: t('config.export.optionSessions'), description: t('config.export.optionSessionsDesc') },
+    { key: 'include_services' as const, label: t('config.export.optionServices'), description: t('config.export.optionServicesDesc') },
+    { key: 'include_templates' as const, label: t('config.export.optionTemplates'), description: t('config.export.optionTemplatesDesc') },
+    { key: 'include_trailer_rules' as const, label: t('config.export.optionTrailerRules'), description: t('config.export.optionTrailerRulesDesc') },
+    { key: 'include_settings' as const, label: t('config.export.optionSettings'), description: t('config.export.optionSettingsDesc') },
   ];
 
   return (
     <div className="space-y-6">
       {/* Export Options */}
       <div>
-        <h3 className="text-sm font-medium text-gray-300 mb-3">Include in Export</h3>
+        <h3 className="text-sm font-medium text-gray-300 mb-3">{t('config.export.includeInExport')}</h3>
         <div className="space-y-2">
           {optionItems.map((item) => (
             <button
@@ -126,11 +128,11 @@ export function ExportButton() {
             <Unlock size={18} className="text-yellow-400" />
           )}
           <div className="flex-1">
-            <div className="font-medium">Encrypt Sensitive Data</div>
+            <div className="font-medium">{t('config.export.encryptSensitiveData')}</div>
             <div className="text-xs text-gray-500">
               {options.encrypt_secrets
-                ? 'API keys and passwords will be encrypted'
-                : 'WARNING: Sensitive data will be exported in plain text'}
+                ? t('config.export.encryptedDesc')
+                : t('config.export.unencryptedWarning')}
             </div>
           </div>
         </button>
@@ -138,23 +140,22 @@ export function ExportButton() {
         {options.encrypt_secrets && (
           <div className="mt-4 space-y-3 pl-4 border-l-2 border-indigo-500/50">
             <Input
-              label="Encryption Password"
+              label={t('config.export.encryptionPassword')}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter a strong password"
+              placeholder={t('config.export.enterStrongPassword')}
             />
             <Input
-              label="Confirm Password"
+              label={t('config.export.confirmPassword')}
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm password"
+              placeholder={t('config.export.confirmPasswordPlaceholder')}
             />
             {passwordError && <p className="text-sm text-red-400">{passwordError}</p>}
             <p className="text-xs text-gray-500">
-              This password will be required to import the configuration with decrypted secrets.
-              Store it securely.
+              {t('config.export.passwordNote')}
             </p>
           </div>
         )}
@@ -168,11 +169,11 @@ export function ExportButton() {
           className="min-w-[150px]"
         >
           {exportMutation.isPending ? (
-            'Exporting...'
+            t('config.export.exporting')
           ) : (
             <>
               <Download size={16} />
-              <span className="ml-2">Export Configuration</span>
+              <span className="ml-2">{t('config.export.exportConfiguration')}</span>
             </>
           )}
         </Button>
@@ -180,7 +181,7 @@ export function ExportButton() {
 
       {exportMutation.error && (
         <div className="p-4 bg-red-500/20 rounded-lg text-red-400 text-sm">
-          Export failed. Please try again.
+          {t('config.export.exportFailed')}
         </div>
       )}
     </div>

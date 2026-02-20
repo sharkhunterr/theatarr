@@ -5,6 +5,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Calendar, Vote, CheckCircle, Film, HelpCircle, Mail, Play, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { VoteCard } from '../../components/portal/VoteCard';
@@ -64,6 +65,7 @@ interface PortalVote {
 
 export function PortalHome() {
   useCountdown();
+  const { t } = useTranslation(['portal', 'common']);
   const { user } = useAuthStore();
   const displayName = user?.first_name || user?.username || 'User';
 
@@ -106,26 +108,26 @@ export function PortalHome() {
 
   const formatCountdown = (dateStr: string) => {
     const diff = new Date(dateStr).getTime() - Date.now();
-    if (diff <= 0) return 'Maintenant';
+    if (diff <= 0) return t('portal:home.countdown.now');
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     if (hours >= 24) {
       const days = Math.floor(hours / 24);
       const h = hours % 24;
-      return `dans ${days}j ${h}h`;
+      return t('portal:home.countdown.inDaysHours', { days, hours: h });
     }
     if (hours >= 1) {
       const m = minutes % 60;
-      return `dans ${hours}h${m > 0 ? `${m.toString().padStart(2, '0')}` : ''}`;
+      return t('portal:home.countdown.inHoursMinutes', { hours, minutes: m > 0 ? m.toString().padStart(2, '0') : '' });
     }
-    return `dans ${minutes}min`;
+    return t('portal:home.countdown.inMinutes', { minutes });
   };
 
   const statItems = [
     {
       icon: Calendar,
       value: stats?.upcoming_sessions ?? '-',
-      label: 'A venir',
+      label: t('portal:home.stats.upcoming'),
       color: 'blue',
       gradient: 'from-blue-500/15 to-blue-500/5',
       iconBg: 'bg-blue-500/20',
@@ -134,7 +136,7 @@ export function PortalHome() {
     {
       icon: Vote,
       value: stats?.pending_votes ?? '-',
-      label: 'Votes',
+      label: t('portal:home.stats.votes'),
       color: 'theatarr',
       gradient: 'from-theatarr-500/15 to-theatarr-500/5',
       iconBg: 'bg-theatarr-500/20',
@@ -143,7 +145,7 @@ export function PortalHome() {
     {
       icon: Film,
       value: stats?.total_sessions_attended ?? '-',
-      label: 'Vues',
+      label: t('portal:home.stats.watched'),
       color: 'green',
       gradient: 'from-green-500/15 to-green-500/5',
       iconBg: 'bg-green-500/20',
@@ -152,7 +154,7 @@ export function PortalHome() {
     {
       icon: CheckCircle,
       value: stats?.total_votes_cast ?? '-',
-      label: 'Votés',
+      label: t('portal:home.stats.voted'),
       color: 'purple',
       gradient: 'from-purple-500/15 to-purple-500/5',
       iconBg: 'bg-purple-500/20',
@@ -194,7 +196,7 @@ export function PortalHome() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Play size={18} className={isImminent ? 'text-green-400' : 'text-theatarr-400'} />
-                <h2 className="text-lg font-semibold text-dark-text">Sessions aujourd'hui</h2>
+                <h2 className="text-lg font-semibold text-dark-text">{t('portal:home.sessionsToday')}</h2>
                 <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-full ${
                   isImminent
                     ? 'bg-green-500 text-white animate-pulse'
@@ -207,7 +209,7 @@ export function PortalHome() {
                 </span>
               </div>
               <Link to="/portal/sessions" className="text-sm text-theatarr-500 hover:underline">
-                Voir tout
+                {t('portal:home.viewAll')}
               </Link>
             </div>
             <div className="space-y-3">
@@ -257,7 +259,7 @@ export function PortalHome() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Mail size={18} className="text-blue-400" />
-              <h2 className="text-lg font-semibold text-dark-text">Invitations en attente</h2>
+              <h2 className="text-lg font-semibold text-dark-text">{t('portal:home.pendingInvitations')}</h2>
               <span className="px-2 py-0.5 text-xs font-bold bg-blue-500 text-white rounded-full animate-blink">
                 {pendingInvitations.items.length}
               </span>
@@ -301,7 +303,7 @@ export function PortalHome() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Vote size={18} className="text-theatarr-400" />
-              <h2 className="text-lg font-semibold text-dark-text">Votes en attente</h2>
+              <h2 className="text-lg font-semibold text-dark-text">{t('portal:home.pendingVotes')}</h2>
               <span className="px-2 py-0.5 text-xs font-bold bg-theatarr-500 text-white rounded-full animate-blink">
                 {pendingVotes.items.length}
               </span>
@@ -333,7 +335,7 @@ export function PortalHome() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <HelpCircle size={18} className="text-yellow-400" />
-              <h2 className="text-lg font-semibold text-dark-text">Quiz en cours</h2>
+              <h2 className="text-lg font-semibold text-dark-text">{t('portal:home.pendingQuiz')}</h2>
               <span className="px-2 py-0.5 text-xs font-bold bg-yellow-500 text-white rounded-full animate-blink">
                 {pendingQuiz.items.length}
               </span>
@@ -359,9 +361,9 @@ export function PortalHome() {
                       <p className="text-sm text-dark-muted line-clamp-1 mt-0.5">{quiz.description}</p>
                     )}
                     <div className="flex items-center gap-3 mt-2 text-xs text-dark-muted">
-                      <span>{quiz.question_count} questions</span>
+                      <span>{t('portal:home.quiz.questions', { count: quiz.question_count })}</span>
                       {!quiz.has_joined && (
-                        <span className="text-blue-400">Pas encore rejoint</span>
+                        <span className="text-blue-400">{t('portal:home.quiz.notJoined')}</span>
                       )}
                     </div>
                   </div>
@@ -379,7 +381,7 @@ export function PortalHome() {
         return upcomingFiltered.length > 0 ? (
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-dark-text">Prochaines sessions</h2>
+            <h2 className="text-lg font-semibold text-dark-text">{t('portal:home.upcomingSessions')}</h2>
             <Link to="/portal/sessions" className="text-sm text-theatarr-500 hover:underline">
               Voir tout
             </Link>
@@ -421,10 +423,10 @@ export function PortalHome() {
           <div className="text-center py-12">
             <Film size={48} className="mx-auto text-dark-muted mb-4" />
             <h3 className="text-lg font-medium text-dark-text mb-2">
-              Aucune activite pour le moment
+              {t('portal:home.emptyTitle')}
             </h3>
             <p className="text-dark-muted">
-              Vous serez notifie lorsque vous serez invite a une session ou un vote.
+              {t('portal:home.emptyDescription')}
             </p>
           </div>
         )}

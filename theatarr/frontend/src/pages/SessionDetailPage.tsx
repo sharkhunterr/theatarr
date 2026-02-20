@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import {
   ArrowLeft,
@@ -48,7 +49,7 @@ import { apiClient } from '../api/client';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCountdown } from '../hooks/useCountdown';
 import { useSetting } from '../hooks/useSettings';
-import { useLayoutStore } from '../stores/layoutStore';
+import { useLocaleFormat } from '../hooks/useLocaleFormat';
 import {
   type Session,
   type SessionState,
@@ -88,56 +89,6 @@ interface Participant {
 }
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatDateShort(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function getStatusBadge(status: string, language: string) {
-  const labels: Record<string, { fr: string; en: string }> = {
-    draft: { fr: 'Brouillon', en: 'Draft' },
-    scheduled: { fr: 'Programmee', en: 'Scheduled' },
-    running: { fr: 'En cours', en: 'Running' },
-    paused: { fr: 'En pause', en: 'Paused' },
-    completed: { fr: 'Terminee', en: 'Completed' },
-    interrupted: { fr: 'Interrompue', en: 'Interrupted' },
-  };
-  const colors: Record<string, string> = {
-    draft: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-    scheduled: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    running: 'bg-green-500/20 text-green-400 border-green-500/30',
-    paused: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    completed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    interrupted: 'bg-red-500/20 text-red-400 border-red-500/30',
-  };
-  return {
-    label: language === 'fr' ? labels[status]?.fr : labels[status]?.en || status,
-    color: colors[status] || colors.draft,
-  };
-}
-
-// ============================================================================
 // Timeline Component (improved with proportional widths + multi-stripe)
 // ============================================================================
 
@@ -146,16 +97,15 @@ function SessionTimeline({
   currentIndex,
   elapsedMs,
   status,
-  language,
   movieRuntimeMs,
 }: {
   sequences: Sequence[];
   currentIndex: number;
   elapsedMs: number;
   status: string;
-  language: string;
   movieRuntimeMs: number;
 }) {
+  const { t } = useTranslation(['sessions', 'common']);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const widths = useMemo(
@@ -171,7 +121,7 @@ function SessionTimeline({
   if (sequences.length === 0) {
     return (
       <div className="text-sm text-dark-muted text-center py-4">
-        {language === 'fr' ? 'Aucune sequence' : 'No sequences'}
+        {t('sessions:detail.noSequences')}
       </div>
     );
   }
@@ -332,24 +282,14 @@ function SessionTimeline({
 function ParticipantsSection({
   participants,
   isLoading,
-  language,
   qrTicketsEnabled = false,
 }: {
   participants: Participant[];
   isLoading: boolean;
-  language: string;
   qrTicketsEnabled?: boolean;
 }) {
-  const t = {
-    title: language === 'fr' ? 'Participants' : 'Participants',
-    accepted: language === 'fr' ? 'acceptes' : 'accepted',
-    invited: language === 'fr' ? 'invites' : 'invited',
-    pending: language === 'fr' ? 'En attente' : 'Pending',
-    acceptedLabel: language === 'fr' ? 'Accepte' : 'Accepted',
-    declined: language === 'fr' ? 'Refuse' : 'Declined',
-    noParticipants: language === 'fr' ? 'Aucun participant invite' : 'No participants invited',
-    checkedIn: language === 'fr' ? 'scannes' : 'checked in',
-  };
+  const { t } = useTranslation(['sessions', 'common']);
+  const { formatTime } = useLocaleFormat();
 
   if (isLoading) {
     return (
@@ -372,8 +312,8 @@ function ParticipantsSection({
   if (participants.length === 0) {
     return (
       <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
-        <h3 className="text-sm font-medium text-dark-text mb-2">{t.title}</h3>
-        <p className="text-sm text-dark-muted">{t.noParticipants}</p>
+        <h3 className="text-sm font-medium text-dark-text mb-2">{t('sessions:participants.title')}</h3>
+        <p className="text-sm text-dark-muted">{t('sessions:participants.noParticipants')}</p>
       </div>
     );
   }
@@ -386,10 +326,6 @@ function ParticipantsSection({
   const getDisplayName = (p: Participant) => {
     if (p.first_name && p.last_name) return `${p.first_name} ${p.last_name}`;
     return p.username;
-  };
-
-  const formatCheckInTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   };
 
   const renderGroup = (
@@ -418,7 +354,7 @@ function ParticipantsSection({
               )}
               title={
                 showCheckIn && p.checked_in && p.checked_in_at
-                  ? `Check-in: ${formatCheckInTime(p.checked_in_at)}`
+                  ? `Check-in: ${formatTime(p.checked_in_at)}`
                   : p.email || p.username
               }
             >
@@ -446,23 +382,23 @@ function ParticipantsSection({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-dark-text flex items-center gap-2">
           <Users size={14} className="text-dark-muted" />
-          {t.title}
+          {t('sessions:participants.title')}
         </h3>
         <div className="flex items-center gap-3">
           {qrTicketsEnabled && checkedInCount > 0 && (
             <span className="text-xs text-green-400">
-              {checkedInCount} {t.checkedIn}
+              {checkedInCount} {t('sessions:participants.checkedIn')}
             </span>
           )}
           <span className="text-xs text-dark-muted">
-            {accepted.length} {t.accepted} / {participants.length} {t.invited}
+            {accepted.length} {t('sessions:participants.accepted')} / {participants.length} {t('sessions:participants.invited')}
           </span>
         </div>
       </div>
       <div className="space-y-3">
-        {renderGroup(accepted, Check, 'text-green-400', 'bg-green-500/10 border-green-500/20', t.acceptedLabel, qrTicketsEnabled)}
-        {renderGroup(pending, Clock, 'text-yellow-400', 'bg-yellow-500/10 border-yellow-500/20', t.pending)}
-        {renderGroup(declined, X, 'text-red-400', 'bg-red-500/10 border-red-500/20', t.declined)}
+        {renderGroup(accepted, Check, 'text-green-400', 'bg-green-500/10 border-green-500/20', t('sessions:participants.acceptedLabel'), qrTicketsEnabled)}
+        {renderGroup(pending, Clock, 'text-yellow-400', 'bg-yellow-500/10 border-yellow-500/20', t('sessions:participants.pending'))}
+        {renderGroup(declined, X, 'text-red-400', 'bg-red-500/10 border-red-500/20', t('sessions:participants.declined'))}
       </div>
     </div>
   );
@@ -476,7 +412,8 @@ export function SessionDetailPage() {
   useCountdown();
   const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
   const { id } = useParams<{ id: string }>();
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['sessions', 'common']);
+  const { formatDate } = useLocaleFormat();
 
   // Fetch session
   const {
@@ -516,7 +453,7 @@ export function SessionDetailPage() {
       if (message.type === 'session_state' && message.payload?.session_id === id) {
         const newState = message.payload as unknown as SessionState;
         setLiveState(newState);
-        // Refetch full session data when status changes (e.g. running → paused → completed)
+        // Refetch full session data when status changes (e.g. running -> paused -> completed)
         if (prevStatusRef.current && prevStatusRef.current !== newState.status) {
           refetchSession();
         }
@@ -582,35 +519,40 @@ export function SessionDetailPage() {
   const canStop = currentStatus === 'running' || currentStatus === 'paused';
   const canSkip = currentStatus === 'running';
 
-  const statusBadge = getStatusBadge(currentStatus, language);
+  const getStatusBadge = (status: string) => {
+    const labelMap: Record<string, string> = {
+      draft: t('sessions:detail.draft'),
+      scheduled: t('sessions:detail.scheduledStatus'),
+      running: t('sessions:detail.running'),
+      paused: t('sessions:detail.paused'),
+      completed: t('sessions:detail.completed'),
+      interrupted: t('sessions:detail.interrupted'),
+    };
+    const colors: Record<string, string> = {
+      draft: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+      scheduled: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      running: 'bg-green-500/20 text-green-400 border-green-500/30',
+      paused: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      completed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      interrupted: 'bg-red-500/20 text-red-400 border-red-500/30',
+    };
+    return {
+      label: labelMap[status] || status,
+      color: colors[status] || colors.draft,
+    };
+  };
+
+  const statusBadge = getStatusBadge(currentStatus);
   const bgColor = session?.color_palette?.primary || '#1a1a1a';
 
-  const t = {
-    back: language === 'fr' ? 'Sessions' : 'Sessions',
-    edit: language === 'fr' ? 'Modifier' : 'Edit',
-    play: language === 'fr' ? 'Lancer' : 'Play',
-    resume: language === 'fr' ? 'Reprendre' : 'Resume',
-    pause: 'Pause',
-    stop: language === 'fr' ? 'Arreter' : 'Stop',
-    skip: language === 'fr' ? 'Suivant' : 'Skip',
-    details: language === 'fr' ? 'Details' : 'Details',
-    description: 'Description',
-    created: language === 'fr' ? 'Creee le' : 'Created',
-    started: language === 'fr' ? 'Demarree le' : 'Started',
-    ended: language === 'fr' ? 'Terminee le' : 'Ended',
-    scheduled: language === 'fr' ? 'Programmee le' : 'Scheduled',
-    displayCode: language === 'fr' ? 'Code display' : 'Display code',
-    sequences: language === 'fr' ? 'sequences' : 'sequences',
-    actions: language === 'fr' ? 'actions' : 'actions',
-    mysteryMovie: language === 'fr' ? 'Film mystere' : 'Mystery movie',
-    voteOpen: language === 'fr' ? 'Vote en cours' : 'Vote in progress',
-    voteClosed: language === 'fr' ? 'Vote clos' : 'Vote closed',
-    votePending: language === 'fr' ? 'Vote en attente' : 'Vote pending',
-    linked: language === 'fr' ? 'Vote lie' : 'Linked vote',
-    display: 'Display',
-    wallmount: 'Wallmount',
-    notFound: language === 'fr' ? 'Session non trouvee' : 'Session not found',
-    loading: language === 'fr' ? 'Chargement...' : 'Loading...',
+  const formatShortDate = (dateStr: string) => {
+    return formatDate(dateStr, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   // ---- Loading / Error states ----
@@ -634,10 +576,10 @@ export function SessionDetailPage() {
           className="inline-flex items-center gap-2 text-dark-muted hover:text-dark-text transition-colors mb-4"
         >
           <ArrowLeft size={18} />
-          <span>{t.back}</span>
+          <span>{t('sessions:detail.back')}</span>
         </Link>
         <div className="text-center py-12">
-          <p className="text-dark-muted">{t.notFound}</p>
+          <p className="text-dark-muted">{t('sessions:detail.notFound')}</p>
         </div>
       </div>
     );
@@ -655,14 +597,14 @@ export function SessionDetailPage() {
           className="inline-flex items-center gap-2 text-dark-muted hover:text-dark-text transition-colors"
         >
           <ArrowLeft size={18} />
-          <span>{t.back}</span>
+          <span>{t('sessions:detail.back')}</span>
         </Link>
         <Link
           to={`/sessions/${id}/edit`}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-surface border border-dark-border text-sm text-dark-text hover:border-theatarr-500/50 hover:text-theatarr-500 transition-colors"
         >
           <Edit3 size={14} />
-          {t.edit}
+          {t('sessions:detail.edit')}
         </Link>
       </div>
 
@@ -734,7 +676,7 @@ export function SessionDetailPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Préparation BA
+                  {t('sessions:detail.preparingTrailers')}
                 </span>
               )}
               {/* Session start countdown */}
@@ -760,7 +702,7 @@ export function SessionDetailPage() {
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <div className="flex items-center gap-1.5">
                   <Shuffle size={14} className="text-purple-400" />
-                  <span className="text-purple-300 font-medium text-sm">{t.mysteryMovie}</span>
+                  <span className="text-purple-300 font-medium text-sm">{t('sessions:detail.mysteryMovie')}</span>
                 </div>
                 {session.mystery_reveal_at && (() => {
                   const reveal = getMysteryRevealCountdown(session.mystery_reveal_at);
@@ -780,7 +722,7 @@ export function SessionDetailPage() {
                 <div className="flex items-center gap-1.5">
                   <Vote size={14} className="text-blue-400" />
                   <span className="text-blue-300 font-medium text-sm">
-                    {voteSession?.is_open === false ? t.voteClosed : t.voteOpen}
+                    {voteSession?.is_open === false ? t('sessions:detail.voteClosed') : t('sessions:detail.voteOpen')}
                   </span>
                 </div>
                 {session.vote_reveal_at && (() => {
@@ -815,13 +757,13 @@ export function SessionDetailPage() {
               {session.scheduled_at && (
                 <span className="flex items-center gap-1">
                   <Calendar size={12} />
-                  {formatDateShort(session.scheduled_at)}
+                  {formatShortDate(session.scheduled_at)}
                 </span>
               )}
               {sequences.length > 0 && (
                 <span className="flex items-center gap-1">
                   <Zap size={12} />
-                  {sequences.length} {t.sequences}
+                  {sequences.length} {t('sessions:detail.sequences')}
                 </span>
               )}
               {session.display_code && (
@@ -865,7 +807,7 @@ export function SessionDetailPage() {
             isLoading={controllingAction === 'play'}
           >
             <Play size={14} className="mr-1" />
-            {currentStatus === 'paused' ? t.resume : t.play}
+            {currentStatus === 'paused' ? t('sessions:detail.resume') : t('sessions:detail.play')}
           </Button>
         )}
         {canPause && (
@@ -877,7 +819,7 @@ export function SessionDetailPage() {
             isLoading={controllingAction === 'pause'}
           >
             <Pause size={14} className="mr-1" />
-            {t.pause}
+            {t('sessions:detail.pause')}
           </Button>
         )}
         {canSkip && (
@@ -889,7 +831,7 @@ export function SessionDetailPage() {
             isLoading={controllingAction === 'skip'}
           >
             <SkipForward size={14} className="mr-1" />
-            {t.skip}
+            {t('sessions:detail.skip')}
           </Button>
         )}
         {canStop && (
@@ -902,7 +844,7 @@ export function SessionDetailPage() {
             className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
           >
             <Square size={14} className="mr-1" />
-            {t.stop}
+            {t('sessions:detail.stop')}
           </Button>
         )}
 
@@ -913,7 +855,7 @@ export function SessionDetailPage() {
         {sequences.length > 0 && (
           <button
             onClick={() => setShowTimelineDetail(true)}
-            title={language === 'fr' ? 'Detail timeline' : 'Timeline detail'}
+            title={t('sessions:detail.timelineDetail')}
             className="p-1.5 rounded-lg text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
           >
             <BarChart3 size={16} />
@@ -924,7 +866,7 @@ export function SessionDetailPage() {
             href={`/display/${session.display_code}`}
             target="_blank"
             rel="noopener noreferrer"
-            title={t.display}
+            title={t('sessions:detail.display')}
             className="p-1.5 rounded-lg text-dark-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
           >
             <ScreenShare size={16} />
@@ -935,7 +877,7 @@ export function SessionDetailPage() {
             href={`/wallmount/${session.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            title={t.wallmount}
+            title={t('sessions:detail.wallmount')}
             className="p-1.5 rounded-lg text-dark-muted hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
           >
             <Monitor size={16} />
@@ -944,7 +886,7 @@ export function SessionDetailPage() {
         {session.qr_tickets_enabled && (
           <button
             onClick={() => setShowScanner(true)}
-            title={language === 'fr' ? 'Scanner un ticket' : 'Scan a ticket'}
+            title={t('sessions:detail.scanTicket')}
             className="p-1.5 rounded-lg text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
           >
             <QrCode size={16} />
@@ -967,7 +909,6 @@ export function SessionDetailPage() {
             currentIndex={currentIndex}
             elapsedMs={elapsedMs}
             status={currentStatus}
-            language={language}
             movieRuntimeMs={movieRuntimeMs}
           />
         </div>
@@ -978,7 +919,6 @@ export function SessionDetailPage() {
         isOpen={showTimelineDetail}
         onClose={() => setShowTimelineDetail(false)}
         sessionId={id!}
-        language={language}
         currentIndex={currentIndex}
         elapsedMs={elapsedMs}
         status={currentStatus}
@@ -996,15 +936,14 @@ export function SessionDetailPage() {
       <ParticipantsSection
         participants={participants}
         isLoading={isParticipantsLoading}
-        language={language}
         qrTicketsEnabled={session.qr_tickets_enabled}
       />
 
       {/* Details */}
-      <SessionDetailsSection session={session} voteSession={voteSession} language={language} />
+      <SessionDetailsSection session={session} voteSession={voteSession} />
 
       {/* Activity / Events */}
-      <SessionActivitySection sessionId={id!} startedAt={session.started_at} language={language} />
+      <SessionActivitySection sessionId={id!} startedAt={session.started_at} />
 
       {/* QR Scanner Modal */}
       <QrScannerModal
@@ -1064,31 +1003,26 @@ function formatRuntimeMin(min: number): string {
 function SessionDetailsSection({
   session,
   voteSession,
-  language,
 }: {
   session: Session;
   voteSession: VoteSessionSummary | undefined;
-  language: string;
 }) {
+  const { t } = useTranslation(['sessions', 'common']);
+  const { formatDate } = useLocaleFormat();
   const [actionsExpanded, setActionsExpanded] = useState(false);
   const [overviewExpanded, setOverviewExpanded] = useState(false);
   const md = session.movie_details;
   const actions = useMemo(() => extractActionsFromWorkflow(session.workflow), [session.workflow]);
 
-  const t = {
-    details: language === 'fr' ? 'Details' : 'Details',
-    movieInfo: language === 'fr' ? 'Film' : 'Movie',
-    sessionInfo: language === 'fr' ? 'Session' : 'Session',
-    scheduled: language === 'fr' ? 'Programmee le' : 'Scheduled',
-    started: language === 'fr' ? 'Demarree le' : 'Started',
-    ended: language === 'fr' ? 'Terminee le' : 'Ended',
-    created: language === 'fr' ? 'Creee le' : 'Created',
-    linked: language === 'fr' ? 'Vote lie' : 'Linked vote',
-    voteOpen: language === 'fr' ? 'Vote en cours' : 'Vote in progress',
-    voteClosed: language === 'fr' ? 'Vote clos' : 'Vote closed',
-    actions: language === 'fr' ? 'Actions' : 'Actions',
-    noActions: language === 'fr' ? 'Aucune action configuree' : 'No actions configured',
-    enrichment: language === 'fr' ? 'Enrichissement' : 'Enrichment',
+  const formatFullDate = (dateStr: string) => {
+    return formatDate(dateStr, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
@@ -1098,7 +1032,7 @@ function SessionDetailsSection({
         <div className="bg-dark-surface rounded-xl border border-dark-border p-4 space-y-3">
           <h3 className="text-sm font-medium text-dark-text flex items-center gap-2">
             <Film size={14} className="text-theatarr-500" />
-            {t.movieInfo}
+            {t('sessions:detailSections.movieInfo')}
           </h3>
 
           {session.description && (
@@ -1165,9 +1099,7 @@ function SessionDetailsSection({
                   onClick={() => setOverviewExpanded(!overviewExpanded)}
                   className="text-xs text-theatarr-500 hover:text-theatarr-400 mt-1 transition-colors"
                 >
-                  {overviewExpanded
-                    ? (language === 'fr' ? 'Voir moins' : 'See less')
-                    : (language === 'fr' ? 'Voir plus' : 'See more')}
+                  {overviewExpanded ? t('sessions:detail.seeLess') : t('sessions:detail.seeMore')}
                 </button>
               )}
             </div>
@@ -1203,7 +1135,7 @@ function SessionDetailsSection({
       <div className="bg-dark-surface rounded-xl border border-dark-border p-4 space-y-3">
         <h3 className="text-sm font-medium text-dark-text flex items-center gap-2">
           <Clock size={14} className="text-dark-muted" />
-          {t.sessionInfo}
+          {t('sessions:detailSections.sessionInfo')}
         </h3>
 
         {!md && session.description && (
@@ -1224,10 +1156,10 @@ function SessionDetailsSection({
               )}
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-dark-text">{t.linked}: {voteSession.name}</p>
+              <p className="text-sm font-medium text-dark-text">{t('sessions:detailSections.linked')}: {voteSession.name}</p>
               <p className="text-xs text-dark-muted">
                 {voteSession.total_votes} vote{voteSession.total_votes !== 1 ? 's' : ''}
-                {voteSession.is_open ? ` — ${t.voteOpen}` : ` — ${t.voteClosed}`}
+                {voteSession.is_open ? ` — ${t('sessions:detailSections.voteOpen')}` : ` — ${t('sessions:detailSections.voteClosed')}`}
               </p>
             </div>
             <Link
@@ -1245,8 +1177,8 @@ function SessionDetailsSection({
             <div className="flex items-center gap-2 text-dark-muted">
               <Calendar size={14} className="text-purple-400 flex-shrink-0" />
               <div>
-                <span className="text-dark-text">{t.scheduled}</span>
-                <p className="text-xs">{formatDate(session.scheduled_at)}</p>
+                <span className="text-dark-text">{t('sessions:detailSections.scheduled')}</span>
+                <p className="text-xs">{formatFullDate(session.scheduled_at)}</p>
               </div>
             </div>
           )}
@@ -1254,8 +1186,8 @@ function SessionDetailsSection({
             <div className="flex items-center gap-2 text-dark-muted">
               <Play size={14} className="text-green-400 flex-shrink-0" />
               <div>
-                <span className="text-dark-text">{t.started}</span>
-                <p className="text-xs">{formatDate(session.started_at)}</p>
+                <span className="text-dark-text">{t('sessions:detailSections.started')}</span>
+                <p className="text-xs">{formatFullDate(session.started_at)}</p>
               </div>
             </div>
           )}
@@ -1263,16 +1195,16 @@ function SessionDetailsSection({
             <div className="flex items-center gap-2 text-dark-muted">
               <Check size={14} className="text-blue-400 flex-shrink-0" />
               <div>
-                <span className="text-dark-text">{t.ended}</span>
-                <p className="text-xs">{formatDate(session.completed_at)}</p>
+                <span className="text-dark-text">{t('sessions:detailSections.ended')}</span>
+                <p className="text-xs">{formatFullDate(session.completed_at)}</p>
               </div>
             </div>
           )}
           <div className="flex items-center gap-2 text-dark-muted">
             <Clock size={14} className="text-dark-muted flex-shrink-0" />
             <div>
-              <span className="text-dark-text">{t.created}</span>
-              <p className="text-xs">{formatDate(session.created_at)}</p>
+              <span className="text-dark-text">{t('sessions:detailSections.created')}</span>
+              <p className="text-xs">{formatFullDate(session.created_at)}</p>
             </div>
           </div>
         </div>
@@ -1286,7 +1218,7 @@ function SessionDetailsSection({
             >
               {actionsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <Zap size={14} className="text-purple-400" />
-              {t.actions} ({actions.length})
+              {t('sessions:detailSections.actions')} ({actions.length})
             </button>
             {actionsExpanded && (
               <div className="mt-2 space-y-1.5">
@@ -1355,12 +1287,11 @@ interface SessionEvent {
 function SessionActivitySection({
   sessionId,
   startedAt,
-  language,
 }: {
   sessionId: string;
   startedAt?: string | null;
-  language: string;
 }) {
+  const { t } = useTranslation(['sessions', 'common']);
   const [expanded, setExpanded] = useState(false);
 
   const { data: events, isLoading } = useQuery<SessionEvent[]>({
@@ -1368,12 +1299,6 @@ function SessionActivitySection({
     queryFn: () => apiClient.get<SessionEvent[]>(`/logs/sessions/${sessionId}/events`),
     enabled: expanded,
   });
-
-  const t = {
-    title: language === 'fr' ? 'Activite' : 'Activity',
-    noEvents: language === 'fr' ? 'Aucun evenement enregistre' : 'No events recorded',
-    loading: language === 'fr' ? 'Chargement...' : 'Loading...',
-  };
 
   return (
     <div className="bg-dark-surface rounded-xl border border-dark-border">
@@ -1383,7 +1308,7 @@ function SessionActivitySection({
       >
         {expanded ? <ChevronDown size={14} className="text-dark-muted" /> : <ChevronRight size={14} className="text-dark-muted" />}
         <Activity size={14} className="text-green-400" />
-        <h3 className="text-sm font-medium text-dark-text">{t.title}</h3>
+        <h3 className="text-sm font-medium text-dark-text">{t('sessions:activity.title')}</h3>
         {events && (
           <span className="text-xs text-dark-muted ml-1">({events.length})</span>
         )}
@@ -1393,13 +1318,13 @@ function SessionActivitySection({
           {isLoading ? (
             <div className="flex items-center justify-center py-6">
               <Spinner size="sm" />
-              <span className="ml-2 text-sm text-dark-muted">{t.loading}</span>
+              <span className="ml-2 text-sm text-dark-muted">{t('sessions:activity.loading')}</span>
             </div>
           ) : events && events.length > 0 ? (
             <EventTimeline events={events} sessionStartedAt={startedAt} />
           ) : (
             <div className="text-center py-4 text-sm text-dark-muted">
-              {t.noEvents}
+              {t('sessions:activity.noEvents')}
             </div>
           )}
         </div>
@@ -1434,6 +1359,7 @@ interface FeedbackSummary {
 }
 
 function FeedbackModal({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+  const { t, i18n } = useTranslation(['sessions', 'common']);
   const { data, isLoading } = useQuery({
     queryKey: ['feedback-summary', sessionId],
     queryFn: () => apiClient.get<FeedbackSummary>(`/feedback/sessions/${sessionId}/summary`),
@@ -1455,7 +1381,7 @@ function FeedbackModal({ sessionId, onClose }: { sessionId: string; onClose: () 
               {data.overall_average.toFixed(1)}<span className="text-lg text-white/40">/10</span>
             </div>
             <p className="text-sm text-dark-muted mt-1">
-              {data.total_submissions} avis
+              {data.total_submissions} {t('sessions:activity.submissions')}
             </p>
           </div>
 
@@ -1464,7 +1390,9 @@ function FeedbackModal({ sessionId, onClose }: { sessionId: string; onClose: () 
             <div className="space-y-2">
               {data.category_averages.map((cat) => (
                 <div key={cat.slug} className="flex items-center gap-3">
-                  <span className="text-sm text-dark-muted w-36 truncate">{cat.label_fr}</span>
+                  <span className="text-sm text-dark-muted w-36 truncate">
+                    {i18n.language === 'fr' ? cat.label_fr : cat.label_en}
+                  </span>
                   <div className="flex-1 h-2 bg-dark-border rounded-full overflow-hidden">
                     <div
                       className="h-full bg-amber-500 rounded-full transition-all"
@@ -1482,7 +1410,9 @@ function FeedbackModal({ sessionId, onClose }: { sessionId: string; onClose: () 
           {/* Individual entries */}
           {data.entries.length > 0 && (
             <div className="border-t border-dark-border pt-4 space-y-3">
-              <h4 className="text-sm font-medium text-dark-text">Avis individuels</h4>
+              <h4 className="text-sm font-medium text-dark-text">
+                {t('sessions:feedback.individualReviews')}
+              </h4>
               {data.entries.map((entry) => (
                 <div key={entry.id} className="bg-dark-bg rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">

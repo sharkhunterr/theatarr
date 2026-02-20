@@ -1,0 +1,80 @@
+{
+  "title": "Servizi",
+  "subtitle": "Configura servizi esterni (illuminazione, lettori, sorgenti media)",
+  "addService": "Aggiungi servizio",
+  "refresh": "Aggiorna",
+  "categories": {
+    "all": "Tutti",
+    "lighting": "Illuminazione",
+    "player": "Lettori",
+    "media_source": "Sorgenti media",
+    "actuator": "Attuatori",
+    "metadata": "Metadati"
+  },
+  "empty": {
+    "noServices": "Nessun servizio configurato",
+    "addFirst": "Aggiungi il tuo primo servizio"
+  },
+  "stats": {
+    "services": "servizi",
+    "connected": "connessi",
+    "errors": "errori"
+  },
+  "modal": {
+    "editService": "Modifica servizio",
+    "newService": "Nuovo servizio",
+    "deleteService": "Elimina servizio",
+    "deleteConfirm": "Sei sicuro di voler eliminare",
+    "deleteWarning": "Questa azione non puo essere annullata. Le sequenze che usano questo servizio dovranno essere aggiornate.",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "capabilities": "Funzionalita"
+  },
+  "form": {
+    "name": "Nome del servizio",
+    "type": "Tipo di servizio",
+    "selectType": "Seleziona un tipo",
+    "enabled": "Abilitato",
+    "host": "Host / URL",
+    "apiKey": "Chiave API",
+    "save": "Salva",
+    "cancel": "Annulla",
+    "loadingLibraries": "Caricamento librerie...",
+    "basicInfo": "Informazioni di base",
+    "description": "Descrizione",
+    "descriptionPlaceholder": "Descrizione facoltativa",
+    "enableService": "Abilita questo servizio",
+    "adapterConfig": "Configurazione adattatore",
+    "category": "Categoria",
+    "adapterType": "Tipo di adattatore",
+    "selectAdapter": "Seleziona un adattatore...",
+    "noAdapters": "Nessun adattatore disponibile per questa categoria",
+    "settings": "Impostazioni",
+    "libraries": "Librerie",
+    "librariesError": "Caricamento librerie fallito. Controlla la connessione.",
+    "noLibraries": "Nessuna libreria trovata. Testa prima la connessione del servizio.",
+    "librariesHelp": "Seleziona le librerie da utilizzare. Se nessuna e selezionata, verranno usate tutte le librerie di film.",
+    "elements": "elementi",
+    "saving": "Salvataggio...",
+    "updateService": "Aggiorna servizio",
+    "createService": "Crea servizio"
+  },
+  "card": {
+    "enabled": "Abilitato",
+    "disabled": "Disabilitato",
+    "lastSeen": "Ultimo accesso",
+    "capabilities": "funzionalita",
+    "test": "Testa",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "connected": "Connesso",
+    "disconnected": "Disconnesso",
+    "error": "Errore",
+    "unknown": "Sconosciuto",
+    "lighting": "Illuminazione",
+    "player": "Lettore",
+    "media_source": "Sorgente media",
+    "actuator": "Attuatore",
+    "metadata": "Metadati"
+  }
+}

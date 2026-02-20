@@ -1,0 +1,228 @@
+{
+  "page": {
+    "title": "Media",
+    "subtitle": "Trailers, pre-rolls, sounds and display templates"
+  },
+  "tabs": {
+    "trailers": "Trailers",
+    "prerolls": "Pre-rolls",
+    "sounds": "Sounds",
+    "templates": "Templates"
+  },
+  "actions": {
+    "create": "Create",
+    "add": "Add",
+    "refreshBuiltin": "Refresh Built-in"
+  },
+  "trailers": {
+    "subtabs": {
+      "library": "Library",
+      "rules": "Rules"
+    },
+    "filters": {
+      "all": "All",
+      "ready": "Ready",
+      "pending": "Pending",
+      "error": "Error"
+    },
+    "status": {
+      "ready": "Ready",
+      "downloading": "{{progress}}%",
+      "pending": "Pending",
+      "error": "Error",
+      "unknownError": "Unknown error"
+    },
+    "empty": {
+      "title": "No trailers",
+      "action": "Download a trailer"
+    },
+    "download": {
+      "title": "Download a trailer",
+      "movieTitle": "Movie title",
+      "movieTitlePlaceholder": "Blade Runner 2049",
+      "youtubeUrl": "YouTube URL",
+      "youtubeUrlPlaceholder": "https://www.youtube.com/watch?v=...",
+      "cancel": "Cancel",
+      "downloading": "Downloading...",
+      "download": "Download"
+    },
+    "deleteConfirm": "Delete \"{{title}}\"?",
+    "openYoutube": "Open on YouTube",
+    "delete": "Delete",
+    "rules": {
+      "active": "Active",
+      "disabled": "Disabled",
+      "trailers": "trailers",
+      "genres": "Genres: {{genres}}",
+      "lastRun": "Last run: {{date}}",
+      "run": "Run",
+      "edit": "Edit",
+      "empty": {
+        "title": "No rules configured",
+        "action": "Create a rule"
+      },
+      "modal": {
+        "editTitle": "Edit rule",
+        "createTitle": "Create a rule"
+      }
+    }
+  },
+  "prerolls": {
+    "filters": {
+      "all": "All",
+      "ready": "Ready",
+      "pending": "Pending",
+      "error": "Error"
+    },
+    "status": {
+      "ready": "Ready",
+      "downloading": "{{progress}}%",
+      "pending": "Pending",
+      "error": "Error",
+      "unknownError": "Unknown error"
+    },
+    "sourceType": {
+      "youtube": "YouTube",
+      "upload": "Upload"
+    },
+    "empty": {
+      "title": "No pre-rolls in the library",
+      "action": "Add your first pre-roll"
+    },
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "delete": "Delete",
+    "addModal": {
+      "title": "Add a pre-roll",
+      "uploadFile": "Upload a file",
+      "youtube": "YouTube",
+      "name": "Name",
+      "namePlaceholder": "Pre-roll name",
+      "tags": "Tags (optional, comma-separated)",
+      "tagsPlaceholder": "studio, intro, custom...",
+      "videoFile": "Video file",
+      "youtubeUrl": "YouTube URL",
+      "youtubeUrlPlaceholder": "https://www.youtube.com/watch?v=...",
+      "errorPrefix": "Error:",
+      "errorDefault": "An error occurred",
+      "cancel": "Cancel",
+      "importing": "Importing...",
+      "import": "Import",
+      "downloading": "Downloading...",
+      "download": "Download"
+    }
+  },
+  "sounds": {
+    "filters": {
+      "all": "All",
+      "ready": "Ready",
+      "pending": "Pending",
+      "error": "Error"
+    },
+    "status": {
+      "ready": "Ready",
+      "downloading": "{{progress}}%",
+      "pending": "Pending",
+      "error": "Error",
+      "unknownError": "Unknown error"
+    },
+    "empty": {
+      "title": "No sounds in the library",
+      "action": "Add your first sound"
+    },
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "delete": "Delete",
+    "addModal": {
+      "title": "Add a sound",
+      "youtubeUrl": "YouTube URL",
+      "youtubeUrlPlaceholder": "https://www.youtube.com/watch?v=... or playlist URL",
+      "cancel": "Cancel",
+      "analyzing": "Analyzing...",
+      "analyze": "Analyze",
+      "errorPrefix": "Error:",
+      "analyzeError": "Unable to analyze the URL",
+      "name": "Name",
+      "namePlaceholder": "Sound name",
+      "tags": "Tags (comma-separated)",
+      "tagsPlaceholder": "ambiance, music, intro...",
+      "duration": "Duration: {{duration}}",
+      "chapters": "Chapters ({{selected}}/{{total}})",
+      "tracks": "Tracks ({{selected}}/{{total}})",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "singleVideo": "Single video — the full audio will be extracted.",
+      "back": "Back",
+      "downloading": "Downloading...",
+      "download": "Download",
+      "downloadError": "Download failed",
+      "downloadStarted": "Download started!",
+      "downloadStartedHint": "Sounds will appear in the library once ready."
+    }
+  },
+  "templates": {
+    "filters": {
+      "all": "All",
+      "wallmount": "Wallmount",
+      "waiting_screen": "Waiting",
+      "quiz": "Quiz",
+      "feedback": "Feedback",
+      "custom": "Custom"
+    },
+    "status": {
+      "active": "Active",
+      "builtin": "Built-in"
+    },
+    "components": "components",
+    "activate": "Activate",
+    "edit": "Edit",
+    "delete": "Delete",
+    "empty": {
+      "title": "No templates found",
+      "createFirst": "Create your first template"
+    },
+    "backToList": "Back to list",
+    "deleteConfirm": "Delete template \"{{name}}\"?",
+    "builtinsUpdated": "{{count}} built-in templates updated",
+    "errorLoading": "Error loading templates",
+    "modal": {
+      "createTitle": "Create a template",
+      "editTitle": "Edit template"
+    }
+  },
+  "movies": {
+    "title": "Movies",
+    "subtitle": "Browse movies from your media library",
+    "searchPlaceholder": "Search movies...",
+    "allGenres": "All Genres",
+    "unknownYear": "Unknown year",
+    "previous": "Previous",
+    "next": "Next",
+    "noMovies": "No movies found",
+    "connectService": "Connect a media service (Plex, Jellyfin) to see your library",
+    "trailerAvailable": "Trailer available",
+    "close": "Close",
+    "createSession": "Create Session"
+  },
+  "display": {
+    "sessionDisplay": "Session Display",
+    "enterCode": "Enter session code",
+    "enterAllChars": "Enter all 6 characters",
+    "invalidCode": "Invalid code",
+    "validating": "Validating...",
+    "connectionError": "Connection error to server",
+    "codeHint": "The code is displayed in the session details",
+    "invalidOrNotFound": "Invalid code or session not found",
+    "sessionNotFound": "Session not found",
+    "back": "Back",
+    "fullscreen": "Fullscreen",
+    "enableSound": "Enable sound",
+    "connected": "Connected",
+    "connecting": "Connecting...",
+    "sessionPaused": "Session paused",
+    "status": {
+      "draft": "Waiting to start",
+      "scheduled": "Session scheduled",
+      "paused": "Session paused",
+      "completed": "Session completed"
+    }
+  }
+}

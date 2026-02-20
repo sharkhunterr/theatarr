@@ -3,9 +3,9 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Users, UserCheck, UserX, CheckSquare, Square } from 'lucide-react';
 import { apiClient } from '../../api/client';
-import { useLayoutStore } from '../../stores/layoutStore';
 import { Spinner } from '../common';
 import clsx from 'clsx';
 
@@ -24,16 +24,7 @@ interface ParticipantsSelectorProps {
 }
 
 export function ParticipantsSelector({ selectedUserIds, onChange }: ParticipantsSelectorProps) {
-  const { language } = useLayoutStore();
-
-  const t = {
-    participants: language === 'fr' ? 'Participants' : 'Participants',
-    selectAll: language === 'fr' ? 'Tout sélectionner' : 'Select all',
-    deselectAll: language === 'fr' ? 'Tout désélectionner' : 'Deselect all',
-    noUsers: language === 'fr' ? 'Aucun utilisateur disponible' : 'No users available',
-    selected: language === 'fr' ? 'sélectionné(s)' : 'selected',
-    filterUsers: language === 'fr' ? 'Filtrer les utilisateurs...' : 'Filter users...',
-  };
+  const { t } = useTranslation('sessions');
 
   // Fetch all users
   const { data: usersData, isLoading } = useQuery({
@@ -74,7 +65,7 @@ export function ParticipantsSelector({ selectedUserIds, onChange }: Participants
         <div className="flex items-center gap-2">
           <Users size={18} className="text-theatarr-500" />
           <span className="text-sm font-medium text-dark-text">
-            {selectedUserIds.length} {t.selected}
+            {selectedUserIds.length} {t('participants.selected')}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -84,7 +75,7 @@ export function ParticipantsSelector({ selectedUserIds, onChange }: Participants
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-lg transition-colors"
           >
             <UserCheck size={14} />
-            {t.selectAll}
+            {t('participants.selectAll')}
           </button>
           <button
             type="button"
@@ -92,7 +83,7 @@ export function ParticipantsSelector({ selectedUserIds, onChange }: Participants
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors"
           >
             <UserX size={14} />
-            {t.deselectAll}
+            {t('participants.deselectAll')}
           </button>
         </div>
       </div>
@@ -156,7 +147,7 @@ export function ParticipantsSelector({ selectedUserIds, onChange }: Participants
       ) : (
         <div className="text-center py-8 text-dark-muted">
           <Users size={32} className="mx-auto mb-2 opacity-50" />
-          <p className="text-sm">{t.noUsers}</p>
+          <p className="text-sm">{t('participants.noUsers')}</p>
         </div>
       )}
     </div>

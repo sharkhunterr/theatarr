@@ -5,6 +5,7 @@
 import { Vote, Check, Clock, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 
 interface MoviePreview {
   title?: string;
@@ -30,34 +31,35 @@ export function VoteCard({
   closesAt,
   status,
 }: VoteCardProps) {
+  const { t } = useTranslation(['portal', 'common']);
   const isOpen = status === 'open';
 
   const getStatusBadge = () => {
     if (!isOpen) {
-      return { text: 'Cloture', color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
+      return { text: t('portal:voteCard.status.closed'), color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
     }
     if (!closesAt) {
-      return { text: 'Ouvert', color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
+      return { text: t('portal:voteCard.status.open'), color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
     }
     const diff = new Date(closesAt).getTime() - Date.now();
     if (diff <= 0) {
-      return { text: 'Cloture', color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
+      return { text: t('portal:voteCard.status.closed'), color: 'bg-dark-muted/20 text-dark-muted', icon: Lock, pulse: false };
     }
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
     if (days >= 2) {
-      return { text: `${days}j restants`, color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
+      return { text: t('portal:voteCard.status.daysRemaining', { count: days }), color: 'bg-green-500/20 text-green-400', icon: Clock, pulse: false };
     }
     if (hours >= 6) {
-      return { text: `${hours}h restantes`, color: 'bg-blue-500/20 text-blue-400', icon: Clock, pulse: false };
+      return { text: t('portal:voteCard.status.hoursRemaining', { count: hours }), color: 'bg-blue-500/20 text-blue-400', icon: Clock, pulse: false };
     }
     if (hours >= 1) {
       const m = minutes % 60;
-      return { text: `${hours}h${m > 0 ? `${m.toString().padStart(2, '0')}` : ''} restantes`, color: 'bg-orange-500/20 text-orange-400', icon: Clock, pulse: false };
+      return { text: t('portal:voteCard.status.hoursMinutesRemaining', { hours, minutes: m > 0 ? m.toString().padStart(2, '0') : '' }), color: 'bg-orange-500/20 text-orange-400', icon: Clock, pulse: false };
     }
-    return { text: `${minutes}min restantes`, color: 'bg-red-500/20 text-red-400', icon: Clock, pulse: true };
+    return { text: t('portal:voteCard.status.minutesRemaining', { count: minutes }), color: 'bg-red-500/20 text-red-400', icon: Clock, pulse: true };
   };
 
   const badge = getStatusBadge();
@@ -132,15 +134,15 @@ export function VoteCard({
             {hasVoted ? (
               <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
                 <Check size={12} />
-                Vote
+                {t('portal:voteCard.voted')}
               </span>
             ) : isOpen ? (
               <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400">
-                A voter
+                {t('portal:voteCard.toVote')}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-red-500/20 text-red-400">
-                Non vote
+                {t('portal:voteCard.notVoted')}
               </span>
             )}</div>
         </div>

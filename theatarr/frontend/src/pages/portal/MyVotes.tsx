@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Vote } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../api/client';
 import { VoteCard } from '../../components/portal/VoteCard';
 import { usePortalNotifications } from '../../hooks/usePortalNotifications';
@@ -23,6 +24,7 @@ interface PortalVote {
 type TabType = 'pending' | 'all';
 
 export function MyVotes() {
+  const { t } = useTranslation(['portal', 'common']);
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const { items } = usePortalNotifications();
   const pendingVoteCount = items.find((i) => i.id === 'votes')?.count || 0;
@@ -50,7 +52,7 @@ export function MyVotes() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-dark-text">Mes Votes</h1>
+        <h1 className="text-xl font-bold text-dark-text">{t('portal:votes.title')}</h1>
       </div>
 
       {/* Tabs */}
@@ -64,7 +66,7 @@ export function MyVotes() {
               : 'border-transparent text-dark-muted hover:text-dark-text'
           )}
         >
-          A voter
+          {t('portal:votes.tabs.pending')}
           {pendingVoteCount > 0 && (
             <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
               {pendingVoteCount}
@@ -80,7 +82,7 @@ export function MyVotes() {
               : 'border-transparent text-dark-muted hover:text-dark-text'
           )}
         >
-          Tous les votes
+          {t('portal:votes.tabs.all')}
           {closedVotesCount > 0 && (
             <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-dark-muted/50 text-dark-text text-[10px] font-bold leading-none">
               {closedVotesCount}
@@ -124,12 +126,12 @@ export function MyVotes() {
         <div className="text-center py-12">
           <Vote size={48} className="mx-auto text-dark-muted mb-4" />
           <h3 className="text-lg font-medium text-dark-text mb-2">
-            {activeTab === 'pending' ? 'Aucun vote en attente' : 'Aucun vote'}
+            {activeTab === 'pending' ? t('portal:votes.empty.pendingTitle') : t('portal:votes.empty.allTitle')}
           </h3>
           <p className="text-dark-muted">
             {activeTab === 'pending'
-              ? 'Vous avez vote pour toutes les sessions ouvertes.'
-              : "Vous n'avez pas encore ete invite a voter."}
+              ? t('portal:votes.empty.pendingDescription')
+              : t('portal:votes.empty.allDescription')}
           </p>
         </div>
       )}

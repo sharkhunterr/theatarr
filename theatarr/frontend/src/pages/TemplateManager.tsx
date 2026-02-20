@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Edit2, Trash2, Check, Monitor, ArrowLeft } from 'lucide-react';
 import { Button, Modal, Spinner, ButtonGroup } from '../components/common';
 import { TemplateEditor } from '../components/templates/TemplateEditor';
@@ -46,6 +47,7 @@ interface TemplateManagerProps {
 }
 
 export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltinsTrigger }: TemplateManagerProps = {}) {
+  const { t } = useTranslation(['media', 'common']);
   const queryClient = useQueryClient();
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -87,7 +89,7 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
-      setSuccessMessage(`${data?.total || 0} templates integres mis a jour`);
+      setSuccessMessage(t('media:templates.builtinsUpdated', { count: data?.total || 0 }));
       setTimeout(() => setSuccessMessage(null), 3000);
     },
   });
@@ -115,7 +117,7 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
   };
 
   const handleDelete = async (template: Template) => {
-    if (window.confirm(`Supprimer le template "${template.name}" ?`)) {
+    if (window.confirm(t('media:templates.deleteConfirm', { name: template.name }))) {
       await deleteMutation.mutateAsync(template.id);
     }
   };
@@ -167,7 +169,7 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
         </div>
       ) : error ? (
         <div className="text-center py-12">
-          <p className="text-red-400">Erreur lors du chargement des templates</p>
+          <p className="text-red-400">{t('media:templates.errorLoading')}</p>
         </div>
       ) : filteredTemplates && filteredTemplates.length > 0 ? (
         <div className="rounded-lg border border-dark-border bg-dark-surface overflow-hidden divide-y divide-dark-border">
@@ -194,12 +196,12 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
                   <span className="font-medium text-dark-text text-sm truncate">{template.name}</span>
                   {template.is_active && (
                     <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-[10px] font-medium rounded flex-shrink-0">
-                      Actif
+                      {t('media:templates.status.active')}
                     </span>
                   )}
                   {template.is_builtin && (
                     <span className="px-1.5 py-0.5 bg-dark-border text-dark-muted text-[10px] font-medium rounded flex-shrink-0">
-                      Integre
+                      {t('media:templates.status.builtin')}
                     </span>
                   )}
                 </div>
@@ -209,7 +211,7 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
                     {template.template_type}
                   </span>
                   {template.layout?.components && (
-                    <span className="flex-shrink-0">{template.layout.components.length} composants</span>
+                    <span className="flex-shrink-0">{template.layout.components.length} {t('media:templates.components')}</span>
                   )}
                   {template.description && (
                     <span className="truncate hidden sm:inline">{template.description}</span>
@@ -224,7 +226,7 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
                     onClick={() => handleActivate(template)}
                     disabled={activateMutation.isPending}
                     className="p-1.5 rounded-lg text-dark-muted hover:text-green-400 hover:bg-green-500/10 transition-colors"
-                    title="Activer"
+                    title={t('media:templates.activate')}
                   >
                     <Check size={14} />
                   </button>
@@ -234,7 +236,7 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
                     <button
                       onClick={() => handleEdit(template)}
                       className="p-1.5 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border/50 transition-colors"
-                      title="Modifier"
+                      title={t('media:templates.edit')}
                     >
                       <Edit2 size={14} />
                     </button>
@@ -242,7 +244,7 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
                       onClick={() => handleDelete(template)}
                       disabled={deleteMutation.isPending}
                       className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                      title="Supprimer"
+                      title={t('media:templates.delete')}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -255,10 +257,10 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
       ) : (
         <div className="text-center py-12">
           <Monitor size={48} className="mx-auto text-dark-muted mb-4" />
-          <p className="text-dark-muted">Aucun template trouve</p>
+          <p className="text-dark-muted">{t('media:templates.empty.title')}</p>
           {filter === 'custom' && (
             <Button className="mt-4" onClick={handleCreate}>
-              Creer votre premier template
+              {t('media:templates.empty.createFirst')}
             </Button>
           )}
         </div>
@@ -280,12 +282,12 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
       <div className="mb-4">
         <ButtonGroup
           options={[
-            { key: 'all' as const, label: 'Tous' },
-            { key: 'wallmount' as const, label: 'Wallmount' },
-            { key: 'waiting_screen' as const, label: 'Waiting' },
-            { key: 'quiz' as const, label: 'Quiz' },
-            { key: 'feedback' as const, label: 'Feedback' },
-            { key: 'custom' as const, label: 'Custom' },
+            { key: 'all' as const, label: t('media:templates.filters.all') },
+            { key: 'wallmount' as const, label: t('media:templates.filters.wallmount') },
+            { key: 'waiting_screen' as const, label: t('media:templates.filters.waiting_screen') },
+            { key: 'quiz' as const, label: t('media:templates.filters.quiz') },
+            { key: 'feedback' as const, label: t('media:templates.filters.feedback') },
+            { key: 'custom' as const, label: t('media:templates.filters.custom') },
           ]}
           value={filter}
           onChange={setFilter}
@@ -302,7 +304,7 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
               className="flex items-center gap-1.5 text-sm text-dark-muted hover:text-dark-text mb-3 transition-colors"
             >
               <ArrowLeft size={16} />
-              <span>Retour a la liste</span>
+              <span>{t('media:templates.backToList')}</span>
             </button>
             <div className="h-[calc(100%-36px)] rounded-lg overflow-hidden border border-dark-border bg-black">
               <TemplatePreview
@@ -333,7 +335,7 @@ export function TemplateManager({ createOpen, onCreateOpenChange, refreshBuiltin
       <Modal
         isOpen={isEditorOpen}
         onClose={handleEditorClose}
-        title={isCreateMode ? 'Creer un template' : 'Modifier le template'}
+        title={isCreateMode ? t('media:templates.modal.createTitle') : t('media:templates.modal.editTitle')}
         size="xl"
       >
         <TemplateEditor

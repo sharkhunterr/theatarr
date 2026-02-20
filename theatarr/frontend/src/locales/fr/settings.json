@@ -1,0 +1,273 @@
+{
+  "config": {
+    "title": "Paramètres",
+    "subtitle": "Configuration générale de l'application",
+    "tabs": {
+      "settings": "Paramètres",
+      "export": "Export",
+      "import": "Import"
+    },
+    "actions": {
+      "reset": "Réinitialiser",
+      "save": "Enregistrer",
+      "saving": "Enregistrement..."
+    },
+    "settings": {
+      "enabled": "Activé",
+      "customSettings": "Paramètres personnalisés",
+      "noCustomSettings": "Aucun paramètre personnalisé. Cliquez sur \"Ajouter\" pour en créer un.",
+      "settingKey": "Clé du paramètre",
+      "settingValue": "Valeur (JSON ou texte)",
+      "unsavedChanges": "Modifications non enregistrées",
+      "allSaved": "Tous les changements sont enregistrés",
+      "emailTestPlaceholder": "Adresse email de test",
+      "emailSending": "Envoi...",
+      "emailTest": "Tester",
+      "emailSuccess": "Email envoyé avec succès",
+      "emailSaveFirst": "Enregistrez d'abord vos paramètres SMTP, puis saisissez une adresse et cliquez sur Tester."
+    },
+    "export": {
+      "title": "Exporter la configuration",
+      "description": "Exportez votre configuration incluant sessions, services, templates et paramètres.",
+      "items": {
+        "sessions": "Sessions",
+        "services": "Services",
+        "templates": "Templates",
+        "trailers": "Bandes-annonces"
+      },
+      "includeInExport": "Inclure dans l'export",
+      "optionSessions": "Sessions",
+      "optionSessionsDesc": "Configurations de sessions et séquences",
+      "optionServices": "Services",
+      "optionServicesDesc": "Services connectés et identifiants",
+      "optionTemplates": "Templates",
+      "optionTemplatesDesc": "Templates d'affichage personnalisés",
+      "optionTrailerRules": "Règles de bandes-annonces",
+      "optionTrailerRulesDesc": "Configurations de téléchargement automatique",
+      "optionSettings": "Paramètres",
+      "optionSettingsDesc": "Paramètres de l'application",
+      "encryptSensitiveData": "Chiffrer les données sensibles",
+      "encryptedDesc": "Les clés API et mots de passe seront chiffrés",
+      "unencryptedWarning": "ATTENTION : Les données sensibles seront exportées en clair",
+      "encryptionPassword": "Mot de passe de chiffrement",
+      "enterStrongPassword": "Entrez un mot de passe fort",
+      "confirmPassword": "Confirmer le mot de passe",
+      "confirmPasswordPlaceholder": "Confirmez le mot de passe",
+      "passwordRequired": "Le mot de passe est requis pour le chiffrement",
+      "passwordMinLength": "Le mot de passe doit contenir au moins 8 caractères",
+      "passwordMismatch": "Les mots de passe ne correspondent pas",
+      "passwordNote": "Ce mot de passe sera nécessaire pour importer la configuration avec les secrets déchiffrés. Conservez-le en sécurité.",
+      "exporting": "Export...",
+      "exportConfiguration": "Exporter la configuration",
+      "exportFailed": "L'export a échoué. Veuillez réessayer."
+    },
+    "import": {
+      "title": "Importer la configuration",
+      "description": "Restaurez la configuration depuis une sauvegarde exportée.",
+      "startImport": "Démarrer l'import",
+      "processTitle": "Processus d'import",
+      "steps": {
+        "selectFile": "1. Sélectionner le fichier",
+        "selectFileDesc": "Fichier de configuration exporté",
+        "preview": "2. Aperçu des changements",
+        "previewDesc": "Examinez les modifications",
+        "resolve": "3. Résoudre les conflits",
+        "resolveDesc": "Gestion des éléments existants",
+        "apply": "4. Appliquer l'import",
+        "applyDesc": "Configuration importée"
+      },
+      "results": {
+        "sessions": "Sessions",
+        "services": "Services",
+        "templates": "Templates",
+        "trailerRules": "Règles de bandes-annonces",
+        "created": "Créés :",
+        "updated": "Mis à jour :",
+        "skipped": "Ignorés :",
+        "settingsUpdated": "paramètres mis à jour",
+        "errors": "Erreurs",
+        "done": "Terminé"
+      },
+      "dropZone": "Déposez le fichier de configuration ici",
+      "or": "ou",
+      "browseFiles": "Parcourir les fichiers",
+      "validFile": "Fichier de configuration valide",
+      "remove": "Supprimer",
+      "encryptedConfig": "Configuration chiffrée",
+      "encryptedConfigDesc": "Cette configuration contient des secrets chiffrés. Entrez le mot de passe pour les déchiffrer lors de l'import.",
+      "decryptionPassword": "Mot de passe de déchiffrement",
+      "enterExportPassword": "Entrez le mot de passe d'export",
+      "cancel": "Annuler",
+      "analyzing": "Analyse...",
+      "previewImport": "Aperçu de l'import",
+      "analysisFailed": "Échec de l'analyse du fichier. Assurez-vous qu'il s'agit d'un export de configuration Theatarr valide.",
+      "readyToImport": "Prêt à importer",
+      "noConflicts": "Aucun conflit détecté. Vérifiez les changements ci-dessous et procédez à l'import.",
+      "toCreate": "à créer",
+      "toUpdate": "à mettre à jour",
+      "settingsWillBeUpdated": "Les paramètres de l'application seront mis à jour",
+      "importConfiguration": "Importer la configuration",
+      "back": "Retour",
+      "conflictsDetected": "{{count}} conflit détecté",
+      "conflictsDetected_other": "{{count}} conflits détectés",
+      "conflictsDescription": "Certains éléments de l'import existent déjà. Choisissez comment gérer chaque conflit.",
+      "applyAndImport": "Appliquer et importer",
+      "importingConfig": "Import de la configuration en cours...",
+      "importingWait": "Cela peut prendre un moment",
+      "importComplete": "Import terminé",
+      "importSuccess": "La configuration a été importée avec succès.",
+      "importWithWarnings": "Import terminé avec des avertissements",
+      "importPartial": "Certains éléments n'ont pas pu être importés. Voir les détails ci-dessous.",
+      "modalTitle": "Import de la configuration"
+    }
+  },
+  "users": {
+    "title": "Utilisateurs",
+    "subtitle": "Gérez les comptes et les permissions",
+    "filters": {
+      "all": "Tous",
+      "admin": "Admin",
+      "user": "User"
+    },
+    "newUser": "Nouvel utilisateur",
+    "roles": {
+      "user": "Utilisateur",
+      "admin": "Administrateur"
+    },
+    "badges": {
+      "admin": "Admin",
+      "inactive": "Inactif"
+    },
+    "neverConnected": "Jamais connecté",
+    "empty": {
+      "title": "Aucun utilisateur",
+      "description": "Créez votre premier utilisateur pour commencer."
+    },
+    "form": {
+      "username": "Nom d'utilisateur *",
+      "password": "Mot de passe *",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "email": "Email",
+      "role": "Rôle"
+    },
+    "validation": {
+      "usernameRequired": "Le nom d'utilisateur est requis",
+      "passwordRequired": "Le mot de passe est requis",
+      "passwordMinLength": "Le mot de passe doit contenir au moins 6 caractères"
+    },
+    "modal": {
+      "editTitle": "Modifier l'utilisateur",
+      "createTitle": "Nouvel utilisateur",
+      "cancel": "Annuler",
+      "saving": "Enregistrement...",
+      "edit": "Modifier",
+      "create": "Créer"
+    },
+    "passwordModal": {
+      "title": "Changer le mot de passe",
+      "newPassword": "Nouveau mot de passe",
+      "minChars": "Minimum 6 caractères",
+      "cancel": "Annuler",
+      "changing": "Changement...",
+      "change": "Changer"
+    },
+    "actions": {
+      "edit": "Modifier",
+      "changePassword": "Changer le mot de passe",
+      "activate": "Activer",
+      "deactivate": "Désactiver",
+      "delete": "Supprimer"
+    },
+    "deleteConfirm": "Supprimer l'utilisateur \"{{username}}\" ?"
+  },
+  "logs": {
+    "title": "Logs système",
+    "entries": "entries",
+    "autoRefresh": "Auto-refresh",
+    "live": "En direct",
+    "paused": "En pause",
+    "search": "Rechercher...",
+    "noLogs": "Aucun log",
+    "loadingEvents": "Chargement des événements...",
+    "categories": {
+      "all": "Tout",
+      "scheduler": "Planificateur",
+      "sessions": "Sessions",
+      "vote": "Vote",
+      "services": "Services",
+      "enrichment": "Enrichissement",
+      "movies": "Films",
+      "auth": "Auth",
+      "system": "Système"
+    },
+    "levels": {
+      "all": "All",
+      "debug": "DEBUG",
+      "info": "INFO",
+      "warning": "WARN",
+      "error": "ERROR"
+    }
+  },
+  "history": {
+    "title": "Historique",
+    "totalPlayback": "{{hours}}h de lecture totale",
+    "last7days": "7 derniers jours",
+    "filters": {
+      "all": "Tous",
+      "completed": "Terminé",
+      "running": "En cours",
+      "paused": "En pause",
+      "interrupted": "Interrompu"
+    },
+    "status": {
+      "completed": "Terminé",
+      "running": "En cours",
+      "paused": "En pause",
+      "stopped": "Arrêté",
+      "interrupted": "Interrompu",
+      "draft": "Brouillon",
+      "scheduled": "Planifié"
+    },
+    "labels": {
+      "start": "Début:",
+      "duration": "Durée:",
+      "end": "Fin:",
+      "sequences": "Séquences:",
+      "id": "ID:"
+    },
+    "noEvents": "Aucun événement enregistré (session exécutée avant l'activation du suivi)",
+    "events": {
+      "sessionStarted": "Session démarrée",
+      "sessionPaused": "Session en pause",
+      "sessionResumed": "Session reprise",
+      "sessionStopped": "Session arrêtée",
+      "sessionCompleted": "Session terminée",
+      "sessionInterrupted": "Session interrompue",
+      "sequenceStarted": "Séquence démarrée",
+      "sequenceCompleted": "Séquence terminée",
+      "sequenceSkipped": "Séquence sautée",
+      "actionExecuted": "Action exécutée",
+      "trailerResolved": "Bande-annonce résolue",
+      "prerollResolved": "Pré-roll résolu",
+      "playbackEnded": "Lecture terminée",
+      "displayConnected": "Display connecté",
+      "displayDisconnected": "Display déconnecté",
+      "noEventsForSession": "Aucun événement enregistré pour cette session"
+    },
+    "empty": "Aucun historique trouvé",
+    "pagination": {
+      "previous": "Précédent",
+      "next": "Suivant",
+      "pageOf": "Page {{page}} sur {{total}}"
+    }
+  },
+  "login": {
+    "subtitle": "Home Cinema Orchestration",
+    "username": "Username",
+    "usernamePlaceholder": "Enter your username",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "signIn": "Sign In"
+  }
+}

@@ -15,11 +15,11 @@ import {
   Film,
   Check,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, Modal, Spinner, ButtonGroup } from '../components/common';
 import { VoteSessionForm } from '../components/vote/VoteSessionForm';
 import { VoteResults } from '../components/vote/VoteResults';
 import { apiClient } from '../api/client';
-import { useLayoutStore } from '../stores/layoutStore';
 
 interface VoteSession {
   id: string;
@@ -67,7 +67,7 @@ interface VoteSessionManagerProps {
 
 export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessionManagerProps = {}) {
   const queryClient = useQueryClient();
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['votes', 'common']);
   const [selectedSession, setSelectedSession] = useState<VoteSession | null>(null);
   const [internalCreateOpen, setInternalCreateOpen] = useState(false);
   const isCreateOpen = createOpen ?? internalCreateOpen;
@@ -77,31 +77,6 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
   const [tokens, setTokens] = useState<VoteToken[]>([]);
   const [filter, setFilter] = useState<'all' | 'open' | 'closed' | 'draft'>('all');
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
-
-  const t = {
-    title: language === 'fr' ? 'Votes' : 'Votes',
-    subtitle: language === 'fr' ? 'Créez et gérez les votes pour vos films' : 'Create and manage movie votes',
-    createButton: language === 'fr' ? 'Nouveau vote' : 'New Vote',
-    all: language === 'fr' ? 'Tous' : 'All',
-    draft: language === 'fr' ? 'Brouillon' : 'Draft',
-    open: language === 'fr' ? 'Ouvert' : 'Open',
-    closed: language === 'fr' ? 'Fermé' : 'Closed',
-    votes: language === 'fr' ? 'votes' : 'votes',
-    movies: language === 'fr' ? 'films' : 'movies',
-    openVoting: language === 'fr' ? 'Ouvrir' : 'Open',
-    closeVoting: language === 'fr' ? 'Fermer' : 'Close',
-    tokens: language === 'fr' ? 'Liens' : 'Links',
-    results: language === 'fr' ? 'Résultats' : 'Results',
-    delete: language === 'fr' ? 'Supprimer' : 'Delete',
-    noSessions: language === 'fr' ? 'Aucun vote' : 'No votes',
-    createFirst: language === 'fr' ? 'Créer votre premier vote' : 'Create Your First Vote',
-    generateTokens: language === 'fr' ? 'Générer 5 liens' : 'Generate 5 Links',
-    noTokens: language === 'fr' ? 'Aucun lien généré. Cliquez sur "Générer" pour créer des liens de vote.' : 'No links generated yet. Click "Generate" to create vote links.',
-    totalVotes: language === 'fr' ? 'Votes totaux' : 'Total Votes',
-    closesAt: language === 'fr' ? 'Ferme le' : 'Closes',
-    copied: language === 'fr' ? 'Copié !' : 'Copied!',
-    linkedToSession: language === 'fr' ? 'Lié à la séance' : 'Linked to session',
-  };
 
   const { data, isLoading, error } = useQuery<VoteSessionListResponse>({
     queryKey: ['vote-sessions', filter],
@@ -171,7 +146,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
   };
 
   const handleDelete = async (session: VoteSession) => {
-    if (window.confirm(`${language === 'fr' ? 'Supprimer la session' : 'Delete session'} "${session.name}"?`)) {
+    if (window.confirm(`${t('votes:voteManager.deleteConfirm')} "${session.name}"?`)) {
       await deleteMutation.mutateAsync(session.id);
     }
   };
@@ -205,7 +180,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
     return (
       <div className="p-4">
         <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400">
-          {language === 'fr' ? 'Erreur lors du chargement des votes' : 'Failed to load votes'}
+          {t('votes:voteManager.loadError')}
         </div>
       </div>
     );
@@ -216,10 +191,10 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
       <div className="mb-4">
         <ButtonGroup
           options={[
-            { key: 'all' as const, label: t.all },
-            { key: 'draft' as const, label: t.draft },
-            { key: 'open' as const, label: t.open },
-            { key: 'closed' as const, label: t.closed },
+            { key: 'all' as const, label: t('votes:voteManager.all') },
+            { key: 'draft' as const, label: t('votes:voteManager.draft') },
+            { key: 'open' as const, label: t('votes:voteManager.open') },
+            { key: 'closed' as const, label: t('votes:voteManager.closed') },
           ]}
           value={filter}
           onChange={setFilter}
@@ -272,16 +247,16 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
                           session.status
                         )}`}
                       >
-                        {session.status === 'draft' ? t.draft : session.status === 'open' ? t.open : t.closed}
+                        {session.status === 'draft' ? t('votes:voteManager.draft') : session.status === 'open' ? t('votes:voteManager.open') : t('votes:voteManager.closed')}
                       </span>
                       {session.linked_session_id && (
                         <a
                           href={`/sessions/${session.linked_session_id}`}
                           className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-theatarr-500/20 text-theatarr-400 border border-theatarr-500/30 hover:bg-theatarr-500/30 transition-colors"
-                          title={session.linked_session_name || t.linkedToSession}
+                          title={session.linked_session_name || t('votes:voteManager.linkedToSession')}
                         >
                           <Link2 size={10} />
-                          {session.linked_session_name || t.linkedToSession}
+                          {session.linked_session_name || t('votes:voteManager.linkedToSession')}
                         </a>
                       )}
                     </div>
@@ -293,11 +268,11 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
                     <div className="flex flex-wrap items-center gap-3 text-xs text-dark-muted">
                       <span className="flex items-center gap-1">
                         <Users size={14} />
-                        {session.total_votes} {t.votes}
+                        {session.total_votes} {t('votes:voteManager.votes')}
                       </span>
                       <span className="flex items-center gap-1">
                         <Film size={14} />
-                        {session.movie_options.length} {t.movies}
+                        {session.movie_options.length} {t('votes:voteManager.movies')}
                       </span>
                       {session.closes_at && (
                         <span className="flex items-center gap-1">
@@ -305,15 +280,15 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
                           {(() => {
                             const diff = new Date(session.closes_at).getTime() - Date.now();
                             if (diff <= 0 || session.status !== 'open') {
-                              return `${t.closesAt} ${new Date(session.closes_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}`;
+                              return `${t('votes:voteManager.closesAt')} ${new Date(session.closes_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}`;
                             }
                             const h = Math.floor(diff / 3600000);
                             const m = Math.floor((diff % 3600000) / 60000);
                             if (h > 24) {
                               const d = Math.floor(h / 24);
-                              return `Fermeture dans ${d}j`;
+                              return t('votes:voteManager.closesInDays', { days: d });
                             }
-                            return h > 0 ? `Fermeture dans ${h}h${m}m` : `Fermeture dans ${m}m`;
+                            return h > 0 ? t('votes:voteManager.closesInHours', { hours: h, minutes: m }) : t('votes:voteManager.closesInMinutes', { minutes: m });
                           })()}
                         </span>
                       )}
@@ -331,7 +306,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
                       disabled={openMutation.isPending}
                     >
                       <Play size={14} className="mr-1" />
-                      {t.openVoting}
+                      {t('votes:voteManager.openVoting')}
                     </Button>
                   )}
 
@@ -343,7 +318,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
                       disabled={closeMutation.isPending}
                     >
                       <Square size={14} className="mr-1" />
-                      {t.closeVoting}
+                      {t('votes:voteManager.closeVoting')}
                     </Button>
                   )}
 
@@ -353,7 +328,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
                     onClick={() => handleViewTokens(session)}
                   >
                     <Link2 size={14} className="mr-1" />
-                    {t.tokens}
+                    {t('votes:voteManager.tokens')}
                   </Button>
 
                   <Button
@@ -362,7 +337,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
                     onClick={() => handleViewResults(session)}
                   >
                     <BarChart2 size={14} className="mr-1" />
-                    {t.results}
+                    {t('votes:voteManager.results')}
                   </Button>
 
                   <Button
@@ -381,10 +356,10 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
       ) : (
         <Card className="p-8 text-center">
           <Vote size={32} className="mx-auto text-dark-muted mb-3" />
-          <p className="text-sm text-dark-muted mb-3">{t.noSessions}</p>
+          <p className="text-sm text-dark-muted mb-3">{t('votes:voteManager.noSessions')}</p>
           <Button size="sm" onClick={() => setIsCreateOpen(true)}>
             <Plus size={14} className="mr-1" />
-            {t.createFirst}
+            {t('votes:voteManager.createFirst')}
           </Button>
         </Card>
       )}
@@ -393,7 +368,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title={language === 'fr' ? 'Nouveau vote' : 'New Vote'}
+        title={t('votes:voteManager.newVoteTitle')}
         size="lg"
       >
         <VoteSessionForm
@@ -412,7 +387,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
           setIsTokensOpen(false);
           setTokens([]);
         }}
-        title={`${t.tokens} - ${selectedSession?.name}`}
+        title={`${t('votes:voteManager.tokens')} - ${selectedSession?.name}`}
         size="lg"
       >
         <div className="space-y-4">
@@ -430,7 +405,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
               disabled={createTokensMutation.isPending}
             >
               <Plus size={14} className="mr-2" />
-              {t.generateTokens}
+              {t('votes:voteManager.generateTokens')}
             </Button>
           </div>
 
@@ -448,7 +423,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
                       <span className="text-dark-muted text-sm ml-2">{token.label}</span>
                     )}
                     <div className="text-xs text-dark-muted mt-1">
-                      {language === 'fr' ? 'Utilisé' : 'Used'}: {token.use_count}
+                      {t('votes:voteManager.used')}: {token.use_count}
                       {token.max_uses && ` / ${token.max_uses}`}
                     </div>
                   </div>
@@ -463,7 +438,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
                         {copiedToken === token.id ? (
                           <>
                             <Check size={14} className="mr-1" />
-                            {t.copied}
+                            {t('votes:voteManager.copied')}
                           </>
                         ) : (
                           <Copy size={14} />
@@ -484,7 +459,7 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
             </div>
           ) : (
             <p className="text-dark-muted text-center py-8">
-              {t.noTokens}
+              {t('votes:voteManager.noTokens')}
             </p>
           )}
         </div>
@@ -494,11 +469,11 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
       <Modal
         isOpen={isResultsOpen}
         onClose={() => setIsResultsOpen(false)}
-        title={`${t.results} - ${selectedSession?.name}`}
+        title={`${t('votes:voteManager.results')} - ${selectedSession?.name}`}
         size="lg"
       >
         {selectedSession && (
-          <VoteResultsAdmin session={selectedSession} language={language} />
+          <VoteResultsAdmin session={selectedSession} />
         )}
       </Modal>
     </div>
@@ -506,7 +481,8 @@ export function VoteSessionManager({ createOpen, onCreateOpenChange }: VoteSessi
 }
 
 // Admin results view with more details
-function VoteResultsAdmin({ session, language }: { session: VoteSession; language: 'en' | 'fr' }) {
+function VoteResultsAdmin({ session }: { session: VoteSession }) {
+  const { t } = useTranslation(['votes']);
   const { data, isLoading } = useQuery({
     queryKey: ['vote-results', session.id],
     queryFn: async () => {
@@ -524,14 +500,14 @@ function VoteResultsAdmin({ session, language }: { session: VoteSession; languag
   }
 
   if (!data) {
-    return <p className="text-dark-muted text-center py-8">{language === 'fr' ? 'Aucun résultat disponible' : 'No results available'}</p>;
+    return <p className="text-dark-muted text-center py-8">{t('votes:voteManager.noResultsAvailable')}</p>;
   }
 
   return (
     <div>
       <div className="mb-6 text-center p-4 bg-dark-surface rounded-lg">
         <div className="text-4xl font-bold text-dark-text">{data.total_votes}</div>
-        <div className="text-dark-muted">{language === 'fr' ? 'Votes totaux' : 'Total Votes'}</div>
+        <div className="text-dark-muted">{t('votes:voteManager.totalVotes')}</div>
       </div>
 
       <VoteResults

@@ -4,10 +4,10 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Search, Film, Lightbulb, Volume2, Monitor, Zap, ClipboardCheck, X, RefreshCw, Sparkles, Star, Clapperboard } from 'lucide-react';
 import { Spinner } from '../common';
 import { apiClient } from '../../api/client';
-import { useLayoutStore } from '../../stores/layoutStore';
 
 // Types
 export type ActionType = 'lighting' | 'audio' | 'display' | 'media' | 'actuator' | 'session';
@@ -75,35 +75,21 @@ const actionTypeConfig: Record<ActionType, {
   icon: typeof Lightbulb;
   color: string;
   bgColor: string;
-  label: { en: string; fr: string };
+  labelKey: string;
   category: string;
 }> = {
-  lighting: { icon: Lightbulb, color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', label: { en: 'Lighting', fr: 'Éclairage' }, category: 'lighting' },
-  audio: { icon: Volume2, color: 'text-blue-400', bgColor: 'bg-blue-500/20', label: { en: 'Audio', fr: 'Audio' }, category: 'player' },
-  media: { icon: Film, color: 'text-green-400', bgColor: 'bg-green-500/20', label: { en: 'Media', fr: 'Média' }, category: 'media_source' },
-  display: { icon: Monitor, color: 'text-purple-400', bgColor: 'bg-purple-500/20', label: { en: 'Display', fr: 'Affichage' }, category: 'player' },
-  actuator: { icon: Zap, color: 'text-orange-400', bgColor: 'bg-orange-500/20', label: { en: 'Actuator', fr: 'Actionneur' }, category: 'actuator' },
-  session: { icon: ClipboardCheck, color: 'text-teal-400', bgColor: 'bg-teal-500/20', label: { en: 'Session', fr: 'Session' }, category: '' },
+  lighting: { icon: Lightbulb, color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', labelKey: 'lighting', category: 'lighting' },
+  audio: { icon: Volume2, color: 'text-blue-400', bgColor: 'bg-blue-500/20', labelKey: 'audio', category: 'player' },
+  media: { icon: Film, color: 'text-green-400', bgColor: 'bg-green-500/20', labelKey: 'media', category: 'media_source' },
+  display: { icon: Monitor, color: 'text-purple-400', bgColor: 'bg-purple-500/20', labelKey: 'display', category: 'player' },
+  actuator: { icon: Zap, color: 'text-orange-400', bgColor: 'bg-orange-500/20', labelKey: 'actuator', category: 'actuator' },
+  session: { icon: ClipboardCheck, color: 'text-teal-400', bgColor: 'bg-teal-500/20', labelKey: 'session', category: '' },
 };
 
 export function ActionEditorPanel({ action, services, onChange, onDelete, colorPalette, sessionId, movieId, movieSourceId, movieGenres, allActions }: ActionEditorPanelProps) {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation('sessions');
   const config = actionTypeConfig[action.action_type];
   const Icon = config.icon;
-
-  const t = {
-    service: language === 'fr' ? 'Service' : 'Service',
-    noService: language === 'fr' ? 'Aucun (manuel)' : 'None (manual)',
-    delay: language === 'fr' ? 'Délai avant exécution (ms)' : 'Delay before execution (ms)',
-    duration: language === 'fr' ? 'Durée de maintien (secondes)' : 'Hold duration (seconds)',
-    durationHelp: language === 'fr' ? 'Temps d\'attente après cette action avant la suivante. 0 = passage immédiat.' : 'Wait time after this action before the next one. 0 = immediate.',
-    onFailure: language === 'fr' ? 'En cas d\'échec' : 'On Failure',
-    warn: language === 'fr' ? 'Avertir et continuer' : 'Warn and continue',
-    skip: language === 'fr' ? 'Ignorer' : 'Skip silently',
-    abort: language === 'fr' ? 'Interrompre la session' : 'Abort session',
-    deleteAction: language === 'fr' ? 'Supprimer l\'action' : 'Delete Action',
-    actionSettings: language === 'fr' ? 'Paramètres de l\'action' : 'Action Settings',
-  };
 
   // Filter services by action type category
   const availableServices = services.filter(s => {
@@ -124,7 +110,7 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
         </div>
         <div>
           <div className="font-medium text-dark-text">
-            {language === 'fr' ? config.label.fr : config.label.en}
+            {t(`actionTypes.${config.labelKey}`)}
           </div>
           <div className="text-xs text-dark-muted">{action.command}</div>
         </div>
@@ -132,13 +118,13 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
 
       {/* Service Selection */}
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.service}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('actionEditor.service')}</label>
         <select
           value={action.service_id || ''}
           onChange={(e) => onChange({ service_id: e.target.value || undefined })}
           className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
         >
-          <option value="">{t.noService}</option>
+          <option value="">{t('actionEditor.noService')}</option>
           {availableServices.map((service) => (
             <option key={service.id} value={service.id}>
               {service.name} ({service.adapter_type})
@@ -153,7 +139,6 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
           <LightingForm
             action={action}
             onChange={onChange}
-            language={language}
             colorPalette={colorPalette}
           />
         )}
@@ -161,14 +146,12 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
           <AudioForm
             action={action}
             onChange={onChange}
-            language={language}
           />
         )}
         {action.action_type === 'media' && (
           <MediaForm
             action={action}
             onChange={onChange}
-            language={language}
             sessionId={sessionId}
             movieId={movieId}
             movieSourceId={movieSourceId}
@@ -180,31 +163,28 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
           <DisplayForm
             action={action}
             onChange={onChange}
-            language={language}
           />
         )}
         {action.action_type === 'actuator' && (
           <ActuatorForm
             action={action}
             onChange={onChange}
-            language={language}
           />
         )}
         {action.action_type === 'session' && (
           <SessionForm
             action={action}
             onChange={onChange}
-            language={language}
           />
         )}
       </div>
 
       {/* Common Settings */}
       <div className="border-t border-dark-border pt-4 space-y-4">
-        <h4 className="text-sm font-medium text-dark-text">{t.actionSettings}</h4>
+        <h4 className="text-sm font-medium text-dark-text">{t('actionEditor.actionSettings')}</h4>
 
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.duration}</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t('actionEditor.duration')}</label>
           <input
             type="number"
             value={(action.duration_ms || 0) / 1000}
@@ -213,11 +193,11 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
             min="0"
             step="1"
           />
-          <p className="text-xs text-dark-muted mt-1">{t.durationHelp}</p>
+          <p className="text-xs text-dark-muted mt-1">{t('actionEditor.durationHelp')}</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.delay}</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t('actionEditor.delay')}</label>
           <input
             type="number"
             value={action.delay_ms}
@@ -229,15 +209,15 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.onFailure}</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t('actionEditor.onFailure')}</label>
           <select
             value={action.on_failure}
             onChange={(e) => onChange({ on_failure: e.target.value as 'warn' | 'skip' | 'abort' })}
             className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
           >
-            <option value="warn">{t.warn}</option>
-            <option value="skip">{t.skip}</option>
-            <option value="abort">{t.abort}</option>
+            <option value="warn">{t('actionEditor.warn')}</option>
+            <option value="skip">{t('actionEditor.skip')}</option>
+            <option value="abort">{t('actionEditor.abort')}</option>
           </select>
         </div>
 
@@ -247,7 +227,7 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
           className="w-full px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
         >
           <X size={16} />
-          {t.deleteAction}
+          {t('actionEditor.deleteAction')}
         </button>
       </div>
     </div>
@@ -260,14 +240,13 @@ export function ActionEditorPanel({ action, services, onChange, onDelete, colorP
 function LightingForm({
   action,
   onChange,
-  language,
   colorPalette,
 }: {
   action: ActionItem;
   onChange: (updates: Partial<ActionItem>) => void;
-  language: string;
   colorPalette?: ColorPalette | null;
 }) {
+  const { t } = useTranslation('sessions');
   const { parameters, command, service_id } = action;
 
   // Fetch lights from service if selected
@@ -280,31 +259,14 @@ function LightingForm({
     enabled: !!service_id,
   });
 
-  const t = {
-    command: language === 'fr' ? 'Commande' : 'Command',
-    targetLights: language === 'fr' ? 'Lumières cibles' : 'Target Lights',
-    allLights: language === 'fr' ? 'Toutes les lumières' : 'All lights',
-    color: language === 'fr' ? 'Couleur' : 'Color',
-    brightness: language === 'fr' ? 'Luminosité' : 'Brightness',
-    transition: language === 'fr' ? 'Transition (ms)' : 'Transition (ms)',
-    scene: language === 'fr' ? 'Scène' : 'Scene',
-    noLights: language === 'fr' ? 'Aucune lumière disponible' : 'No lights available',
-    refresh: language === 'fr' ? 'Actualiser' : 'Refresh',
-    moviePalette: language === 'fr' ? 'Palette du film' : 'Movie Palette',
-    noPalette: language === 'fr' ? 'Sélectionnez un film pour voir sa palette' : 'Select a movie to see its palette',
-    effect: language === 'fr' ? 'Effet' : 'Effect',
-    effectSpeed: language === 'fr' ? 'Vitesse' : 'Speed',
-    effectIntensity: language === 'fr' ? 'Intensité' : 'Intensity',
-  };
-
   const commands = [
-    { value: 'turn_on', label: language === 'fr' ? 'Allumer' : 'Turn On' },
-    { value: 'turn_off', label: language === 'fr' ? 'Éteindre' : 'Turn Off' },
-    { value: 'toggle', label: 'Toggle' },
-    { value: 'set_color', label: language === 'fr' ? 'Définir couleur' : 'Set Color' },
-    { value: 'set_brightness', label: language === 'fr' ? 'Définir luminosité' : 'Set Brightness' },
-    { value: 'set_scene', label: language === 'fr' ? 'Activer scène' : 'Activate Scene' },
-    { value: 'set_effect', label: language === 'fr' ? 'Effet LED' : 'LED Effect' },
+    { value: 'turn_on', label: t('lightingForm.turnOn') },
+    { value: 'turn_off', label: t('lightingForm.turnOff') },
+    { value: 'toggle', label: t('lightingForm.toggle') },
+    { value: 'set_color', label: t('lightingForm.setColor') },
+    { value: 'set_brightness', label: t('lightingForm.setBrightness') },
+    { value: 'set_scene', label: t('lightingForm.activateScene') },
+    { value: 'set_effect', label: t('lightingForm.ledEffect') },
   ];
 
   const lights = resources?.items || [];
@@ -319,7 +281,7 @@ function LightingForm({
     <div className="space-y-4">
       {/* Command */}
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('lightingForm.command')}</label>
         <select
           value={command}
           onChange={(e) => onChange({ command: e.target.value })}
@@ -335,13 +297,13 @@ function LightingForm({
       {service_id && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-sm font-medium text-dark-text">{t.targetLights}</label>
+            <label className="text-sm font-medium text-dark-text">{t('lightingForm.targetLights')}</label>
             <button
               onClick={() => refetch()}
               className="text-xs text-dark-muted hover:text-dark-text flex items-center gap-1"
             >
               <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
-              {t.refresh}
+              {t('lightingForm.refresh')}
             </button>
           </div>
           {isLoading ? (
@@ -359,9 +321,9 @@ function LightingForm({
               }}
               className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
             >
-              <option value="all">{t.allLights}</option>
+              <option value="all">{t('lightingForm.allLights')}</option>
               {groups.length > 0 && (
-                <optgroup label={language === 'fr' ? 'Groupes' : 'Groups'}>
+                <optgroup label={t('lightingForm.groups')}>
                   {groups.map((group) => (
                     <option key={`group-${group.id}`} value={group.id}>
                       {group.name} ({group.member_count})
@@ -369,14 +331,14 @@ function LightingForm({
                   ))}
                 </optgroup>
               )}
-              <optgroup label={language === 'fr' ? 'Lumières individuelles' : 'Individual lights'}>
+              <optgroup label={t('lightingForm.individualLights')}>
                 {lights.map((light) => (
                   <option key={light.id} value={light.id}>{light.name}</option>
                 ))}
               </optgroup>
             </select>
           ) : (
-            <div className="text-sm text-dark-muted p-2 bg-dark-bg rounded-lg">{t.noLights}</div>
+            <div className="text-sm text-dark-muted p-2 bg-dark-bg rounded-lg">{t('lightingForm.noLights')}</div>
           )}
         </div>
       )}
@@ -387,7 +349,7 @@ function LightingForm({
           {/* Movie Palette Swatches */}
           {colorPalette && (
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-2">{t.moviePalette}</label>
+              <label className="block text-sm font-medium text-dark-text mb-2">{t('lightingForm.moviePalette')}</label>
               <div className="flex flex-wrap gap-2">
                 {[
                   { color: colorPalette.primary, label: 'Primary' },
@@ -437,7 +399,7 @@ function LightingForm({
           {/* Color picker row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{t.color}</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t('lightingForm.color')}</label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
@@ -455,7 +417,7 @@ function LightingForm({
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{t.transition}</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t('lightingForm.transition')}</label>
               <input
                 type="number"
                 value={(parameters.transition_ms as number) || 0}
@@ -473,7 +435,7 @@ function LightingForm({
       {(command === 'set_brightness' || command === 'set_color' || command === 'turn_on') && (
         <div>
           <label className="block text-sm font-medium text-dark-text mb-1">
-            {t.brightness} ({(parameters.brightness as number) || 100}%)
+            {t('lightingForm.brightness')} ({(parameters.brightness as number) || 100}%)
           </label>
           <input
             type="range"
@@ -489,7 +451,7 @@ function LightingForm({
       {/* Scene */}
       {command === 'set_scene' && service_id && (
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.scene}</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t('lightingForm.scene')}</label>
           {scenes.length > 0 ? (
             <select
               value={(parameters.scene as string) || ''}
@@ -517,7 +479,7 @@ function LightingForm({
       {command === 'set_effect' && (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.effect}</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('lightingForm.effect')}</label>
             {service_id && scenes.length > 0 ? (
               <select
                 value={(parameters.effect as string) || ''}
@@ -535,14 +497,14 @@ function LightingForm({
                 value={(parameters.effect as string) || ''}
                 onChange={(e) => handleParametersChange({ effect: e.target.value })}
                 className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
-                placeholder={language === 'fr' ? 'Nom ou ID de l\'effet' : 'Effect name or ID'}
+                placeholder={t('lightingFormExtra.effectNamePlaceholder')}
               />
             )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-dark-text mb-1">
-              {t.effectSpeed} ({(parameters.speed as number) ?? 128})
+              {t('lightingForm.effectSpeed')} ({(parameters.speed as number) ?? 128})
             </label>
             <input
               type="range"
@@ -556,7 +518,7 @@ function LightingForm({
 
           <div>
             <label className="block text-sm font-medium text-dark-text mb-1">
-              {t.effectIntensity} ({(parameters.intensity as number) ?? 128})
+              {t('lightingForm.effectIntensity')} ({(parameters.intensity as number) ?? 128})
             </label>
             <input
               type="range"
@@ -589,37 +551,21 @@ interface SoundLibraryItem {
 function AudioForm({
   action,
   onChange,
-  language,
 }: {
   action: ActionItem;
   onChange: (updates: Partial<ActionItem>) => void;
-  language: string;
 }) {
+  const { t } = useTranslation('sessions');
   const { parameters, command } = action;
 
-  const t = {
-    command: language === 'fr' ? 'Commande' : 'Command',
-    sourceType: language === 'fr' ? 'Type de source' : 'Source Type',
-    soundLibrary: language === 'fr' ? 'Bibliothèque de sons' : 'Sound Library',
-    externalUrl: language === 'fr' ? 'URL externe' : 'External URL',
-    selectSound: language === 'fr' ? 'Sélectionner un son' : 'Select a sound',
-    url: language === 'fr' ? 'URL audio' : 'Audio URL',
-    volume: language === 'fr' ? 'Volume' : 'Volume',
-    fadeIn: language === 'fr' ? 'Fondu d\'entrée (ms)' : 'Fade In (ms)',
-    fadeOut: language === 'fr' ? 'Fondu de sortie (ms)' : 'Fade Out (ms)',
-    fadeDuration: language === 'fr' ? 'Durée du fondu (ms)' : 'Fade Duration (ms)',
-    loop: language === 'fr' ? 'Lecture en boucle' : 'Loop',
-    device: language === 'fr' ? 'Appareil cible' : 'Target Device',
-  };
-
   const commands = [
-    { value: 'play', label: language === 'fr' ? 'Lecture' : 'Play' },
-    { value: 'pause', label: 'Pause' },
-    { value: 'resume', label: language === 'fr' ? 'Reprendre' : 'Resume' },
-    { value: 'stop', label: language === 'fr' ? 'Arrêter' : 'Stop' },
-    { value: 'set_volume', label: language === 'fr' ? 'Régler volume' : 'Set Volume' },
-    { value: 'mute', label: language === 'fr' ? 'Couper le son' : 'Mute' },
-    { value: 'unmute', label: language === 'fr' ? 'Activer le son' : 'Unmute' },
+    { value: 'play', label: t('audioForm.play') },
+    { value: 'pause', label: t('audioForm.pause') },
+    { value: 'resume', label: t('audioForm.resume') },
+    { value: 'stop', label: t('audioForm.stop') },
+    { value: 'set_volume', label: t('audioForm.setVolume') },
+    { value: 'mute', label: t('audioForm.mute') },
+    { value: 'unmute', label: t('audioForm.unmute') },
   ];
 
   const sourceType = parameters.sound_id !== undefined ? 'library' : 'url';
@@ -650,7 +596,7 @@ function AudioForm({
     <div className="space-y-4">
       {/* Command */}
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('audioForm.command')}</label>
         <select
           value={command}
           onChange={(e) => onChange({ command: e.target.value })}
@@ -667,7 +613,7 @@ function AudioForm({
         <>
           {/* Source type selector */}
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.sourceType}</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('audioForm.sourceType')}</label>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -678,7 +624,7 @@ function AudioForm({
                     : 'bg-dark-bg border border-dark-border text-dark-muted hover:text-dark-text'
                 }`}
               >
-                {t.soundLibrary}
+                {t('audioForm.soundLibrary')}
               </button>
               <button
                 type="button"
@@ -689,7 +635,7 @@ function AudioForm({
                     : 'bg-dark-bg border border-dark-border text-dark-muted hover:text-dark-text'
                 }`}
               >
-                {t.externalUrl}
+                {t('audioForm.externalUrl')}
               </button>
             </div>
           </div>
@@ -697,13 +643,13 @@ function AudioForm({
           {/* Library sound selector */}
           {sourceType === 'library' && (
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{t.selectSound}</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t('audioForm.selectSound')}</label>
               <select
                 value={(parameters.sound_id as string) || ''}
                 onChange={(e) => handleParametersChange({ sound_id: e.target.value || undefined })}
                 className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
               >
-                <option value="">-- {t.selectSound} --</option>
+                <option value="">-- {t('audioForm.selectSound')} --</option>
                 {sounds.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -724,7 +670,7 @@ function AudioForm({
           {/* External URL */}
           {sourceType === 'url' && (
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{t.url}</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t('audioForm.url')}</label>
               <input
                 type="text"
                 value={(parameters.url as string) || (parameters.source as string) || ''}
@@ -741,7 +687,7 @@ function AudioForm({
       {(command === 'set_volume' || command === 'play') && (
         <div>
           <label className="block text-sm font-medium text-dark-text mb-1">
-            {t.volume} ({(parameters.volume as number) ?? 80}%)
+            {t('audioForm.volume')} ({(parameters.volume as number) ?? 80}%)
           </label>
           <input
             type="range"
@@ -758,7 +704,7 @@ function AudioForm({
       {command === 'play' && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.fadeIn}</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('audioForm.fadeIn')}</label>
             <input
               type="number"
               value={(parameters.fade_in_ms as number) || 0}
@@ -769,7 +715,7 @@ function AudioForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.fadeOut}</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('audioForm.fadeOut')}</label>
             <input
               type="number"
               value={(parameters.fade_out_ms as number) || 0}
@@ -785,7 +731,7 @@ function AudioForm({
       {/* Fade for stop/volume */}
       {(command === 'stop' || command === 'set_volume') && (
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.fadeDuration}</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t('audioForm.fadeDuration')}</label>
           <input
             type="number"
             value={(parameters.fade_ms as number) || 0}
@@ -806,13 +752,13 @@ function AudioForm({
             onChange={(e) => handleParametersChange({ loop: e.target.checked })}
             className="rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500"
           />
-          <span className="text-sm text-dark-text">{t.loop}</span>
+          <span className="text-sm text-dark-text">{t('audioForm.loop')}</span>
         </label>
       )}
 
       {/* Target device */}
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.device}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('audioForm.device')}</label>
         <input
           type="text"
           value={(parameters.device as string) || ''}
@@ -864,7 +810,6 @@ const QUALITY_PRESETS = [
 function MediaForm({
   action,
   onChange,
-  language,
   sessionId,
   movieId,
   movieSourceId,
@@ -873,13 +818,13 @@ function MediaForm({
 }: {
   action: ActionItem;
   onChange: (updates: Partial<ActionItem>) => void;
-  language: string;
   sessionId?: string;
   movieId?: string | null;
   movieSourceId?: string | null;
   movieGenres?: string[] | null;
   allActions?: ActionItem[];
 }) {
+  const { t } = useTranslation('sessions');
   const { parameters, command, service_id } = action;
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -889,38 +834,11 @@ function MediaForm({
   const [chaptersDurationMs, setChaptersDurationMs] = useState(0);
   const [chaptersLoaded, setChaptersLoaded] = useState(false);
 
-  const t = {
-    command: language === 'fr' ? 'Commande' : 'Command',
-    selectMovie: language === 'fr' ? 'Sélectionner un film' : 'Select a movie',
-    searchPlaceholder: language === 'fr' ? 'Rechercher un film...' : 'Search for a movie...',
-    noResults: language === 'fr' ? 'Aucun film trouvé' : 'No movies found',
-    selectedMovie: language === 'fr' ? 'Film sélectionné' : 'Selected Movie',
-    change: language === 'fr' ? 'Changer' : 'Change',
-    remove: language === 'fr' ? 'Retirer' : 'Remove',
-    startPosition: language === 'fr' ? 'Position de départ (ms)' : 'Start Position (ms)',
-    audioTrack: language === 'fr' ? 'Piste audio' : 'Audio Track',
-    subtitleTrack: language === 'fr' ? 'Sous-titres' : 'Subtitles',
-    videoQuality: language === 'fr' ? 'Qualité vidéo' : 'Video Quality',
-    noSubtitles: language === 'fr' ? 'Aucun' : 'None',
-    defaultTrack: language === 'fr' ? 'Par défaut' : 'Default',
-    loadingStreams: language === 'fr' ? 'Chargement des pistes...' : 'Loading tracks...',
-    noService: language === 'fr' ? 'Sélectionnez un service média pour rechercher des films' : 'Select a media service to search for movies',
-    pauseAt: language === 'fr' ? 'Pause automatique à' : 'Auto-pause at',
-    pauseAtHint: language === 'fr' ? 'Le film se mettra en pause à ce moment (HH:MM:SS). Le moteur passera automatiquement à la séquence suivante.' : 'The movie will pause at this time (HH:MM:SS). The engine will automatically advance to the next sequence.',
-    noPause: language === 'fr' ? 'Pas de pause' : 'No pause',
-    resumeHint: language === 'fr' ? 'Reprend la lecture du film là où il a été mis en pause dans une séquence précédente.' : 'Resumes movie playback from where it was paused in a previous sequence.',
-    smartIntermission: language === 'fr' ? 'Entracte intelligente' : 'Smart Intermission',
-    smartIntermissionHint: language === 'fr' ? 'Positionne la pause au chapitre le plus proche du milieu du film.' : 'Sets the pause at the chapter boundary closest to the middle of the movie.',
-    noChapters: language === 'fr' ? 'Aucun chapitre trouvé pour ce film.' : 'No chapters found for this movie.',
-    chapterSet: language === 'fr' ? 'Pause positionnée au chapitre' : 'Pause set at chapter',
-    chapterSelect: language === 'fr' ? 'Pause après le chapitre...' : 'Pause after chapter...',
-  };
-
   const commands = [
-    { value: 'play', label: language === 'fr' ? 'Lecture' : 'Play' },
-    { value: 'pause', label: 'Pause' },
-    { value: 'stop', label: language === 'fr' ? 'Arrêter' : 'Stop' },
-    { value: 'resume', label: language === 'fr' ? 'Reprendre' : 'Resume' },
+    { value: 'play', label: t('mediaForm.play') },
+    { value: 'pause', label: t('mediaForm.pause') },
+    { value: 'stop', label: t('mediaForm.stop') },
+    { value: 'resume', label: t('mediaForm.resume') },
   ];
 
   // Fetch media streams when a movie is selected
@@ -979,11 +897,11 @@ function MediaForm({
       setChaptersDurationMs(data.duration_ms || 0);
       setChaptersLoaded(true);
       if (chs.length < 2) {
-        setChaptersError(t.noChapters);
+        setChaptersError(t('mediaForm.noChapters'));
       }
       return chs;
     } catch {
-      setChaptersError(t.noChapters);
+      setChaptersError(t('mediaForm.noChapters'));
       setChaptersLoaded(true);
       return [];
     } finally {
@@ -1006,7 +924,7 @@ function MediaForm({
     }
     const bestChapter = chs[bestIdx];
     handleParametersChange({ pause_at_ms: bestChapter.end_ms });
-    setChaptersError(`${t.chapterSet} "${bestChapter.title}"`);
+    setChaptersError(`${t('mediaForm.chapterSet')} "${bestChapter.title}"`);
   };
 
   const handleRemoveMovie = () => {
@@ -1028,7 +946,7 @@ function MediaForm({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('mediaForm.command')}</label>
         <select
           value={command}
           onChange={(e) => onChange({ command: e.target.value })}
@@ -1045,13 +963,13 @@ function MediaForm({
           {/* Media Source Selector */}
           <div>
             <label className="block text-sm font-medium text-dark-text mb-2">
-              {language === 'fr' ? 'Source' : 'Source'}
+              {t('mediaSource.source')}
             </label>
             <div className="flex gap-2">
               {([
-                { value: 'service', label: language === 'fr' ? 'Service' : 'Service', icon: <Monitor size={14} /> },
-                { value: 'trailer', label: language === 'fr' ? 'Bande-annonce' : 'Trailer', icon: <Film size={14} /> },
-                { value: 'preroll', label: language === 'fr' ? 'Pré-roll' : 'Pre-roll', icon: <Clapperboard size={14} /> },
+                { value: 'service', label: t('mediaSource.service'), icon: <Monitor size={14} /> },
+                { value: 'trailer', label: t('mediaSource.trailer'), icon: <Film size={14} /> },
+                { value: 'preroll', label: t('mediaSource.preroll'), icon: <Clapperboard size={14} /> },
               ] as const).map((src) => (
                 <button
                   key={src.value}
@@ -1081,7 +999,6 @@ function MediaForm({
             <TrailerSourceForm
               parameters={parameters}
               onChange={handleParametersChange}
-              language={language}
               sessionId={sessionId}
               movieId={movieId}
               movieSourceId={movieSourceId}
@@ -1096,17 +1013,17 @@ function MediaForm({
 
           {/* PreRoll Source Form */}
           {((parameters.media_source as string) === 'preroll') && (
-            <PreRollSourceForm parameters={parameters} onChange={handleParametersChange} language={language} />
+            <PreRollSourceForm parameters={parameters} onChange={handleParametersChange} />
           )}
 
           {/* Service source (existing behavior) */}
           {((parameters.media_source as string) || 'service') === 'service' && (
           <>
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-2">{t.selectMovie}</label>
+            <label className="block text-sm font-medium text-dark-text mb-2">{t('mediaForm.selectMovie')}</label>
 
             {!service_id ? (
-              <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">{t.noService}</div>
+              <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">{t('mediaForm.noService')}</div>
             ) : selectedMovie && !isSearchOpen ? (
               <div className="flex items-center gap-3 p-3 bg-dark-bg border border-dark-border rounded-lg">
                 <div className="w-10 h-14 bg-dark-border rounded flex-shrink-0 overflow-hidden">
@@ -1126,7 +1043,7 @@ function MediaForm({
                     onClick={() => setIsSearchOpen(true)}
                     className="px-2 py-1 text-xs bg-dark-border hover:bg-dark-muted/30 text-dark-text rounded"
                   >
-                    {t.change}
+                    {t('mediaForm.change')}
                   </button>
                   <button
                     type="button"
@@ -1143,7 +1060,7 @@ function MediaForm({
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
                   <input
                     type="text"
-                    placeholder={t.searchPlaceholder}
+                    placeholder={t('mediaForm.searchPlaceholder')}
                     value={searchQuery}
                     onChange={(e) => { setSearchQuery(e.target.value); setIsSearchOpen(true); }}
                     onFocus={() => setIsSearchOpen(true)}
@@ -1179,7 +1096,7 @@ function MediaForm({
                         ))}
                       </div>
                     ) : (
-                      <div className="p-4 text-center text-dark-muted text-sm">{t.noResults}</div>
+                      <div className="p-4 text-center text-dark-muted text-sm">{t('mediaForm.noResults')}</div>
                     )}
                   </div>
                 )}
@@ -1191,19 +1108,19 @@ function MediaForm({
           {service_id && mediaId && (
             <div className="space-y-4">
               {isStreamsLoading ? (
-                <div className="text-sm text-dark-muted p-2">{t.loadingStreams}</div>
+                <div className="text-sm text-dark-muted p-2">{t('mediaForm.loadingStreams')}</div>
               ) : (
                 <>
                   {/* Audio Track */}
                   {mediaStreams && mediaStreams.audio_tracks.length > 0 && (
                     <div>
-                      <label className="block text-sm font-medium text-dark-text mb-1">{t.audioTrack}</label>
+                      <label className="block text-sm font-medium text-dark-text mb-1">{t('mediaForm.audioTrack')}</label>
                       <select
                         value={(parameters.audio_stream_id as number) || ''}
                         onChange={(e) => handleParametersChange({ audio_stream_id: e.target.value ? Number(e.target.value) : undefined })}
                         className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
                       >
-                        <option value="">{t.defaultTrack}</option>
+                        <option value="">{t('mediaForm.defaultTrack')}</option>
                         {mediaStreams.audio_tracks.map((track) => (
                           <option key={track.id} value={track.id}>
                             {track.display_title}
@@ -1216,13 +1133,13 @@ function MediaForm({
                   {/* Subtitle Track */}
                   {mediaStreams && mediaStreams.subtitle_tracks.length > 0 && (
                     <div>
-                      <label className="block text-sm font-medium text-dark-text mb-1">{t.subtitleTrack}</label>
+                      <label className="block text-sm font-medium text-dark-text mb-1">{t('mediaForm.subtitleTrack')}</label>
                       <select
                         value={(parameters.subtitle_stream_id as number) || ''}
                         onChange={(e) => handleParametersChange({ subtitle_stream_id: e.target.value ? Number(e.target.value) : undefined })}
                         className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
                       >
-                        <option value="">{t.noSubtitles}</option>
+                        <option value="">{t('mediaForm.noSubtitles')}</option>
                         {mediaStreams.subtitle_tracks.map((track) => (
                           <option key={track.id} value={track.id}>
                             {track.display_title}
@@ -1236,7 +1153,7 @@ function MediaForm({
 
               {/* Video Quality */}
               <div>
-                <label className="block text-sm font-medium text-dark-text mb-1">{t.videoQuality}</label>
+                <label className="block text-sm font-medium text-dark-text mb-1">{t('mediaForm.videoQuality')}</label>
                 <select
                   value={(parameters.video_quality as string) || 'original'}
                   onChange={(e) => handleParametersChange({ video_quality: e.target.value })}
@@ -1251,7 +1168,7 @@ function MediaForm({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.startPosition}</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('mediaForm.startPosition')}</label>
             <input
               type="number"
               value={(parameters.position_ms as number) || 0}
@@ -1264,7 +1181,7 @@ function MediaForm({
 
           {/* Pause automatique — 3 inputs H / M / S pour mobile */}
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.pauseAt}</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('mediaForm.pauseAt')}</label>
             {(() => {
               const ms = (parameters.pause_at_ms as number) || 0;
               const totalSec = Math.floor(ms / 1000);
@@ -1333,7 +1250,7 @@ function MediaForm({
                 </div>
               );
             })()}
-            <p className="text-xs text-dark-muted mt-1">{t.pauseAtHint}</p>
+            <p className="text-xs text-dark-muted mt-1">{t('mediaForm.pauseAtHint')}</p>
           </div>
 
           {/* Smart Intermission + Chapter selector */}
@@ -1353,7 +1270,7 @@ function MediaForm({
                     }`}
                   >
                     {isLoadingChapters ? <Spinner size="sm" /> : <Sparkles size={14} />}
-                    {t.smartIntermission}
+                    {t('mediaForm.smartIntermission')}
                   </button>
                   {chapters.length >= 2 ? (
                     <select
@@ -1374,13 +1291,13 @@ function MediaForm({
                           const ch = chapters.find(c => String(c.index) === idx);
                           if (ch) {
                             handleParametersChange({ pause_at_ms: ch.end_ms });
-                            setChaptersError(`${t.chapterSet} "${ch.title}"`);
+                            setChaptersError(`${t('mediaForm.chapterSet')} "${ch.title}"`);
                           }
                         }
                       }}
                       className="flex-1 min-w-0 bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text text-sm"
                     >
-                      <option value="">{t.chapterSelect}</option>
+                      <option value="">{t('mediaForm.chapterSelect')}</option>
                       {chapters.slice(0, -1).map((ch) => {
                         const sec = Math.floor(ch.end_ms / 1000);
                         const hh = Math.floor(sec / 3600);
@@ -1398,7 +1315,7 @@ function MediaForm({
                     </select>
                   ) : noChaptersAvailable ? (
                     <span className="text-xs text-dark-muted italic">
-                      {language === 'fr' ? 'Indisponible — aucun chapitre détecté' : 'Unavailable — no chapters detected'}
+                      {t('mediaSource.chaptersUnavailable')}
                     </span>
                   ) : !chaptersLoaded && !isLoadingChapters ? (
                     <button
@@ -1406,15 +1323,15 @@ function MediaForm({
                       onClick={fetchChapters}
                       className="text-xs text-dark-muted hover:text-dark-text transition-colors"
                     >
-                      {language === 'fr' ? 'Charger les chapitres' : 'Load chapters'}
+                      {t('mediaSource.loadChapters')}
                     </button>
                   ) : null}
                 </div>
                 {!noChaptersAvailable && (
-                  <p className="text-xs text-dark-muted">{t.smartIntermissionHint}</p>
+                  <p className="text-xs text-dark-muted">{t('mediaForm.smartIntermissionHint')}</p>
                 )}
                 {chaptersError && (
-                  <p className={`text-xs ${chaptersError.startsWith(t.chapterSet) ? 'text-green-400' : 'text-amber-400'}`}>
+                  <p className={`text-xs ${chaptersError.startsWith(t('mediaForm.chapterSet')) ? 'text-green-400' : 'text-amber-400'}`}>
                     {chaptersError}
                   </p>
                 )}
@@ -1428,7 +1345,7 @@ function MediaForm({
 
       {command === 'resume' && (
         <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-          <p className="text-sm text-blue-300">{t.resumeHint}</p>
+          <p className="text-sm text-blue-300">{t('mediaForm.resumeHint')}</p>
         </div>
       )}
     </div>
@@ -1442,22 +1359,21 @@ function MediaForm({
 function TrailerSourceForm({
   parameters,
   onChange,
-  language,
-  sessionId,
+  sessionId: _sessionId,
   movieId,
-  movieSourceId,
+  movieSourceId: _movieSourceId,
   movieGenres,
   excludeTmdbIds,
 }: {
   parameters: Record<string, unknown>;
   onChange: (updates: Record<string, unknown>) => void;
-  language: string;
   sessionId?: string;
   movieId?: string | null;
   movieSourceId?: string | null;
   movieGenres?: string[] | null;
   excludeTmdbIds?: string[];
 }) {
+  const { t } = useTranslation('sessions');
   const trailerMode = (parameters.trailer_mode as string) || 'manual';
   const [isSearching, setIsSearching] = useState(false);
 
@@ -1480,13 +1396,13 @@ function TrailerSourceForm({
       {/* Mode selector */}
       <div>
         <label className="block text-sm font-medium text-dark-text mb-2">
-          {language === 'fr' ? 'Mode de sélection' : 'Selection mode'}
+          {t('trailerSource.selectionMode')}
         </label>
         <div className="flex gap-2">
           {([
-            { value: 'manual', label: language === 'fr' ? 'Manuel' : 'Manual' },
-            { value: 'auto', label: 'Auto' },
-            { value: 'rule', label: language === 'fr' ? 'Règle' : 'Rule' },
+            { value: 'manual', label: t('trailerSource.manual') },
+            { value: 'auto', label: t('trailerSource.auto') },
+            { value: 'rule', label: t('trailerSource.rule') },
           ] as const).map((m) => (
             <button
               key={m.value}
@@ -1508,18 +1424,18 @@ function TrailerSourceForm({
       {trailerMode === 'manual' && (
         <div>
           <label className="block text-sm font-medium text-dark-text mb-1">
-            {language === 'fr' ? 'Bande-annonce' : 'Trailer'}
+            {t('trailerSource.trailer')}
           </label>
           <select
             value={(parameters.trailer_id as string) || ''}
             onChange={(e) => onChange({ trailer_id: e.target.value || undefined })}
             className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
           >
-            <option value="">{language === 'fr' ? 'Sélectionner...' : 'Select...'}</option>
-            {trailersData?.items?.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.movie_title} — {t.title}
-                {t.duration_seconds ? ` (${formatDuration(t.duration_seconds)})` : ''}
+            <option value="">{t('trailerSource.select')}</option>
+            {trailersData?.items?.map((tr) => (
+              <option key={tr.id} value={tr.id}>
+                {tr.movie_title} — {tr.title}
+                {tr.duration_seconds ? ` (${formatDuration(tr.duration_seconds)})` : ''}
               </option>
             ))}
           </select>
@@ -1535,7 +1451,7 @@ function TrailerSourceForm({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               <span className="text-sm text-green-300 truncate">
-                {(parameters._resolved_trailer_name as string) || 'Bande-annonce résolue'}
+                {(parameters._resolved_trailer_name as string) || t('trailerSource.resolvedTrailer')}
               </span>
               {typeof parameters._resolved_duration_ms === 'number' && (
                 <span className="text-xs text-dark-muted shrink-0">
@@ -1550,7 +1466,7 @@ function TrailerSourceForm({
                 {parameters._preview_trailer_name as string}
               </span>
               <span className="text-xs text-dark-muted shrink-0">
-                {language === 'fr' ? '(à télécharger)' : '(pending download)'}
+                {t('trailerSource.pendingDownload')}
               </span>
             </div>
           ) : isSearching ? (
@@ -1560,20 +1476,16 @@ function TrailerSourceForm({
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
               <span className="text-sm text-blue-300">
-                {language === 'fr' ? 'Recherche en cours…' : 'Searching…'}
+                {t('trailerSource.searching')}
               </span>
             </div>
           ) : (
             <p className="text-sm text-dark-muted">
-              {language === 'fr'
-                ? 'Aucune bande-annonce sélectionnée.'
-                : 'No trailer selected.'}
+              {t('trailerSource.noTrailerSelected')}
             </p>
           )}
           <p className="text-xs text-dark-muted">
-            {language === 'fr'
-              ? 'Sélection automatique parmi les films populaires et à venir.'
-              : 'Automatic selection from popular and upcoming movies.'}
+            {t('trailerSource.autoDescription')}
           </p>
           <button
             type="button"
@@ -1620,14 +1532,14 @@ function TrailerSourceForm({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                {language === 'fr' ? 'Recherche…' : 'Searching…'}
+                {t('trailerSource.searchingShort')}
               </>
             ) : (
               <>
                 <Search size={12} />
                 {parameters._resolved_trailer_id || parameters._preview_trailer_name
-                  ? (language === 'fr' ? 'Changer de bande-annonce' : 'Change trailer')
-                  : (language === 'fr' ? 'Rechercher une bande-annonce' : 'Search for a trailer')}
+                  ? t('trailerSource.changeTrailer')
+                  : t('trailerSource.searchTrailer')}
               </>
             )}
           </button>
@@ -1638,17 +1550,17 @@ function TrailerSourceForm({
       {trailerMode === 'rule' && (
         <div>
           <label className="block text-sm font-medium text-dark-text mb-1">
-            {language === 'fr' ? 'Règle' : 'Rule'}
+            {t('trailerSource.rule')}
           </label>
           <select
             value={(parameters.trailer_rule_id as string) || ''}
             onChange={(e) => onChange({ trailer_rule_id: e.target.value || undefined })}
             className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
           >
-            <option value="">{language === 'fr' ? 'Sélectionner...' : 'Select...'}</option>
+            <option value="">{t('trailerSource.select')}</option>
             {rulesData?.items?.map((r) => (
               <option key={r.id} value={r.id}>
-                {r.name} ({r.trailer_count} {language === 'fr' ? 'bandes-annonces' : 'trailers'})
+                {r.name} ({r.trailer_count} {t('trailerSource.trailers')})
               </option>
             ))}
           </select>
@@ -1665,12 +1577,11 @@ function TrailerSourceForm({
 function PreRollSourceForm({
   parameters,
   onChange,
-  language,
 }: {
   parameters: Record<string, unknown>;
   onChange: (updates: Record<string, unknown>) => void;
-  language: string;
 }) {
+  const { t } = useTranslation('sessions');
   const { data: prerollsData } = useQuery<{ items: Array<{ id: string; name: string; duration_seconds?: number | null; format: string; is_ready: boolean }> }>({
     queryKey: ['prerolls-ready'],
     queryFn: () => apiClient.get('/prerolls?status_filter=ready'),
@@ -1681,14 +1592,14 @@ function PreRollSourceForm({
   return (
     <div>
       <label className="block text-sm font-medium text-dark-text mb-1">
-        {language === 'fr' ? 'Pré-roll' : 'Pre-roll'}
+        {t('prerollSource.preroll')}
       </label>
       <select
         value={(parameters.preroll_id as string) || ''}
         onChange={(e) => onChange({ preroll_id: e.target.value || undefined })}
         className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
       >
-        <option value="">{language === 'fr' ? 'Sélectionner...' : 'Select...'}</option>
+        <option value="">{t('prerollSource.select')}</option>
         {prerollsData?.items?.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -1725,12 +1636,11 @@ interface QuizSessionListItem {
 function DisplayForm({
   action,
   onChange,
-  language,
 }: {
   action: ActionItem;
   onChange: (updates: Partial<ActionItem>) => void;
-  language: string;
 }) {
+  const { t } = useTranslation('sessions');
   const { parameters, command } = action;
 
   // Fetch waiting_screen templates when content_type is waiting_screen
@@ -1741,15 +1651,15 @@ function DisplayForm({
   });
 
   const waitingScreenTemplates = (templatesData?.items || []).filter(
-    (t) => t.template_type === 'waiting_screen'
+    (tmpl) => tmpl.template_type === 'waiting_screen'
   );
 
   const quizTemplates = (templatesData?.items || []).filter(
-    (t) => t.template_type === 'quiz'
+    (tmpl) => tmpl.template_type === 'quiz'
   );
 
   const feedbackTemplates = (templatesData?.items || []).filter(
-    (t) => t.template_type === 'feedback'
+    (tmpl) => tmpl.template_type === 'feedback'
   );
 
   // Fetch quiz sessions for quiz content type
@@ -1761,56 +1671,30 @@ function DisplayForm({
 
   const quizSessions = quizSessionsData?.items || [];
 
-  const t = {
-    command: language === 'fr' ? 'Commande' : 'Command',
-    inputSource: language === 'fr' ? 'Source d\'entrée' : 'Input Source',
-    displayMode: language === 'fr' ? 'Mode d\'affichage' : 'Display Mode',
-    contentType: language === 'fr' ? 'Type de contenu' : 'Content Type',
-    textContent: language === 'fr' ? 'Contenu texte' : 'Text Content',
-    imageUrl: language === 'fr' ? 'URL de l\'image' : 'Image URL',
-    selectTemplate: language === 'fr' ? 'Template d\'attente' : 'Waiting Screen Template',
-    noTemplates: language === 'fr' ? 'Aucun template disponible. Initialisez les templates intégrés.' : 'No templates available. Initialize built-in templates.',
-    quizSession: language === 'fr' ? 'Session de quiz' : 'Quiz Session',
-    selectQuiz: language === 'fr' ? 'Sélectionnez un quiz' : 'Select a quiz',
-    noQuizSessions: language === 'fr' ? 'Aucun quiz disponible. Créez un quiz dans la section Quiz.' : 'No quizzes available. Create one in the Quiz section.',
-    quizTemplate: language === 'fr' ? 'Template d\'affichage' : 'Display Template',
-    noQuizTemplate: language === 'fr' ? 'Aucun (classique par défaut)' : 'None (classic default)',
-    quizInfo: language === 'fr' ? 'Le quiz sera automatiquement lancé et les participants de la session seront inscrits.' : 'The quiz will auto-start and session participants will be auto-enrolled.',
-    position: language === 'fr' ? 'Position' : 'Position',
-    positionX: language === 'fr' ? 'Horizontal (%)' : 'Horizontal (%)',
-    positionY: language === 'fr' ? 'Vertical (%)' : 'Vertical (%)',
-    fontFamily: language === 'fr' ? 'Police' : 'Font',
-    fontSize: language === 'fr' ? 'Taille (px)' : 'Size (px)',
-    fontWeight: language === 'fr' ? 'Graisse' : 'Weight',
-    textColor: language === 'fr' ? 'Couleur' : 'Color',
-    animation: language === 'fr' ? 'Animation' : 'Animation',
-    animationSpeed: language === 'fr' ? 'Vitesse animation (s)' : 'Animation Speed (s)',
-  };
-
   const commands = [
-    { value: 'power_on', label: language === 'fr' ? 'Allumer' : 'Power On' },
-    { value: 'power_off', label: language === 'fr' ? 'Éteindre' : 'Power Off' },
-    { value: 'set_input', label: language === 'fr' ? 'Changer source' : 'Set Input' },
-    { value: 'set_mode', label: language === 'fr' ? 'Changer mode' : 'Set Mode' },
-    { value: 'show', label: language === 'fr' ? 'Afficher contenu' : 'Show Content' },
-    { value: 'hide', label: language === 'fr' ? 'Masquer' : 'Hide' },
+    { value: 'power_on', label: t('displayForm.powerOn') },
+    { value: 'power_off', label: t('displayForm.powerOff') },
+    { value: 'set_input', label: t('displayForm.setInput') },
+    { value: 'set_mode', label: t('displayForm.setMode') },
+    { value: 'show', label: t('displayForm.showContent') },
+    { value: 'hide', label: t('displayForm.hide') },
   ];
 
   const positionsH = [
-    { value: 'center', label: language === 'fr' ? 'Centre' : 'Center' },
-    { value: 'left', label: language === 'fr' ? 'Gauche' : 'Left' },
-    { value: 'right', label: language === 'fr' ? 'Droite' : 'Right' },
-    { value: 'custom', label: language === 'fr' ? 'Personnalise' : 'Custom' },
+    { value: 'center', label: t('displayForm.center') },
+    { value: 'left', label: t('displayForm.left') },
+    { value: 'right', label: t('displayForm.right') },
+    { value: 'custom', label: t('displayForm.custom') },
   ];
   const positionsV = [
-    { value: 'center', label: language === 'fr' ? 'Centre' : 'Center' },
-    { value: 'top', label: language === 'fr' ? 'Haut' : 'Top' },
-    { value: 'bottom', label: language === 'fr' ? 'Bas' : 'Bottom' },
-    { value: 'custom', label: language === 'fr' ? 'Personnalise' : 'Custom' },
+    { value: 'center', label: t('displayForm.center') },
+    { value: 'top', label: t('displayFormExtra.top') },
+    { value: 'bottom', label: t('displayFormExtra.bottom') },
+    { value: 'custom', label: t('displayForm.custom') },
   ];
 
   const textFonts = [
-    { value: '', label: language === 'fr' ? 'Par defaut' : 'Default' },
+    { value: '', label: t('displayFormExtra.defaultFont') },
     { value: 'Georgia, serif', label: 'Georgia' },
     { value: "'Courier New', monospace", label: 'Courier New' },
     { value: 'Impact, sans-serif', label: 'Impact' },
@@ -1821,19 +1705,19 @@ function DisplayForm({
   ];
 
   const textAnimations = [
-    { value: 'none', label: language === 'fr' ? 'Aucune' : 'None' },
-    { value: 'scroll-left', label: language === 'fr' ? 'Defilement gauche' : 'Scroll Left' },
-    { value: 'scroll-right', label: language === 'fr' ? 'Defilement droite' : 'Scroll Right' },
-    { value: 'scroll-up', label: language === 'fr' ? 'Defilement haut' : 'Scroll Up' },
-    { value: 'scroll-down', label: language === 'fr' ? 'Defilement bas' : 'Scroll Down' },
-    { value: 'blink', label: language === 'fr' ? 'Clignotement' : 'Blink' },
-    { value: 'pulse-glow', label: language === 'fr' ? 'Pulsation' : 'Pulse Glow' },
-    { value: 'fade-in', label: language === 'fr' ? 'Fondu entrant' : 'Fade In' },
-    { value: 'fade-out', label: language === 'fr' ? 'Fondu sortant' : 'Fade Out' },
-    { value: 'rotate', label: language === 'fr' ? 'Rotation' : 'Rotate' },
-    { value: 'float', label: language === 'fr' ? 'Flottement' : 'Float' },
-    { value: 'neon-flicker', label: language === 'fr' ? 'Neon clignotant' : 'Neon Flicker' },
-    { value: 'shimmer', label: language === 'fr' ? 'Chatoiement' : 'Shimmer' },
+    { value: 'none', label: t('displayFormExtra.noAnimation') },
+    { value: 'scroll-left', label: t('displayFormExtra.scrollLeft') },
+    { value: 'scroll-right', label: t('displayFormExtra.scrollRight') },
+    { value: 'scroll-up', label: t('displayFormExtra.scrollUp') },
+    { value: 'scroll-down', label: t('displayFormExtra.scrollDown') },
+    { value: 'blink', label: t('displayFormExtra.blink') },
+    { value: 'pulse-glow', label: t('displayFormExtra.pulseGlow') },
+    { value: 'fade-in', label: t('displayFormExtra.fadeIn') },
+    { value: 'fade-out', label: t('displayFormExtra.fadeOut') },
+    { value: 'rotate', label: t('displayFormExtra.rotate') },
+    { value: 'float', label: t('displayFormExtra.float') },
+    { value: 'neon-flicker', label: t('displayFormExtra.neonFlicker') },
+    { value: 'shimmer', label: t('displayFormExtra.shimmer') },
   ];
 
   const fontSizes = [16, 24, 32, 48, 64, 72, 96, 120, 150];
@@ -1854,7 +1738,7 @@ function DisplayForm({
   };
 
   const handleTemplateSelect = (templateId: string) => {
-    const selected = waitingScreenTemplates.find((t) => t.id === templateId);
+    const selected = waitingScreenTemplates.find((tmpl) => tmpl.id === templateId);
     if (selected) {
       handleParametersChange({
         template_id: selected.id,
@@ -1869,7 +1753,7 @@ function DisplayForm({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('displayForm.command')}</label>
         <select
           value={command}
           onChange={(e) => onChange({ command: e.target.value })}
@@ -1883,7 +1767,7 @@ function DisplayForm({
 
       {command === 'set_input' && (
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.inputSource}</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t('displayForm.inputSource')}</label>
           <select
             value={(parameters.input as string) || 'HDMI 1'}
             onChange={(e) => handleParametersChange({ input: e.target.value })}
@@ -1898,7 +1782,7 @@ function DisplayForm({
 
       {command === 'set_mode' && (
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.displayMode}</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t('displayForm.displayMode')}</label>
           <select
             value={(parameters.mode as string) || 'movie'}
             onChange={(e) => handleParametersChange({ mode: e.target.value })}
@@ -1914,7 +1798,7 @@ function DisplayForm({
       {command === 'show' && (
         <>
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-1">{t.contentType}</label>
+            <label className="block text-sm font-medium text-dark-text mb-1">{t('displayForm.contentType')}</label>
             <select
               value={(parameters.content_type as string) || 'text'}
               onChange={(e) => {
@@ -1927,10 +1811,10 @@ function DisplayForm({
               }}
               className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
             >
-              <option value="waiting_screen">{language === 'fr' ? 'Waiting Screen' : 'Waiting Screen'}</option>
+              <option value="waiting_screen">{t('displayFormExtra.waitingScreen')}</option>
               <option value="quiz">Quiz</option>
               <option value="feedback">Feedback</option>
-              <option value="text">{language === 'fr' ? 'Texte' : 'Text'}</option>
+              <option value="text">{t('displayFormExtra.text')}</option>
               <option value="image">Image</option>
               <option value="template">Template</option>
             </select>
@@ -1939,7 +1823,7 @@ function DisplayForm({
           {/* Waiting Screen Template Selector */}
           {(parameters.content_type as string) === 'waiting_screen' && (
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{t.selectTemplate}</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t('displayForm.selectTemplate')}</label>
               {waitingScreenTemplates.length > 0 ? (
                 <div className="space-y-2">
                   {waitingScreenTemplates.map((tmpl) => (
@@ -1970,7 +1854,7 @@ function DisplayForm({
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">{t.noTemplates}</div>
+                <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">{t('displayForm.noTemplates')}</div>
               )}
             </div>
           )}
@@ -1980,12 +1864,12 @@ function DisplayForm({
             <div className="space-y-4">
               {/* Info banner */}
               <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-xs text-indigo-300">
-                {t.quizInfo}
+                {t('displayForm.quizInfo')}
               </div>
 
               {/* Quiz Session Selector */}
               <div>
-                <label className="block text-sm font-medium text-dark-text mb-1">{t.quizSession}</label>
+                <label className="block text-sm font-medium text-dark-text mb-1">{t('displayForm.quizSession')}</label>
                 {quizSessions.length > 0 ? (
                   <select
                     value={(parameters.quiz_session_id as string) || ''}
@@ -1999,7 +1883,7 @@ function DisplayForm({
                       };
                       // Auto-fill template from quiz if it has one and no template is set yet
                       if (selected?.template_id && !parameters.quiz_template_id) {
-                        const tmpl = quizTemplates.find(t => t.id === selected.template_id);
+                        const tmpl = quizTemplates.find(qt => qt.id === selected.template_id);
                         if (tmpl) {
                           updates.quiz_template_id = tmpl.id;
                           updates.template_name = tmpl.name;
@@ -2011,7 +1895,7 @@ function DisplayForm({
                     }}
                     className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
                   >
-                    <option value="">{t.selectQuiz}</option>
+                    <option value="">{t('displayForm.selectQuiz')}</option>
                     {quizSessions.map((qs) => (
                       <option key={qs.id} value={qs.id}>
                         {qs.name} ({qs.question_count}Q) — {qs.status}
@@ -2019,13 +1903,13 @@ function DisplayForm({
                     ))}
                   </select>
                 ) : (
-                  <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">{t.noQuizSessions}</div>
+                  <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">{t('displayForm.noQuizSessions')}</div>
                 )}
               </div>
 
               {/* Quiz Template Selector */}
               <div>
-                <label className="block text-sm font-medium text-dark-text mb-1">{t.quizTemplate}</label>
+                <label className="block text-sm font-medium text-dark-text mb-1">{t('displayForm.quizTemplate')}</label>
                 {quizTemplates.length > 0 ? (
                   <div className="space-y-2">
                     {quizTemplates.map((tmpl) => {
@@ -2064,7 +1948,7 @@ function DisplayForm({
                   </div>
                 ) : (
                   <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">
-                    {t.noQuizTemplate}
+                    {t('displayForm.noQuizTemplate')}
                   </div>
                 )}
               </div>
@@ -2073,7 +1957,7 @@ function DisplayForm({
 
           {(parameters.content_type as string) === 'feedback' && (
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{language === 'fr' ? 'Template Feedback' : 'Feedback Template'}</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t('displayFormExtra.feedbackTemplate')}</label>
               {feedbackTemplates.length > 0 ? (
                 <div className="space-y-2">
                   {feedbackTemplates.map((tmpl) => {
@@ -2112,7 +1996,7 @@ function DisplayForm({
                 </div>
               ) : (
                 <div className="text-sm text-dark-muted p-3 bg-dark-bg rounded-lg">
-                  {language === 'fr' ? 'Aucun template feedback disponible' : 'No feedback templates available'}
+                  {t('displayFormExtra.noFeedbackTemplates')}
                 </div>
               )}
             </div>
@@ -2122,7 +2006,7 @@ function DisplayForm({
             <div className="space-y-3">
               {/* Text content */}
               <div>
-                <label className="block text-sm font-medium text-dark-text mb-1">{t.textContent}</label>
+                <label className="block text-sm font-medium text-dark-text mb-1">{t('displayForm.textContent')}</label>
                 <textarea
                   value={(parameters.content as string) || ''}
                   onChange={(e) => handleParametersChange({ content: e.target.value })}
@@ -2133,7 +2017,7 @@ function DisplayForm({
               {/* Position: horizontal + vertical selects */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.positionX}</label>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t('displayForm.positionX')}</label>
                   <select
                     value={(parameters.position_h as string) || 'center'}
                     onChange={(e) => handleParametersChange({ position_h: e.target.value })}
@@ -2156,7 +2040,7 @@ function DisplayForm({
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.positionY}</label>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t('displayForm.positionY')}</label>
                   <select
                     value={(parameters.position_v as string) || 'center'}
                     onChange={(e) => handleParametersChange({ position_v: e.target.value })}
@@ -2182,7 +2066,7 @@ function DisplayForm({
 
               {/* Color */}
               <div>
-                <label className="block text-xs font-medium text-dark-muted mb-1">{t.textColor}</label>
+                <label className="block text-xs font-medium text-dark-muted mb-1">{t('displayForm.textColor')}</label>
                 <div className="flex gap-2">
                   <input
                     type="color"
@@ -2203,7 +2087,7 @@ function DisplayForm({
               {/* Font + Size + Weight row */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.fontFamily}</label>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t('displayForm.fontFamily')}</label>
                   <select
                     value={(parameters.font_family as string) || ''}
                     onChange={(e) => handleParametersChange({ font_family: e.target.value || undefined })}
@@ -2215,28 +2099,28 @@ function DisplayForm({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.fontSize}</label>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t('displayForm.fontSize')}</label>
                   <select
                     value={(parameters.font_size as number) || ''}
                     onChange={(e) => handleParametersChange({ font_size: e.target.value ? Number(e.target.value) : undefined })}
                     className="w-full bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-dark-text text-sm"
                   >
-                    <option value="">{language === 'fr' ? 'Auto' : 'Auto'}</option>
+                    <option value="">{t('displayFormExtra.auto')}</option>
                     {fontSizes.map((s) => (
                       <option key={s} value={s}>{s}px</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.fontWeight}</label>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t('displayForm.fontWeight')}</label>
                   <select
                     value={(parameters.font_weight as string) || ''}
                     onChange={(e) => handleParametersChange({ font_weight: e.target.value || undefined })}
                     className="w-full bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-dark-text text-sm"
                   >
-                    <option value="">{language === 'fr' ? 'Normal' : 'Normal'}</option>
-                    <option value="300">{language === 'fr' ? 'Leger' : 'Light'}</option>
-                    <option value="700">{language === 'fr' ? 'Gras' : 'Bold'}</option>
+                    <option value="">{t('displayFormExtra.normal')}</option>
+                    <option value="300">{t('displayFormExtra.light')}</option>
+                    <option value="700">{t('displayFormExtra.bold')}</option>
                   </select>
                 </div>
               </div>
@@ -2244,7 +2128,7 @@ function DisplayForm({
               {/* Animation row */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-dark-muted mb-1">{t.animation}</label>
+                  <label className="block text-xs font-medium text-dark-muted mb-1">{t('displayForm.animation')}</label>
                   <select
                     value={(parameters.animation as string) || 'none'}
                     onChange={(e) => handleParametersChange({ animation: e.target.value })}
@@ -2258,7 +2142,7 @@ function DisplayForm({
                 {(parameters.animation as string) && (parameters.animation as string) !== 'none' && (
                   <div>
                     <label className="block text-xs font-medium text-dark-muted mb-1">
-                      {t.animationSpeed}: {(parameters.animation_speed as number) || 10}s
+                      {t('displayForm.animationSpeed')}: {(parameters.animation_speed as number) || 10}s
                     </label>
                     <input
                       type="range"
@@ -2276,7 +2160,7 @@ function DisplayForm({
 
           {(parameters.content_type as string) === 'image' && (
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{t.imageUrl}</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t('displayForm.imageUrl')}</label>
               <input
                 type="text"
                 value={(parameters.image_url as string) || ''}
@@ -2299,12 +2183,11 @@ function DisplayForm({
 function ActuatorForm({
   action,
   onChange,
-  language,
 }: {
   action: ActionItem;
   onChange: (updates: Partial<ActionItem>) => void;
-  language: string;
 }) {
+  const { t } = useTranslation('sessions');
   const { parameters, command, service_id } = action;
 
   // Fetch devices from service
@@ -2317,23 +2200,14 @@ function ActuatorForm({
     enabled: !!service_id,
   });
 
-  const t = {
-    command: language === 'fr' ? 'Commande' : 'Command',
-    device: language === 'fr' ? 'Appareil' : 'Device',
-    position: language === 'fr' ? 'Position' : 'Position',
-    value: language === 'fr' ? 'Valeur' : 'Value',
-    refresh: language === 'fr' ? 'Actualiser' : 'Refresh',
-    noDevices: language === 'fr' ? 'Aucun appareil disponible' : 'No devices available',
-  };
-
   const commands = [
-    { value: 'power_on', label: language === 'fr' ? 'Allumer' : 'Power On' },
-    { value: 'power_off', label: language === 'fr' ? 'Éteindre' : 'Power Off' },
-    { value: 'toggle', label: 'Toggle' },
-    { value: 'open', label: language === 'fr' ? 'Ouvrir' : 'Open' },
-    { value: 'close', label: language === 'fr' ? 'Fermer' : 'Close' },
-    { value: 'set_position', label: language === 'fr' ? 'Définir position' : 'Set Position' },
-    { value: 'execute', label: language === 'fr' ? 'Exécuter' : 'Execute' },
+    { value: 'power_on', label: t('actuatorForm.powerOn') },
+    { value: 'power_off', label: t('actuatorForm.powerOff') },
+    { value: 'toggle', label: t('actuatorForm.toggle') },
+    { value: 'open', label: t('actuatorForm.open') },
+    { value: 'close', label: t('actuatorForm.close') },
+    { value: 'set_position', label: t('actuatorForm.setPosition') },
+    { value: 'execute', label: t('actuatorForm.execute') },
   ];
 
   const devices = resources?.items || [];
@@ -2345,7 +2219,7 @@ function ActuatorForm({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('actuatorForm.command')}</label>
         <select
           value={command}
           onChange={(e) => onChange({ command: e.target.value })}
@@ -2361,13 +2235,13 @@ function ActuatorForm({
       {service_id && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-sm font-medium text-dark-text">{t.device}</label>
+            <label className="text-sm font-medium text-dark-text">{t('actuatorForm.device')}</label>
             <button
               onClick={() => refetch()}
               className="text-xs text-dark-muted hover:text-dark-text flex items-center gap-1"
             >
               <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
-              {t.refresh}
+              {t('actuatorForm.refresh')}
             </button>
           </div>
           {isLoading ? (
@@ -2397,7 +2271,7 @@ function ActuatorForm({
 
       {!service_id && (
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.device}</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t('actuatorForm.device')}</label>
           <input
             type="text"
             value={(parameters.device as string) || ''}
@@ -2411,7 +2285,7 @@ function ActuatorForm({
       {command === 'set_position' && (
         <div>
           <label className="block text-sm font-medium text-dark-text mb-1">
-            {t.position} ({(parameters.position as number) || 0}%)
+            {t('actuatorForm.position')} ({(parameters.position as number) || 0}%)
           </label>
           <input
             type="range"
@@ -2425,13 +2299,13 @@ function ActuatorForm({
       )}
 
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.value}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('actuatorForm.value')}</label>
         <input
           type="text"
           value={(parameters.value as string) || ''}
           onChange={(e) => handleParametersChange({ value: e.target.value })}
           className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
-          placeholder={language === 'fr' ? 'Valeur optionnelle' : 'Optional value'}
+          placeholder={t('actuatorFormExtra.optionalValue')}
         />
       </div>
     </div>
@@ -2443,45 +2317,32 @@ function ActuatorForm({
 // Session Action Form
 // ============================================================================
 
-const SESSION_COMMANDS = [
-  { value: 'open_feedback', label_fr: 'Ouvrir les feedbacks', label_en: 'Open Feedback' },
-];
-
-function SessionForm({ action, onChange, language }: {
+function SessionForm({ action, onChange }: {
   action: ActionItem;
   onChange: (updates: Partial<ActionItem>) => void;
-  language: string;
 }) {
+  const { t } = useTranslation('sessions');
   const command = action.command;
-
-  const t = {
-    command: language === 'fr' ? 'Commande' : 'Command',
-    description: language === 'fr'
-      ? 'Cette action affiche le template feedback sur le wallmount et invite les participants à noter la séance.'
-      : 'This action displays the feedback template on the wallmount and invites participants to rate the session.',
-  };
 
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('sessionForm.command')}</label>
         <select
           value={command}
           onChange={(e) => onChange({ command: e.target.value })}
           className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
         >
-          {SESSION_COMMANDS.map((cmd) => (
-            <option key={cmd.value} value={cmd.value}>
-              {language === 'fr' ? cmd.label_fr : cmd.label_en}
-            </option>
-          ))}
+          <option value="open_feedback">
+            {t('sessionForm.openFeedback')}
+          </option>
         </select>
       </div>
 
       {command === 'open_feedback' && (
         <div className="text-sm text-dark-muted bg-teal-500/10 border border-teal-500/20 rounded-lg p-3">
           <ClipboardCheck size={14} className="inline mr-1 text-teal-400" />
-          {t.description}
+          {t('sessionForm.feedbackDescription')}
         </div>
       )}
     </div>

@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '../common/Modal';
 import { apiClient } from '../../api/client';
 import {
@@ -61,7 +62,6 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   sessionId: string;
-  language: string;
   currentIndex: number;
   elapsedMs: number;
   status: string;
@@ -129,11 +129,11 @@ export function TimelineDetailModal({
   isOpen,
   onClose,
   sessionId,
-  language,
   currentIndex,
   elapsedMs,
   status,
 }: Props) {
+  const { t } = useTranslation(['sessions']);
   const [scale, setScale] = useState(1);
   const [hoveredAction, setHoveredAction] = useState<{
     action: ActionDetail;
@@ -224,24 +224,12 @@ export function TimelineDetailModal({
 
   const totalHeight = HEADER_HEIGHT + activeLanes.length * LANE_HEIGHT + TIME_AXIS_HEIGHT;
 
-  const t = {
-    title: language === 'fr' ? 'Timeline de la seance' : 'Session Timeline',
-    loading: language === 'fr' ? 'Chargement...' : 'Loading...',
-    noActions: language === 'fr' ? 'Aucune action' : 'No actions',
-    delay: language === 'fr' ? 'Delai' : 'Delay',
-    onFailure: language === 'fr' ? 'Si echec' : 'On failure',
-    service: 'Service',
-    command: language === 'fr' ? 'Commande' : 'Command',
-    params: language === 'fr' ? 'Parametres' : 'Parameters',
-    instant: language === 'fr' ? 'Instantane' : 'Instant',
-  };
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="full" showHeader={false}>
       <div className="space-y-3">
         {/* Custom header with zoom controls */}
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-dark-text">{t.title}</h2>
+          <h2 className="text-lg font-semibold text-dark-text">{t('sessions:timeline.title')}</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={handleZoomOut}
@@ -271,7 +259,7 @@ export function TimelineDetailModal({
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-dark-muted hover:text-dark-text hover:bg-dark-border transition-colors"
-              title={language === 'fr' ? 'Fermer' : 'Close'}
+              title={t('sessions:timeline.close')}
             >
               <X size={18} />
             </button>
@@ -279,9 +267,9 @@ export function TimelineDetailModal({
         </div>
 
         {isLoading ? (
-          <div className="text-center py-12 text-dark-muted">{t.loading}</div>
+          <div className="text-center py-12 text-dark-muted">{t('sessions:timeline.loading')}</div>
         ) : sequences.length === 0 || activeLanes.length === 0 ? (
-          <div className="text-center py-12 text-dark-muted">{t.noActions}</div>
+          <div className="text-center py-12 text-dark-muted">{t('sessions:timeline.noActions')}</div>
         ) : (
           <div className="flex">
             {/* Lane labels (fixed left column) */}
@@ -497,14 +485,14 @@ export function TimelineDetailModal({
                 {hoveredAction.action.command}
               </div>
               <div className="text-[10px] text-dark-muted space-y-0.5">
-                <div>{t.command}: <span className="text-dark-text">{hoveredAction.action.action_type}:{hoveredAction.action.command}</span></div>
+                <div>{t('sessions:timeline.command')}: <span className="text-dark-text">{hoveredAction.action.action_type}:{hoveredAction.action.command}</span></div>
                 {hoveredAction.action.delay_ms > 0 && (
-                  <div>{t.delay}: <span className="text-dark-text">{formatDuration(hoveredAction.action.delay_ms)}</span></div>
+                  <div>{t('sessions:timeline.delay')}: <span className="text-dark-text">{formatDuration(hoveredAction.action.delay_ms)}</span></div>
                 )}
                 {hoveredAction.action.service_id && (
-                  <div>{t.service}: <span className="text-dark-text">{hoveredAction.action.service_id}</span></div>
+                  <div>{t('sessions:timeline.service')}: <span className="text-dark-text">{hoveredAction.action.service_id}</span></div>
                 )}
-                <div>{t.onFailure}: <span className="text-dark-text">{hoveredAction.action.on_failure}</span></div>
+                <div>{t('sessions:timeline.onFailure')}: <span className="text-dark-text">{hoveredAction.action.on_failure}</span></div>
                 {Object.entries(hoveredAction.action.parameters).length > 0 && (
                   <div className="mt-1 pt-1 border-t border-dark-border/30">
                     {Object.entries(hoveredAction.action.parameters).slice(0, 5).map(([key, value]) => (

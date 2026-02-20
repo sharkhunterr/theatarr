@@ -5,8 +5,10 @@
 import { Calendar, Check, X, Clock, Vote, Shuffle, Trophy, Sparkles, Film, Star, Ticket } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { getMysteryRevealCountdown, getVoteRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
 import { useSetting } from '../../hooks/useSettings';
+import { useLocaleFormat } from '../../hooks/useLocaleFormat';
 import { MysteryPoster } from '../common/MysteryPoster';
 import { VotePoster } from '../common/VotePoster';
 import { VotePosterCollage } from '../common/VotePosterCollage';
@@ -53,25 +55,17 @@ export function SessionCard({
   feedbackAverage,
   qrTicketsEnabled,
 }: SessionCardProps) {
+  const { t } = useTranslation(['portal', 'common']);
+  const { formatTime, locale } = useLocaleFormat();
   const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('fr-FR', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const parseDateParts = (dateStr: string) => {
     const date = new Date(dateStr);
     return {
       day: date.getDate(),
-      weekday: date.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''),
-      month: date.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''),
-      time: date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      weekday: date.toLocaleDateString(locale, { weekday: 'short' }).replace('.', ''),
+      month: date.toLocaleDateString(locale, { month: 'short' }).replace('.', ''),
+      time: formatTime(dateStr),
     };
   };
 
@@ -97,21 +91,21 @@ export function SessionCard({
       bgColor: 'bg-yellow-500/20',
       textColor: 'text-yellow-400',
       icon: Clock,
-      label: 'En attente',
+      label: t('portal:sessionCard.invitation.pending'),
     },
     accepted: {
       borderColor: 'border-l-green-500',
       bgColor: 'bg-green-500/20',
       textColor: 'text-green-400',
       icon: Check,
-      label: 'Acceptee',
+      label: t('portal:sessionCard.invitation.accepted'),
     },
     declined: {
       borderColor: 'border-l-red-500',
       bgColor: 'bg-red-500/20',
       textColor: 'text-red-400',
       icon: X,
-      label: 'Refusee',
+      label: t('portal:sessionCard.invitation.declined'),
     },
   };
 
@@ -134,9 +128,11 @@ export function SessionCard({
         };
       }
       const revealText = voteRevealAt ? getVoteRevealCountdown(voteRevealAt).text : null;
+      const closedLabel = t('portal:sessionCard.movie.voteClosed');
+      const waitingLabel = t('portal:sessionCard.movie.waitingVote');
       const voteText = linkedVoteIsOpen === false
-        ? (revealText ? `Vote clos \u00b7 ${revealText}` : 'Vote clos')
-        : (revealText ? `En attente du vote \u00b7 ${revealText}` : 'En attente du vote');
+        ? (revealText ? `${closedLabel} \u00b7 ${revealText}` : closedLabel)
+        : (revealText ? `${waitingLabel} \u00b7 ${revealText}` : waitingLabel);
       return {
         text: voteText,
         icon: <Vote size={14} className="text-blue-400" />,
@@ -153,8 +149,9 @@ export function SessionCard({
         };
       }
       const revealText = mysteryRevealAt ? getMysteryRevealCountdown(mysteryRevealAt).text : null;
+      const mysteryLabel = t('portal:sessionCard.movie.mystery');
       return {
-        text: revealText ? `Mystere \u00b7 ${revealText}` : 'Film mystere',
+        text: revealText ? `${mysteryLabel} \u00b7 ${revealText}` : mysteryLabel,
         icon: <Shuffle size={14} className="text-purple-400 animate-pulse" />,
         showVoteLink: false,
       };
@@ -162,7 +159,7 @@ export function SessionCard({
 
     // Fixed mode
     return {
-      text: movieTitle || 'Film non selectionne',
+      text: movieTitle || t('portal:sessionCard.movie.movieNotSelected'),
       icon: <Film size={14} className="text-dark-muted" />,
       showVoteLink: false,
     };
@@ -243,13 +240,13 @@ export function SessionCard({
                 className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 text-xs font-medium rounded-full bg-theatarr-500/20 text-theatarr-400 border border-theatarr-500/30 hover:bg-theatarr-500/30 transition-colors"
               >
                 <Vote size={10} />
-                Voter maintenant
+                {t('portal:sessionCard.voteNow')}
               </Link>
             )}
             {/* Message if vote requires acceptance first */}
             {!canVote && movieSelectionMode === 'vote' && !movieResolved && linkedVoteSessionId && linkedVoteIsOpen && (
               <p className="text-xs text-yellow-400 mt-1.5">
-                Acceptez l'invitation pour voter
+                {t('portal:sessionCard.acceptToVote')}
               </p>
             )}
           </div>
@@ -283,14 +280,14 @@ export function SessionCard({
               {qrTicketsEnabled && invitationStatus === 'accepted' && (
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-theatarr-500/20 text-theatarr-400">
                   <Ticket size={10} />
-                  Ticket
+                  {t('portal:sessionCard.ticket')}
                 </span>
               )}
               {/* Feedback badge */}
               {feedbackAvailable && !hasSubmittedFeedback && (
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 animate-pulse">
                   <Star size={10} />
-                  Notez
+                  {t('portal:sessionCard.rate')}
                 </span>
               )}
               {hasSubmittedFeedback && feedbackAverage != null && (

@@ -1,0 +1,80 @@
+{
+  "title": "Services",
+  "subtitle": "Configure external services (lighting, players, media sources)",
+  "addService": "Add Service",
+  "refresh": "Refresh",
+  "categories": {
+    "all": "All",
+    "lighting": "Lighting",
+    "player": "Players",
+    "media_source": "Media Sources",
+    "actuator": "Actuators",
+    "metadata": "Metadata"
+  },
+  "empty": {
+    "noServices": "No services configured",
+    "addFirst": "Add Your First Service"
+  },
+  "stats": {
+    "services": "services",
+    "connected": "connected",
+    "errors": "errors"
+  },
+  "modal": {
+    "editService": "Edit Service",
+    "newService": "New Service",
+    "deleteService": "Delete Service",
+    "deleteConfirm": "Are you sure you want to delete",
+    "deleteWarning": "This action cannot be undone. Sequences using this service will need to be updated.",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "capabilities": "Capabilities"
+  },
+  "form": {
+    "name": "Service name",
+    "type": "Service type",
+    "selectType": "Select a type",
+    "enabled": "Enabled",
+    "host": "Host / URL",
+    "apiKey": "API Key",
+    "save": "Save",
+    "cancel": "Cancel",
+    "loadingLibraries": "Loading libraries...",
+    "basicInfo": "Basic Information",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description",
+    "enableService": "Enable this service",
+    "adapterConfig": "Adapter Configuration",
+    "category": "Category",
+    "adapterType": "Adapter Type",
+    "selectAdapter": "Select an adapter...",
+    "noAdapters": "No adapters available for this category",
+    "settings": "Settings",
+    "libraries": "Libraries",
+    "librariesError": "Failed to load libraries. Check connection.",
+    "noLibraries": "No libraries found. Test the service connection first.",
+    "librariesHelp": "Select libraries to use. If none selected, all movie libraries will be used.",
+    "elements": "items",
+    "saving": "Saving...",
+    "updateService": "Update Service",
+    "createService": "Create Service"
+  },
+  "card": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "lastSeen": "Last seen",
+    "capabilities": "capabilities",
+    "test": "Test",
+    "edit": "Edit",
+    "delete": "Delete",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "error": "Error",
+    "unknown": "Unknown",
+    "lighting": "Lighting",
+    "player": "Player",
+    "media_source": "Media Source",
+    "actuator": "Actuator",
+    "metadata": "Metadata"
+  }
+}

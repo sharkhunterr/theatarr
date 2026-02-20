@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Film, X, Check } from 'lucide-react';
 import { Input, Spinner } from '../../common';
 import { apiClient } from '../../../api/client';
-import { useLayoutStore } from '../../../stores/layoutStore';
 
 interface Movie {
   id: string;
@@ -23,14 +23,14 @@ interface MediaActionFormProps {
   onParametersChange: (parameters: Record<string, unknown>) => void;
 }
 
-const mediaCommands = [
-  { value: 'play', label: 'Play Media', labelFr: 'Lire le média' },
-  { value: 'pause', label: 'Pause', labelFr: 'Pause' },
-  { value: 'resume', label: 'Resume', labelFr: 'Reprendre' },
-  { value: 'stop', label: 'Stop', labelFr: 'Arrêter' },
-  { value: 'seek', label: 'Seek', labelFr: 'Avancer/Reculer' },
-  { value: 'next', label: 'Next Track/Chapter', labelFr: 'Piste/Chapitre suivant' },
-  { value: 'previous', label: 'Previous Track/Chapter', labelFr: 'Piste/Chapitre précédent' },
+const mediaCommandKeys: { value: string; key: string }[] = [
+  { value: 'play', key: 'sessions:mediaForm.playMedia' },
+  { value: 'pause', key: 'sessions:mediaForm.pause' },
+  { value: 'resume', key: 'sessions:mediaForm.resume' },
+  { value: 'stop', key: 'sessions:mediaForm.stop' },
+  { value: 'seek', key: 'sessions:mediaForm.seek' },
+  { value: 'next', key: 'sessions:mediaForm.nextTrack' },
+  { value: 'previous', key: 'sessions:mediaForm.previousTrack' },
 ];
 
 export function MediaActionForm({
@@ -39,25 +39,9 @@ export function MediaActionForm({
   onCommandChange,
   onParametersChange,
 }: MediaActionFormProps) {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['sessions', 'common']);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-
-  const t = {
-    command: language === 'fr' ? 'Commande' : 'Command',
-    selectMovie: language === 'fr' ? 'Sélectionner un film' : 'Select a movie',
-    searchPlaceholder: language === 'fr' ? 'Rechercher un film dans votre bibliothèque...' : 'Search for a movie in your library...',
-    noResults: language === 'fr' ? 'Aucun film trouvé' : 'No movies found',
-    selectedMovie: language === 'fr' ? 'Film sélectionné' : 'Selected Movie',
-    changeMovie: language === 'fr' ? 'Changer' : 'Change',
-    removeMovie: language === 'fr' ? 'Retirer' : 'Remove',
-    startPosition: language === 'fr' ? 'Position de départ (ms)' : 'Start Position (ms)',
-    playbackSpeed: language === 'fr' ? 'Vitesse de lecture' : 'Playback Speed',
-    seekPosition: language === 'fr' ? 'Position (ms)' : 'Seek Position (ms)',
-    targetPlayer: language === 'fr' ? 'Lecteur cible' : 'Target Player',
-    targetPlayerPlaceholder: language === 'fr' ? 'ex: plex, kodi, vlc (optionnel)' : 'e.g., plex, kodi, vlc (optional)',
-    enableSubtitles: language === 'fr' ? 'Activer les sous-titres' : 'Enable subtitles',
-  };
 
   // Search movies from media sources
   const { data: searchResults, isLoading: isSearchLoading } = useQuery<Movie[]>({
@@ -98,15 +82,15 @@ export function MediaActionForm({
     <div className="space-y-4">
       {/* Command Select */}
       <div>
-        <label className="block text-sm font-medium text-dark-text mb-1">{t.command}</label>
+        <label className="block text-sm font-medium text-dark-text mb-1">{t('sessions:mediaForm.command')}</label>
         <select
           value={command}
           onChange={(e) => onCommandChange(e.target.value)}
           className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-dark-text"
         >
-          {mediaCommands.map((cmd) => (
+          {mediaCommandKeys.map((cmd) => (
             <option key={cmd.value} value={cmd.value}>
-              {language === 'fr' ? cmd.labelFr : cmd.label}
+              {t(cmd.key)}
             </option>
           ))}
         </select>
@@ -116,7 +100,7 @@ export function MediaActionForm({
       {command === 'play' && (
         <>
           <div>
-            <label className="block text-sm font-medium text-dark-text mb-2">{t.selectMovie}</label>
+            <label className="block text-sm font-medium text-dark-text mb-2">{t('sessions:mediaForm.selectMovie')}</label>
 
             {/* Selected Movie Display */}
             {selectedMovie && !isSearchOpen ? (
@@ -153,7 +137,7 @@ export function MediaActionForm({
                     onClick={() => setIsSearchOpen(true)}
                     className="px-2 py-1 text-xs bg-dark-border hover:bg-dark-muted/30 text-dark-text rounded transition-colors"
                   >
-                    {t.changeMovie}
+                    {t('sessions:mediaForm.change')}
                   </button>
                   <button
                     type="button"
@@ -174,7 +158,7 @@ export function MediaActionForm({
                       className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted"
                     />
                     <Input
-                      placeholder={t.searchPlaceholder}
+                      placeholder={t('sessions:mediaForm.searchLibraryPlaceholder')}
                       value={searchQuery}
                       onChange={(e) => {
                         setSearchQuery(e.target.value);
@@ -193,7 +177,7 @@ export function MediaActionForm({
                       }}
                       className="px-3 py-2 text-sm bg-dark-border hover:bg-dark-muted/30 text-dark-text rounded-lg transition-colors"
                     >
-                      {language === 'fr' ? 'Annuler' : 'Cancel'}
+                      {t('common:actions.cancel')}
                     </button>
                   )}
                 </div>
@@ -250,7 +234,7 @@ export function MediaActionForm({
                       </div>
                     ) : (
                       <div className="p-4 text-center text-dark-muted text-sm">
-                        {t.noResults}
+                        {t('sessions:mediaForm.noResults')}
                       </div>
                     )}
                   </div>
@@ -261,7 +245,7 @@ export function MediaActionForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{t.startPosition}</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t('sessions:mediaForm.startPosition')}</label>
               <input
                 type="number"
                 value={(parameters.position_ms as number) || 0}
@@ -279,7 +263,7 @@ export function MediaActionForm({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-1">{t.playbackSpeed}</label>
+              <label className="block text-sm font-medium text-dark-text mb-1">{t('sessions:mediaForm.playbackSpeed')}</label>
               <select
                 value={(parameters.speed as number) || 1}
                 onChange={(e) =>
@@ -302,7 +286,7 @@ export function MediaActionForm({
       {/* Seek Position */}
       {command === 'seek' && (
         <div>
-          <label className="block text-sm font-medium text-dark-text mb-1">{t.seekPosition}</label>
+          <label className="block text-sm font-medium text-dark-text mb-1">{t('sessions:mediaForm.seekPosition')}</label>
           <input
             type="number"
             value={(parameters.position_ms as number) || 0}
@@ -318,10 +302,10 @@ export function MediaActionForm({
 
       {/* Target Player */}
       <Input
-        label={t.targetPlayer}
+        label={t('sessions:mediaForm.targetPlayer')}
         value={(parameters.player as string) || ''}
         onChange={(e) => onParametersChange({ ...parameters, player: e.target.value })}
-        placeholder={t.targetPlayerPlaceholder}
+        placeholder={t('sessions:mediaForm.targetPlayerPlaceholder')}
       />
 
       {/* Subtitles (for play) */}
@@ -335,7 +319,7 @@ export function MediaActionForm({
             className="w-4 h-4 accent-theatarr-500"
           />
           <label htmlFor="subtitles" className="text-sm text-dark-text">
-            {t.enableSubtitles}
+            {t('sessions:mediaForm.enableSubtitles')}
           </label>
         </div>
       )}

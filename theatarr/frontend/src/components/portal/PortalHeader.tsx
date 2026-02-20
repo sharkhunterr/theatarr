@@ -2,8 +2,11 @@
  * Compact header for portal interface.
  */
 
+import { useState, useRef, useEffect } from 'react';
 import { LogOut, Moon, Settings, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { NotificationBell } from './NotificationBell';
@@ -11,7 +14,8 @@ import { TheatarrLogo } from '../common';
 
 export function PortalHeader() {
   const { user, logout } = useAuthStore();
-  const { theme, setTheme } = useLayoutStore();
+  const { theme, setTheme, language, setLanguage } = useLayoutStore();
+  const { t } = useTranslation('portal');
 
   const displayName = user?.first_name || user?.username || 'User';
   const isAdmin = user?.role === 'admin';
@@ -32,11 +36,14 @@ export function PortalHeader() {
             {displayName}
           </span>
 
+          {/* Language selector */}
+          <PortalLanguageSelector language={language} setLanguage={setLanguage} />
+
           {/* Theme toggle */}
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
             className="p-2 rounded-lg hover:bg-dark-border/50 text-dark-muted transition-colors"
-            title={isDark ? 'Theme clair' : 'Theme sombre'}
+            title={isDark ? t('header.themeLight') : t('header.themeDark')}
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -49,7 +56,7 @@ export function PortalHeader() {
             <Link
               to="/"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-theatarr-500/10 text-theatarr-500 hover:bg-theatarr-500/20 transition-colors text-sm font-medium"
-              title="Interface Admin"
+              title={t('header.adminInterface')}
             >
               <Settings size={16} />
               <span className="hidden sm:inline">Admin</span>
@@ -59,12 +66,72 @@ export function PortalHeader() {
           <button
             onClick={logout}
             className="p-2 rounded-lg hover:bg-dark-border/50 text-dark-muted transition-colors"
-            title="Logout"
+            title={t('header.logout')}
           >
             <LogOut size={18} />
           </button>
         </div>
       </div>
     </header>
+  );
+}
+
+// Language Selector for Portal
+interface PortalLanguageSelectorProps {
+  language: 'en' | 'fr';
+  setLanguage: (lang: 'en' | 'fr') => void;
+}
+
+const LANGUAGES = [
+  { code: 'fr' as const, label: 'Français', flag: '\u{1F1EB}\u{1F1F7}' },
+  { code: 'en' as const, label: 'English', flag: '\u{1F1EC}\u{1F1E7}' },
+];
+
+function PortalLanguageSelector({ language, setLanguage }: PortalLanguageSelectorProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const current = LANGUAGES.find((l) => l.code === language);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-2 rounded-lg hover:bg-dark-border/50 text-dark-muted transition-colors text-base"
+      >
+        {current?.flag}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-40 bg-dark-surface border border-dark-border rounded-lg shadow-lg py-1 z-50">
+          {LANGUAGES.map((lang) => (
+            <button
+              key={lang.code}
+              onClick={() => {
+                setLanguage(lang.code);
+                setOpen(false);
+              }}
+              className={clsx(
+                'w-full px-4 py-2 text-left text-sm hover:bg-dark-border/50 transition-colors flex items-center gap-2',
+                language === lang.code && 'text-theatarr-500'
+              )}
+            >
+              <span>{lang.flag}</span>
+              {lang.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

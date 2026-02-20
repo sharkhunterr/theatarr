@@ -1,10 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Layers, GitBranch, Plus, Save } from 'lucide-react';
 import { Button } from '../common';
 import { LinearEditor } from './LinearEditor';
 import { NodeEditor } from './NodeEditor';
 import { ActionEditor } from './ActionEditor';
-import { useLayoutStore } from '../../stores/layoutStore';
 
 // Simple UUID generator for browser compatibility
 function generateId(): string {
@@ -45,29 +45,10 @@ interface SequenceEditorProps {
 type EditorMode = 'linear' | 'node';
 
 export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorProps) {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['sessions', 'common']);
   const [editedSequence, setEditedSequence] = useState<Sequence>(sequence);
   const [editorMode, setEditorMode] = useState<EditorMode>('linear');
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
-
-  const t = {
-    duration: language === 'fr' ? 'Durée' : 'Duration',
-    transition: language === 'fr' ? 'Transition' : 'Transition',
-    fixed: language === 'fr' ? 'Fixe' : 'Fixed',
-    dynamic: language === 'fr' ? 'Dynamique' : 'Dynamic',
-    manual: language === 'fr' ? 'Manuel' : 'Manual',
-    seconds: language === 'fr' ? 's' : 's',
-    actions: language === 'fr' ? 'Actions' : 'Actions',
-    add: language === 'fr' ? 'Ajouter' : 'Add',
-    save: language === 'fr' ? 'Enregistrer' : 'Save',
-    cancel: language === 'fr' ? 'Annuler' : 'Cancel',
-    linear: language === 'fr' ? 'Linéaire' : 'Linear',
-    node: language === 'fr' ? 'Nœuds' : 'Node',
-    noActions: language === 'fr' ? 'Cliquez sur "Ajouter" pour créer une action' : 'Click "Add" to create an action',
-    selectAction: language === 'fr' ? 'Sélectionnez une action' : 'Select an action',
-    actionBlocks: language === 'fr' ? 'Blocs d\'actions' : 'Action Blocks',
-    dragToAdd: language === 'fr' ? 'Glissez pour ajouter' : 'Drag to add',
-  };
 
   const handleNameChange = (name: string) => {
     setEditedSequence({ ...editedSequence, name });
@@ -123,11 +104,11 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
   const selectedAction = editedSequence.actions.find((a) => a.id === selectedActionId);
 
   const actionTypes: { type: Action['action_type']; label: string; color: string }[] = [
-    { type: 'lighting', label: language === 'fr' ? 'Éclairage' : 'Lighting', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-    { type: 'audio', label: 'Audio', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-    { type: 'media', label: language === 'fr' ? 'Média' : 'Media', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-    { type: 'display', label: language === 'fr' ? 'Affichage' : 'Display', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-    { type: 'actuator', label: language === 'fr' ? 'Actionneur' : 'Actuator', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+    { type: 'lighting', label: t('sessions:actionTypes.lighting'), color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+    { type: 'audio', label: t('sessions:actionTypes.audio'), color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+    { type: 'media', label: t('sessions:actionTypes.media'), color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+    { type: 'display', label: t('sessions:actionTypes.display'), color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+    { type: 'actuator', label: t('sessions:actionTypes.actuator'), color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
   ];
 
   return (
@@ -156,7 +137,7 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
               }`}
             >
               <Layers size={12} />
-              {t.linear}
+              {t('sessions:editor.linearMode')}
             </button>
             <button
               onClick={() => setEditorMode('node')}
@@ -167,16 +148,16 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
               }`}
             >
               <GitBranch size={12} />
-              {t.node}
+              {t('sessions:editor.nodeMode')}
             </button>
           </div>
 
           <Button variant="secondary" size="sm" onClick={onCancel}>
-            {t.cancel}
+            {t('common:actions.cancel')}
           </Button>
           <Button size="sm" onClick={handleSave}>
             <Save size={14} className="mr-1" />
-            {t.save}
+            {t('common:actions.save')}
           </Button>
         </div>
       </div>
@@ -184,7 +165,7 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
       {/* Settings Bar */}
       <div className="flex flex-wrap items-center gap-3 p-2 bg-dark-surface/50 border-b border-dark-border text-xs flex-shrink-0">
         <div className="flex items-center gap-1">
-          <label className="text-dark-muted">{t.duration}:</label>
+          <label className="text-dark-muted">{t('sessions:sequenceEditor.duration')}:</label>
           <select
             value={editedSequence.duration_type}
             onChange={(e) =>
@@ -195,9 +176,9 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
             }
             className="bg-dark-bg border border-dark-border rounded px-1.5 py-0.5 text-xs text-dark-text"
           >
-            <option value="fixed">{t.fixed}</option>
-            <option value="dynamic">{t.dynamic}</option>
-            <option value="manual">{t.manual}</option>
+            <option value="fixed">{t('sessions:sequenceEditor.fixed')}</option>
+            <option value="dynamic">{t('sessions:sequenceEditor.dynamic')}</option>
+            <option value="manual">{t('sessions:sequenceEditor.manual')}</option>
           </select>
         </div>
 
@@ -211,12 +192,12 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
               min="0"
               step="0.5"
             />
-            <span className="text-dark-muted">{t.seconds}</span>
+            <span className="text-dark-muted">{t('sessions:sequenceEditor.seconds')}</span>
           </div>
         )}
 
         <div className="flex items-center gap-1">
-          <label className="text-dark-muted">{t.transition}:</label>
+          <label className="text-dark-muted">{t('sessions:sequenceEditor.transition')}:</label>
           <input
             type="number"
             value={editedSequence.transition_ms / 1000}
@@ -230,7 +211,7 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
             min="0"
             step="0.5"
           />
-          <span className="text-dark-muted">{t.seconds}</span>
+          <span className="text-dark-muted">{t('sessions:sequenceEditor.seconds')}</span>
         </div>
       </div>
 
@@ -241,10 +222,10 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
             {/* Linear Mode: Actions List on left, Editor on right */}
             <div className="w-48 sm:w-56 border-r border-dark-border flex flex-col flex-shrink-0">
               <div className="p-2 border-b border-dark-border flex items-center justify-between bg-dark-surface/50">
-                <h3 className="text-xs font-medium text-dark-text">{t.actions}</h3>
+                <h3 className="text-xs font-medium text-dark-text">{t('sessions:editor.actions')}</h3>
                 <Button size="sm" onClick={() => handleAddAction()} className="!px-1.5 !py-0.5 text-xs">
                   <Plus size={12} className="mr-0.5" />
-                  {t.add}
+                  {t('common:actions.add')}
                 </Button>
               </div>
 
@@ -269,7 +250,7 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-dark-muted p-4 text-center text-xs">
-                  {editedSequence.actions.length === 0 ? t.noActions : t.selectAction}
+                  {editedSequence.actions.length === 0 ? t('sessions:sequenceEditor.noActions') : t('sessions:sequenceEditor.selectAction')}
                 </div>
               )}
             </div>
@@ -292,8 +273,8 @@ export function SequenceEditor({ sequence, onSave, onCancel }: SequenceEditorPro
               {/* Action Blocks Panel - 1/4 */}
               <div className="flex-1 border-l border-dark-border flex flex-col bg-dark-surface/30 min-w-[140px] max-w-[200px]">
                 <div className="p-2 border-b border-dark-border">
-                  <h3 className="text-xs font-medium text-dark-text">{t.actionBlocks}</h3>
-                  <p className="text-[10px] text-dark-muted mt-0.5">{t.dragToAdd}</p>
+                  <h3 className="text-xs font-medium text-dark-text">{t('sessions:sequenceEditor.actionBlocks')}</h3>
+                  <p className="text-[10px] text-dark-muted mt-0.5">{t('sessions:sequenceEditor.dragToAdd')}</p>
                 </div>
                 <div className="flex-1 overflow-auto p-2 space-y-1.5">
                   {actionTypes.map((at) => (

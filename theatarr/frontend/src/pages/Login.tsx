@@ -1,9 +1,11 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, CardContent, Input, TheatarrLogo } from '../components/common';
 import { useAuthStore } from '../stores/authStore';
 
 export function Login() {
+  const { t } = useTranslation(['settings', 'common']);
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isLoading, error, clearError, user } = useAuthStore();
@@ -43,26 +45,26 @@ export function Login() {
               <TheatarrLogo size={64} />
             </div>
             <h1 className="text-3xl font-bold text-theatarr-500 mb-2">Theatarr</h1>
-            <p className="text-dark-muted">Home Cinema Orchestration</p>
+            <p className="text-dark-muted">{t('settings:login.subtitle')}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Username"
+              label={t('settings:login.username')}
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              placeholder={t('settings:login.usernamePlaceholder')}
               autoComplete="username"
               required
             />
 
             <Input
-              label="Password"
+              label={t('settings:login.password')}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder={t('settings:login.passwordPlaceholder')}
               autoComplete="current-password"
               required
             />
@@ -74,7 +76,7 @@ export function Login() {
             )}
 
             <Button type="submit" className="w-full" isLoading={isLoading}>
-              Sign In
+              {t('settings:login.signIn')}
             </Button>
           </form>
         </CardContent>

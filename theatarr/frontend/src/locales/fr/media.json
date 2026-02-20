@@ -1,0 +1,228 @@
+{
+  "page": {
+    "title": "Médias",
+    "subtitle": "Bandes-annonces, pré-rolls, sons et modèles d'affichage"
+  },
+  "tabs": {
+    "trailers": "Bandes-annonces",
+    "prerolls": "Pré-rolls",
+    "sounds": "Sons",
+    "templates": "Modèles"
+  },
+  "actions": {
+    "create": "Créer",
+    "add": "Ajouter",
+    "refreshBuiltin": "Refresh Built-in"
+  },
+  "trailers": {
+    "subtabs": {
+      "library": "Bibliothèque",
+      "rules": "Règles"
+    },
+    "filters": {
+      "all": "Tous",
+      "ready": "Prêt",
+      "pending": "En cours",
+      "error": "Erreur"
+    },
+    "status": {
+      "ready": "Prêt",
+      "downloading": "{{progress}}%",
+      "pending": "Attente",
+      "error": "Erreur",
+      "unknownError": "Erreur inconnue"
+    },
+    "empty": {
+      "title": "Aucune bande-annonce",
+      "action": "Télécharger une bande-annonce"
+    },
+    "download": {
+      "title": "Télécharger une bande-annonce",
+      "movieTitle": "Titre du film",
+      "movieTitlePlaceholder": "Blade Runner 2049",
+      "youtubeUrl": "URL YouTube",
+      "youtubeUrlPlaceholder": "https://www.youtube.com/watch?v=...",
+      "cancel": "Annuler",
+      "downloading": "Téléchargement...",
+      "download": "Télécharger"
+    },
+    "deleteConfirm": "Supprimer \"{{title}}\" ?",
+    "openYoutube": "Ouvrir sur YouTube",
+    "delete": "Supprimer",
+    "rules": {
+      "active": "Active",
+      "disabled": "Désactivée",
+      "trailers": "trailers",
+      "genres": "Genres: {{genres}}",
+      "lastRun": "Dernière exécution: {{date}}",
+      "run": "Exécuter",
+      "edit": "Modifier",
+      "empty": {
+        "title": "Aucune règle configurée",
+        "action": "Créer une règle"
+      },
+      "modal": {
+        "editTitle": "Modifier la règle",
+        "createTitle": "Créer une règle"
+      }
+    }
+  },
+  "prerolls": {
+    "filters": {
+      "all": "Tous",
+      "ready": "Prêt",
+      "pending": "En cours",
+      "error": "Erreur"
+    },
+    "status": {
+      "ready": "Prêt",
+      "downloading": "{{progress}}%",
+      "pending": "Attente",
+      "error": "Erreur",
+      "unknownError": "Erreur inconnue"
+    },
+    "sourceType": {
+      "youtube": "YouTube",
+      "upload": "Upload"
+    },
+    "empty": {
+      "title": "Aucun pré-roll dans la bibliothèque",
+      "action": "Ajouter votre premier pré-roll"
+    },
+    "deleteConfirm": "Supprimer \"{{name}}\" ?",
+    "delete": "Supprimer",
+    "addModal": {
+      "title": "Ajouter un pré-roll",
+      "uploadFile": "Importer un fichier",
+      "youtube": "YouTube",
+      "name": "Nom",
+      "namePlaceholder": "Nom du pré-roll",
+      "tags": "Tags (optionnel, séparés par des virgules)",
+      "tagsPlaceholder": "studio, intro, custom...",
+      "videoFile": "Fichier vidéo",
+      "youtubeUrl": "URL YouTube",
+      "youtubeUrlPlaceholder": "https://www.youtube.com/watch?v=...",
+      "errorPrefix": "Erreur :",
+      "errorDefault": "Une erreur est survenue",
+      "cancel": "Annuler",
+      "importing": "Import...",
+      "import": "Importer",
+      "downloading": "Téléchargement...",
+      "download": "Télécharger"
+    }
+  },
+  "sounds": {
+    "filters": {
+      "all": "Tous",
+      "ready": "Prêt",
+      "pending": "En cours",
+      "error": "Erreur"
+    },
+    "status": {
+      "ready": "Prêt",
+      "downloading": "{{progress}}%",
+      "pending": "Attente",
+      "error": "Erreur",
+      "unknownError": "Erreur inconnue"
+    },
+    "empty": {
+      "title": "Aucun son dans la bibliothèque",
+      "action": "Ajouter votre premier son"
+    },
+    "deleteConfirm": "Supprimer \"{{name}}\" ?",
+    "delete": "Supprimer",
+    "addModal": {
+      "title": "Ajouter un son",
+      "youtubeUrl": "URL YouTube",
+      "youtubeUrlPlaceholder": "https://www.youtube.com/watch?v=... ou URL de playlist",
+      "cancel": "Annuler",
+      "analyzing": "Analyse...",
+      "analyze": "Analyser",
+      "errorPrefix": "Erreur :",
+      "analyzeError": "Impossible d'analyser l'URL",
+      "name": "Nom",
+      "namePlaceholder": "Nom du son",
+      "tags": "Tags (séparés par des virgules)",
+      "tagsPlaceholder": "ambiance, musique, intro...",
+      "duration": "Durée : {{duration}}",
+      "chapters": "Chapitres ({{selected}}/{{total}})",
+      "tracks": "Pistes ({{selected}}/{{total}})",
+      "selectAll": "Tout sélectionner",
+      "deselectAll": "Tout désélectionner",
+      "singleVideo": "Vidéo unique — l'audio complet sera extrait.",
+      "back": "Retour",
+      "downloading": "Téléchargement...",
+      "download": "Télécharger",
+      "downloadError": "Échec du téléchargement",
+      "downloadStarted": "Téléchargement lancé !",
+      "downloadStartedHint": "Les sons apparaîtront dans la bibliothèque une fois prêts."
+    }
+  },
+  "templates": {
+    "filters": {
+      "all": "Tous",
+      "wallmount": "Wallmount",
+      "waiting_screen": "Waiting",
+      "quiz": "Quiz",
+      "feedback": "Feedback",
+      "custom": "Custom"
+    },
+    "status": {
+      "active": "Actif",
+      "builtin": "Intégré"
+    },
+    "components": "composants",
+    "activate": "Activer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "empty": {
+      "title": "Aucun template trouvé",
+      "createFirst": "Créer votre premier template"
+    },
+    "backToList": "Retour à la liste",
+    "deleteConfirm": "Supprimer le template \"{{name}}\" ?",
+    "builtinsUpdated": "{{count}} templates intégrés mis à jour",
+    "errorLoading": "Erreur lors du chargement des templates",
+    "modal": {
+      "createTitle": "Créer un template",
+      "editTitle": "Modifier le template"
+    }
+  },
+  "movies": {
+    "title": "Films",
+    "subtitle": "Parcourez les films de votre bibliothèque",
+    "searchPlaceholder": "Rechercher un film...",
+    "allGenres": "Tous les genres",
+    "unknownYear": "Année inconnue",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "noMovies": "Aucun film trouvé",
+    "connectService": "Connectez un service média (Plex, Jellyfin) pour voir votre bibliothèque",
+    "trailerAvailable": "Bande-annonce disponible",
+    "close": "Fermer",
+    "createSession": "Créer une session"
+  },
+  "display": {
+    "sessionDisplay": "Session Display",
+    "enterCode": "Entrez le code de session",
+    "enterAllChars": "Entrez les 6 caracteres",
+    "invalidCode": "Code invalide",
+    "validating": "Validation...",
+    "connectionError": "Erreur de connexion au serveur",
+    "codeHint": "Le code est affiche dans les details de la session",
+    "invalidOrNotFound": "Code invalide ou session introuvable",
+    "sessionNotFound": "Session introuvable",
+    "back": "Retour",
+    "fullscreen": "Plein ecran",
+    "enableSound": "Activer le son",
+    "connected": "Connecte",
+    "connecting": "Connexion...",
+    "sessionPaused": "Session en pause",
+    "status": {
+      "draft": "En attente du lancement",
+      "scheduled": "Session programmee",
+      "paused": "Session en pause",
+      "completed": "Session terminee"
+    }
+  }
+}

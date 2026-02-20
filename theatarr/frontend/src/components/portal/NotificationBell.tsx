@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Bell, Mail, Star, Vote, HelpCircle, ChevronRight, Trophy, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { usePortalNotifications, NotificationItem } from '../../hooks/usePortalNotifications';
 
 const ICON_MAP: Record<string, typeof Bell> = {
@@ -18,6 +19,7 @@ const ICON_MAP: Record<string, typeof Bell> = {
 };
 
 export function NotificationBell() {
+  const { t } = useTranslation(['portal', 'common']);
   const { totalUnseen, items, markAllSeen, markCategorySeen } = usePortalNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const [snapshotItems, setSnapshotItems] = useState<NotificationItem[]>([]);
@@ -66,7 +68,7 @@ export function NotificationBell() {
             ? 'bg-dark-border/50 text-dark-text'
             : 'hover:bg-dark-border/50 text-dark-muted'
         )}
-        title="Notifications"
+        title={t('portal:notifications.title')}
       >
         <Bell size={18} />
         {totalUnseen > 0 && (
@@ -81,7 +83,7 @@ export function NotificationBell() {
         <div className="absolute right-0 top-full mt-2 w-72 bg-dark-surface border border-dark-border rounded-xl shadow-2xl overflow-hidden z-50 animate-slide-down">
           {/* Header */}
           <div className="px-4 py-3 border-b border-dark-border">
-            <h3 className="text-sm font-semibold text-dark-text">Notifications</h3>
+            <h3 className="text-sm font-semibold text-dark-text">{t('portal:notifications.title')}</h3>
           </div>
 
           {/* Items */}
@@ -98,7 +100,7 @@ export function NotificationBell() {
           ) : (
             <div className="px-4 py-8 text-center">
               <Bell size={24} className="mx-auto text-dark-muted mb-2 opacity-50" />
-              <p className="text-sm text-dark-muted">Rien de nouveau</p>
+              <p className="text-sm text-dark-muted">{t('portal:notifications.empty')}</p>
             </div>
           )}
         </div>

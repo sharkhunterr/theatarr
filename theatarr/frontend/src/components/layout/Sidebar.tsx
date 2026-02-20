@@ -21,43 +21,43 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { useLayoutStore } from '../../stores/layoutStore';
 
 interface NavItem {
-  label: string;
-  labelFr: string;
+  labelKey: string;
   icon: LucideIcon;
   path: string;
   children?: NavItem[];
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', labelFr: 'Tableau de bord', icon: LayoutDashboard, path: '/' },
-  { label: 'Sessions', labelFr: 'Sessions', icon: Play, path: '/sessions' },
-  { label: 'Votes & Quiz', labelFr: 'Votes & Quiz', icon: Vote, path: '/votes' },
-  { label: 'Users', labelFr: 'Utilisateurs', icon: Users, path: '/users' },
-  { label: 'Media', labelFr: 'Médias', icon: Film, path: '/media' },
-  { label: 'Services', labelFr: 'Services', icon: Plug, path: '/services' },
-  { label: 'History', labelFr: 'Historique', icon: History, path: '/history' },
-  { label: 'Logs', labelFr: 'Logs', icon: ScrollText, path: '/logs' },
-  { label: 'Settings', labelFr: 'Paramètres', icon: Settings, path: '/settings' },
+  { labelKey: 'admin:sidebar.dashboard', icon: LayoutDashboard, path: '/' },
+  { labelKey: 'admin:sidebar.sessions', icon: Play, path: '/sessions' },
+  { labelKey: 'admin:sidebar.votesQuiz', icon: Vote, path: '/votes' },
+  { labelKey: 'admin:sidebar.users', icon: Users, path: '/users' },
+  { labelKey: 'admin:sidebar.media', icon: Film, path: '/media' },
+  { labelKey: 'admin:sidebar.services', icon: Plug, path: '/services' },
+  { labelKey: 'admin:sidebar.history', icon: History, path: '/history' },
+  { labelKey: 'admin:sidebar.logs', icon: ScrollText, path: '/logs' },
+  { labelKey: 'admin:sidebar.settings', icon: Settings, path: '/settings' },
 ];
 
 interface NavItemComponentProps {
   item: NavItem;
   collapsed: boolean;
-  language: 'en' | 'fr';
 }
 
-function NavItemComponent({ item, collapsed, language }: NavItemComponentProps) {
+function NavItemComponent({ item, collapsed }: NavItemComponentProps) {
   const location = useLocation();
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const isActive = location.pathname === item.path ||
     (item.path !== '/' && location.pathname.startsWith(item.path)) ||
     (item.children && item.children.some((child) => location.pathname === child.path));
 
-  const label = language === 'fr' ? item.labelFr : item.label;
+  const label = t(item.labelKey);
   const Icon = item.icon;
 
   if (item.children && !collapsed) {
@@ -85,7 +85,6 @@ function NavItemComponent({ item, collapsed, language }: NavItemComponentProps) 
                 key={child.path}
                 item={child}
                 collapsed={collapsed}
-                language={language}
               />
             ))}
           </div>
@@ -113,7 +112,8 @@ function NavItemComponent({ item, collapsed, language }: NavItemComponentProps) 
 }
 
 export function Sidebar() {
-  const { sidebarCollapsed, sidebarOpen, setSidebarOpen, toggleSidebar, language } = useLayoutStore();
+  const { sidebarCollapsed, sidebarOpen, setSidebarOpen, toggleSidebar } = useLayoutStore();
+  const { t } = useTranslation('admin');
 
   return (
     <>
@@ -154,7 +154,6 @@ export function Sidebar() {
               key={item.path}
               item={item}
               collapsed={sidebarCollapsed}
-              language={language}
             />
           ))}
         </nav>
@@ -168,10 +167,10 @@ export function Sidebar() {
               'text-dark-muted hover:text-dark-text hover:bg-dark-border/50',
               sidebarCollapsed && 'justify-center px-0'
             )}
-            title={sidebarCollapsed ? 'Expand' : 'Collapse'}
+            title={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
           >
             {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            {!sidebarCollapsed && <span className="text-sm">Collapse</span>}
+            {!sidebarCollapsed && <span className="text-sm">{t('sidebar.collapse')}</span>}
           </button>
         </div>
       </aside>
@@ -194,7 +193,7 @@ export function Sidebar() {
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => (
             <div key={item.path} onClick={() => !item.children && setSidebarOpen(false)}>
-              <NavItemComponent item={item} collapsed={false} language={language} />
+              <NavItemComponent item={item} collapsed={false} />
             </div>
           ))}
         </nav>

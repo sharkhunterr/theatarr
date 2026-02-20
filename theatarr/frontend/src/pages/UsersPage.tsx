@@ -7,8 +7,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, Plus, Shield, Trash2, Key, Edit2, X, Check } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../api/client';
 import { PageHeader, ButtonGroup, Modal } from '../components/common';
+import { useLocaleFormat } from '../hooks/useLocaleFormat';
 
 interface UserData {
   id: string;
@@ -33,6 +35,8 @@ interface UserFormData {
 }
 
 export function UsersPage() {
+  const { t } = useTranslation('settings');
+  const { formatDate: fmtDate } = useLocaleFormat();
   const queryClient = useQueryClient();
   const [roleFilter, setRoleFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -138,17 +142,17 @@ export function UsersPage() {
     setFormError('');
 
     if (!formData.username) {
-      setFormError("Le nom d'utilisateur est requis");
+      setFormError(t('users.validation.usernameRequired'));
       return;
     }
 
     if (!editingUser && !formData.password) {
-      setFormError('Le mot de passe est requis');
+      setFormError(t('users.validation.passwordRequired'));
       return;
     }
 
     if (!editingUser && formData.password.length < 6) {
-      setFormError('Le mot de passe doit contenir au moins 6 caracteres');
+      setFormError(t('users.validation.passwordMinLength'));
       return;
     }
 
@@ -168,7 +172,7 @@ export function UsersPage() {
   };
 
   const handleDelete = (user: UserData) => {
-    if (confirm(`Supprimer l'utilisateur "${user.username}" ?`)) {
+    if (confirm(t('users.deleteConfirm', { username: user.username }))) {
       deleteUserMutation.mutate(user.id);
     }
   };
@@ -181,8 +185,7 @@ export function UsersPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('fr-FR', {
+    return fmtDate(dateStr, {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -199,17 +202,17 @@ export function UsersPage() {
   return (
     <div>
       <PageHeader
-        title="Utilisateurs"
-        subtitle="Gérez les comptes et les permissions"
+        title={t('users.title')}
+        subtitle={t('users.subtitle')}
       />
 
       {/* Filters + Actions */}
       <div className="flex items-center justify-between mb-6">
         <ButtonGroup
           options={[
-            { key: '', label: 'Tous' },
-            { key: 'admin', label: 'Admin' },
-            { key: 'user', label: 'User' },
+            { key: '', label: t('users.filters.all') },
+            { key: 'admin', label: t('users.filters.admin') },
+            { key: 'user', label: t('users.filters.user') },
           ]}
           value={roleFilter}
           onChange={setRoleFilter}
@@ -219,7 +222,7 @@ export function UsersPage() {
           className="inline-flex items-center gap-2 h-9 px-3 bg-theatarr-600 text-white rounded-md text-sm font-medium hover:bg-theatarr-700 transition-colors"
         >
           <Plus className="h-4 w-4" />
-          <span>Nouvel utilisateur</span>
+          <span>{t('users.newUser')}</span>
         </button>
       </div>
 
@@ -273,7 +276,7 @@ export function UsersPage() {
                       )}
                       {!user.is_active && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">
-                          Inactif
+                          {t('users.badges.inactive')}
                         </span>
                       )}
                     </div>
@@ -290,7 +293,7 @@ export function UsersPage() {
                     <p className="text-xs text-dark-muted">
                       {user.last_login_at
                         ? formatDate(user.last_login_at)
-                        : 'Jamais connecte'}
+                        : t('users.neverConnected')}
                     </p>
                   </div>
 
@@ -299,14 +302,14 @@ export function UsersPage() {
                     <button
                       onClick={() => openEditModal(user)}
                       className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-dark-text transition-colors"
-                      title="Modifier"
+                      title={t('users.actions.edit')}
                     >
                       <Edit2 className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => setShowPasswordModal(user.id)}
                       className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-dark-text transition-colors"
-                      title="Changer le mot de passe"
+                      title={t('users.actions.changePassword')}
                     >
                       <Key className="h-4 w-4" />
                     </button>
@@ -318,14 +321,14 @@ export function UsersPage() {
                           ? 'text-green-400 hover:text-green-300'
                           : 'text-dark-muted hover:text-dark-text'
                       )}
-                      title={user.is_active ? 'Desactiver' : 'Activer'}
+                      title={user.is_active ? t('users.actions.deactivate') : t('users.actions.activate')}
                     >
                       {user.is_active ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
                     </button>
                     <button
                       onClick={() => handleDelete(user)}
                       className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-red-500/20 text-dark-muted hover:text-red-400 transition-colors"
-                      title="Supprimer"
+                      title={t('users.actions.delete')}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -337,17 +340,17 @@ export function UsersPage() {
             <div className="p-6 text-center">
               <Users size={32} className="mx-auto text-dark-muted mb-3" />
               <h3 className="text-sm font-medium text-dark-text mb-1">
-                Aucun utilisateur
+                {t('users.empty.title')}
               </h3>
               <p className="text-xs text-dark-muted mb-3">
-                Creez votre premier utilisateur pour commencer.
+                {t('users.empty.description')}
               </p>
               <button
                 onClick={openCreateModal}
                 className="inline-flex items-center gap-2 h-10 px-4 bg-theatarr-600 text-white rounded-md text-sm font-medium hover:bg-theatarr-700 transition-colors"
               >
                 <Plus className="h-4 w-4" />
-                Nouvel utilisateur
+                {t('users.newUser')}
               </button>
             </div>
           )}
@@ -358,13 +361,13 @@ export function UsersPage() {
       <Modal
         isOpen={showModal}
         onClose={closeModal}
-        title={editingUser ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'}
+        title={editingUser ? t('users.modal.editTitle') : t('users.modal.createTitle')}
         size="md"
       >
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-dark-text">
-              Nom d'utilisateur *
+              {t('users.form.username')}
             </label>
             <input
               type="text"
@@ -378,7 +381,7 @@ export function UsersPage() {
           {!editingUser && (
             <div className="space-y-2">
               <label className="text-sm font-medium text-dark-text">
-                Mot de passe *
+                {t('users.form.password')}
               </label>
               <input
                 type="password"
@@ -391,7 +394,7 @@ export function UsersPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-dark-text">Prenom</label>
+              <label className="text-sm font-medium text-dark-text">{t('users.form.firstName')}</label>
               <input
                 type="text"
                 value={formData.first_name}
@@ -400,7 +403,7 @@ export function UsersPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-dark-text">Nom</label>
+              <label className="text-sm font-medium text-dark-text">{t('users.form.lastName')}</label>
               <input
                 type="text"
                 value={formData.last_name}
@@ -411,7 +414,7 @@ export function UsersPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-dark-text">Email</label>
+            <label className="text-sm font-medium text-dark-text">{t('users.form.email')}</label>
             <input
               type="email"
               value={formData.email}
@@ -421,14 +424,14 @@ export function UsersPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-dark-text">Role</label>
+            <label className="text-sm font-medium text-dark-text">{t('users.form.role')}</label>
             <select
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               className="h-10 w-full rounded-md border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text focus:border-theatarr-500 focus:outline-none focus:ring-2 focus:ring-theatarr-500/20"
             >
-              <option value="user">Utilisateur</option>
-              <option value="admin">Administrateur</option>
+              <option value="user">{t('users.roles.user')}</option>
+              <option value="admin">{t('users.roles.admin')}</option>
             </select>
           </div>
 
@@ -441,7 +444,7 @@ export function UsersPage() {
               onClick={closeModal}
               className="h-10 px-4 rounded-md border border-dark-border bg-dark-bg text-sm font-medium text-dark-text hover:bg-dark-border/50 transition-colors"
             >
-              Annuler
+              {t('users.modal.cancel')}
             </button>
             <button
               onClick={handleSubmit}
@@ -449,10 +452,10 @@ export function UsersPage() {
               className="h-10 px-4 rounded-md bg-theatarr-600 text-white text-sm font-medium hover:bg-theatarr-700 transition-colors disabled:opacity-50"
             >
               {createUserMutation.isPending || updateUserMutation.isPending
-                ? 'Enregistrement...'
+                ? t('users.modal.saving')
                 : editingUser
-                  ? 'Modifier'
-                  : 'Creer'}
+                  ? t('users.modal.edit')
+                  : t('users.modal.create')}
             </button>
           </div>
         </div>
@@ -465,13 +468,13 @@ export function UsersPage() {
           setShowPasswordModal(null);
           setNewPassword('');
         }}
-        title="Changer le mot de passe"
+        title={t('users.passwordModal.title')}
         size="sm"
       >
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-dark-text">
-              Nouveau mot de passe
+              {t('users.passwordModal.newPassword')}
             </label>
             <input
               type="password"
@@ -479,7 +482,7 @@ export function UsersPage() {
               onChange={(e) => setNewPassword(e.target.value)}
               className="h-10 w-full rounded-md border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text focus:border-theatarr-500 focus:outline-none focus:ring-2 focus:ring-theatarr-500/20"
             />
-            <p className="text-xs text-dark-muted">Minimum 6 caracteres</p>
+            <p className="text-xs text-dark-muted">{t('users.passwordModal.minChars')}</p>
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4 border-t border-dark-border">
@@ -490,7 +493,7 @@ export function UsersPage() {
               }}
               className="h-10 px-4 rounded-md border border-dark-border bg-dark-bg text-sm font-medium text-dark-text hover:bg-dark-border/50 transition-colors"
             >
-              Annuler
+              {t('users.passwordModal.cancel')}
             </button>
             <button
               onClick={() => {
@@ -504,7 +507,7 @@ export function UsersPage() {
               disabled={newPassword.length < 6 || changePasswordMutation.isPending}
               className="h-10 px-4 rounded-md bg-theatarr-600 text-white text-sm font-medium hover:bg-theatarr-700 transition-colors disabled:opacity-50"
             >
-              {changePasswordMutation.isPending ? 'Changement...' : 'Changer'}
+              {changePasswordMutation.isPending ? t('users.passwordModal.changing') : t('users.passwordModal.change')}
             </button>
           </div>
         </div>

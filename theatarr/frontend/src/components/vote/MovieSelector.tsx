@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Search, Film, Check, Plus, X } from 'lucide-react';
 import { Input, Spinner } from '../common';
 import { apiClient } from '../../api/client';
@@ -51,6 +52,7 @@ export function MovieSelector({
   onRemove,
   maxSelections = 10,
 }: MovieSelectorProps) {
+  const { t } = useTranslation('votes');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Search movies from media sources
@@ -116,7 +118,7 @@ export function MovieSelector({
             className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted"
           />
           <Input
-            placeholder="Rechercher un film dans votre bibliothèque..."
+            placeholder={t('voteMode.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -191,7 +193,7 @@ export function MovieSelector({
               </div>
             ) : (
               <div className="p-4 text-center text-dark-muted">
-                Aucun film trouvé. Essayez une autre recherche.
+                {t('voteMode.noResults')}
               </div>
             )}
           </div>
@@ -202,7 +204,7 @@ export function MovieSelector({
       {selectedMovies.length > 0 && (
         <div>
           <h4 className="text-sm font-medium text-dark-muted mb-3">
-            Films sélectionnés ({selectedMovies.length}/{maxSelections})
+            {t('voteMode.selectedMovies')} ({selectedMovies.length}/{maxSelections})
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {selectedMovies.map((movie, index) => (
@@ -246,7 +248,7 @@ export function MovieSelector({
       {/* Hint */}
       {selectedMovies.length === 0 && (
         <p className="text-sm text-dark-muted text-center py-4">
-          Recherchez et ajoutez au moins 2 films depuis votre bibliothèque Plex ou Jellyfin.
+          {t('voteMode.searchHint')}
         </p>
       )}
     </div>

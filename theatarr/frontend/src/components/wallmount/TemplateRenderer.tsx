@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import i18n from '../../i18n';
 import { MovieInfo } from './MovieInfo';
 import { CountdownTimer } from './CountdownTimer';
 import { formatCountdownShort } from '../../utils/countdown';
@@ -136,6 +137,11 @@ const animationStyles = `
 }
 `;
 
+const LOCALE_MAP: Record<string, string> = { fr: 'fr-FR', en: 'en-US' };
+function getLocale(): string {
+  return LOCALE_MAP[i18n.language] || 'fr-FR';
+}
+
 // Helper to resolve dynamic text variables
 function resolveDynamicText(
   text: string,
@@ -170,9 +176,10 @@ function resolveDynamicText(
   if (countdown_to) {
     resolved = resolved.replace(/\{\{countdown_short\}\}/g, formatCountdownShort(countdown_to));
     const targetDate = new Date(countdown_to);
-    resolved = resolved.replace(/\{\{date\}\}/g, targetDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }));
-    resolved = resolved.replace(/\{\{date_full\}\}/g, targetDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
-    resolved = resolved.replace(/\{\{time\}\}/g, targetDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+    const locale = getLocale();
+    resolved = resolved.replace(/\{\{date\}\}/g, targetDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' }));
+    resolved = resolved.replace(/\{\{date_full\}\}/g, targetDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+    resolved = resolved.replace(/\{\{time\}\}/g, targetDate.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }));
   }
 
   // Mystery variables
@@ -1447,7 +1454,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
               <div className="text-lg font-semibold">{session.name}</div>
               {countdown_to && (
                 <div className="text-sm opacity-70">
-                  {new Date(countdown_to).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                  {new Date(countdown_to).toLocaleDateString(getLocale(), { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
                 </div>
               )}
             </div>
@@ -2044,7 +2051,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
                 <div>
                   <div className="text-sm uppercase tracking-widest opacity-60 mb-3">Projection le</div>
                   <div className="text-2xl" style={{ color: goldColor }}>
-                    {new Date(countdown_to).toLocaleDateString('fr-FR', {
+                    {new Date(countdown_to).toLocaleDateString(getLocale(), {
                       weekday: 'long',
                       day: 'numeric',
                       month: 'long',
@@ -2345,7 +2352,7 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
                   <div className="flex justify-between text-xl px-8 py-2 border-b border-yellow-900/30">
                     <span className="opacity-60">HORAIRE</span>
                     <span style={{ color: letterColor }}>
-                      {new Date(countdown_to).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(countdown_to).toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 )}
@@ -2455,13 +2462,13 @@ export function TemplateRenderer({ template, data }: TemplateRendererProps) {
                     <div className="text-center">
                       <div className="text-xs uppercase tracking-wider opacity-60 mb-1">Date</div>
                       <div className="font-bold">
-                        {new Date(countdown_to).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                        {new Date(countdown_to).toLocaleDateString(getLocale(), { day: 'numeric', month: 'short' })}
                       </div>
                     </div>
                     <div className="text-center">
                       <div className="text-xs uppercase tracking-wider opacity-60 mb-1">Heure</div>
                       <div className="font-bold">
-                        {new Date(countdown_to).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(countdown_to).toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
                   </>

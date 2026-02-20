@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, HelpCircle, Trophy, Users, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { Spinner } from '../components/common';
 import { API_BASE } from '../api/client';
@@ -48,6 +49,7 @@ interface ScoreboardEntry {
 type Screen = 'loading' | 'error' | 'join' | 'waiting' | 'question' | 'feedback' | 'results';
 
 export function QuizPage() {
+  const { t } = useTranslation(['votes', 'common']);
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
   const [screen, setScreen] = useState<Screen>('loading');
@@ -306,8 +308,8 @@ export function QuizPage() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center p-8">
           <HelpCircle size={48} className="mx-auto text-gray-600 mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Lien invalide</h1>
-          <p className="text-gray-400">{errorMessage || 'Ce lien de quiz est invalide ou a expiré.'}</p>
+          <h1 className="text-2xl font-bold text-white mb-2">{t('votes:quizPage.invalidLink')}</h1>
+          <p className="text-gray-400">{errorMessage || t('votes:quizPage.invalidLinkMessage')}</p>
         </div>
       </div>
     );
@@ -345,14 +347,14 @@ export function QuizPage() {
         {screen === 'join' && (
           <div className="text-center">
             <HelpCircle size={64} className="mx-auto text-indigo-500 mb-6" />
-            <h2 className="text-xl font-semibold text-white mb-6">Rejoindre le quiz</h2>
+            <h2 className="text-xl font-semibold text-white mb-6">{t('votes:quizPage.joinQuiz')}</h2>
             <div className="max-w-sm mx-auto space-y-4">
               <input
                 type="text"
                 value={participantName}
                 onChange={(e) => setParticipantName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-                placeholder="Votre nom"
+                placeholder={t('votes:quizPage.yourName')}
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-center text-lg"
                 autoFocus
               />
@@ -361,7 +363,7 @@ export function QuizPage() {
                 disabled={!participantName.trim() || joinMutation.isPending}
                 className="w-full px-6 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold rounded-lg transition-colors"
               >
-                {joinMutation.isPending ? 'Connexion...' : 'Rejoindre'}
+                {joinMutation.isPending ? t('votes:quizPage.connecting') : t('votes:quizPage.join')}
               </button>
               {joinMutation.error && (
                 <p className="text-red-400 text-sm">{(joinMutation.error as Error).message}</p>
@@ -374,9 +376,9 @@ export function QuizPage() {
         {screen === 'waiting' && (
           <div className="text-center py-12">
             <div className="w-16 h-16 mx-auto mb-6 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            <h2 className="text-xl font-semibold text-white mb-2">En attente du démarrage...</h2>
+            <h2 className="text-xl font-semibold text-white mb-2">{t('votes:quizPage.waitingToStart')}</h2>
             <p className="text-gray-400">
-              {participantCount} participant{participantCount > 1 ? 's' : ''} connecté{participantCount > 1 ? 's' : ''}
+              {t('votes:quizPage.participantsConnected', { count: participantCount })}
             </p>
           </div>
         )}
@@ -386,7 +388,7 @@ export function QuizPage() {
           <div>
             {/* Progress bar */}
             <div className="flex items-center justify-between mb-4 text-sm text-gray-400">
-              <span>Question {currentQuestionIndex + 1}/{totalQuestions}</span>
+              <span>{t('votes:quizPage.questionProgress', { current: currentQuestionIndex + 1, total: totalQuestions })}</span>
               {timeRemaining != null && (
                 <span className={`flex items-center gap-1 font-mono ${timeRemaining <= 5 ? 'text-red-400' : ''}`}>
                   <Clock size={14} />
@@ -409,7 +411,7 @@ export function QuizPage() {
             {/* Hint */}
             {currentQuestion.hint && (
               <p className="text-sm text-yellow-400/80 text-center mb-4 italic">
-                Indice : {currentQuestion.hint}
+                {t('votes:quizPage.hint')} {currentQuestion.hint}
               </p>
             )}
 
@@ -448,7 +450,7 @@ export function QuizPage() {
                 disabled={selectedIndices.length === 0 || hasAnswered || answerMutation.isPending}
                 className="px-8 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold rounded-lg transition-colors"
               >
-                {answerMutation.isPending ? 'Envoi...' : 'Valider'}
+                {answerMutation.isPending ? t('votes:quizPage.submitting') : t('votes:quizPage.validate')}
               </button>
               {answerMutation.error && (
                 <p className="text-red-400 text-sm mt-2">{(answerMutation.error as Error).message}</p>
@@ -465,14 +467,14 @@ export function QuizPage() {
                 <div className="w-20 h-20 mx-auto mb-4 bg-green-500/20 rounded-full flex items-center justify-center">
                   <Check size={40} className="text-green-400" />
                 </div>
-                <h2 className="text-2xl font-bold text-green-400">Correct !</h2>
+                <h2 className="text-2xl font-bold text-green-400">{t('votes:quizPage.correct')}</h2>
               </div>
             ) : (
               <div className="mb-6">
                 <div className="w-20 h-20 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center">
                   <X size={40} className="text-red-400" />
                 </div>
-                <h2 className="text-2xl font-bold text-red-400">Incorrect</h2>
+                <h2 className="text-2xl font-bold text-red-400">{t('votes:quizPage.incorrect')}</h2>
               </div>
             )}
 
@@ -510,11 +512,11 @@ export function QuizPage() {
             {/* Score */}
             <div className="flex items-center justify-center gap-2 text-lg">
               <Trophy size={20} className="text-yellow-400" />
-              <span className="text-white font-bold">Score : {answerResult.score}</span>
+              <span className="text-white font-bold">{t('votes:quizPage.score')} {answerResult.score}</span>
             </div>
 
             <p className="text-gray-500 text-sm mt-6">
-              En attente de la prochaine question...
+              {t('votes:quizPage.waitingNextQuestion')}
             </p>
           </div>
         )}
@@ -524,16 +526,16 @@ export function QuizPage() {
           <div className="py-4">
             <div className="text-center mb-8">
               <Trophy size={48} className="mx-auto text-yellow-400 mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">Quiz terminé !</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">{t('votes:quizPage.quizFinished')}</h2>
               <p className="text-gray-400">
-                Votre score : <span className="text-yellow-400 font-bold">{myScore}</span>/{totalQuestions}
+                {t('votes:quizPage.yourScore')} <span className="text-yellow-400 font-bold">{myScore}</span>/{totalQuestions}
               </p>
             </div>
 
             {/* Scoreboard */}
             {scoreboard.length > 0 && (
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-gray-400 mb-3">Classement</h3>
+                <h3 className="text-sm font-medium text-gray-400 mb-3">{t('votes:quizPage.leaderboard')}</h3>
                 {scoreboard.map((entry, idx) => (
                   <div
                     key={entry.token_id}
@@ -575,7 +577,7 @@ export function QuizPage() {
 
       {/* Footer */}
       <footer className="p-4 text-center text-gray-600 text-xs">
-        Powered by Theatarr
+        {t('votes:quizPage.poweredBy')}
       </footer>
     </div>
   );

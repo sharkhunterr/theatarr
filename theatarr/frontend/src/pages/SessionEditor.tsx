@@ -30,6 +30,7 @@ import {
   ClipboardCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { Button, Spinner } from '../components/common';
 import {
   WorkflowEditor,
@@ -45,7 +46,6 @@ import { MysteryModeConfig } from '../components/sessions/MysteryModeConfig';
 import { ParticipantsSelector } from '../components/sessions/ParticipantsSelector';
 import { TemplateSelector } from '../components/sessions/TemplateSelector';
 import { apiClient } from '../api/client';
-import { useLayoutStore } from '../stores/layoutStore';
 import type { MovieSelectionMode, MysteryConfig } from '../stores/sessionStore';
 
 interface ColorPalette {
@@ -264,13 +264,13 @@ function generateId(): string {
   });
 }
 
-const actionTypeConfig: Record<ActionType, { icon: typeof Lightbulb; color: string; bgColor: string; label: { en: string; fr: string } }> = {
-  lighting: { icon: Lightbulb, color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', label: { en: 'Lighting', fr: 'Éclairage' } },
-  audio: { icon: Volume2, color: 'text-blue-400', bgColor: 'bg-blue-500/20', label: { en: 'Audio', fr: 'Audio' } },
-  media: { icon: Play, color: 'text-green-400', bgColor: 'bg-green-500/20', label: { en: 'Media', fr: 'Média' } },
-  display: { icon: Monitor, color: 'text-purple-400', bgColor: 'bg-purple-500/20', label: { en: 'Display', fr: 'Affichage' } },
-  actuator: { icon: Zap, color: 'text-orange-400', bgColor: 'bg-orange-500/20', label: { en: 'Actuator', fr: 'Actionneur' } },
-  session: { icon: ClipboardCheck, color: 'text-teal-400', bgColor: 'bg-teal-500/20', label: { en: 'Session', fr: 'Session' } },
+const actionTypeConfig: Record<ActionType, { icon: typeof Lightbulb; color: string; bgColor: string; labelKey: string }> = {
+  lighting: { icon: Lightbulb, color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', labelKey: 'sessions:actionTypes.lighting' },
+  audio: { icon: Volume2, color: 'text-blue-400', bgColor: 'bg-blue-500/20', labelKey: 'sessions:actionTypes.audio' },
+  media: { icon: Play, color: 'text-green-400', bgColor: 'bg-green-500/20', labelKey: 'sessions:actionTypes.media' },
+  display: { icon: Monitor, color: 'text-purple-400', bgColor: 'bg-purple-500/20', labelKey: 'sessions:actionTypes.display' },
+  actuator: { icon: Zap, color: 'text-orange-400', bgColor: 'bg-orange-500/20', labelKey: 'sessions:actionTypes.actuator' },
+  session: { icon: ClipboardCheck, color: 'text-teal-400', bgColor: 'bg-teal-500/20', labelKey: 'sessions:actionTypes.session' },
 };
 
 const defaultCommands: Record<ActionType, string> = {
@@ -285,84 +285,15 @@ const defaultCommands: Record<ActionType, string> = {
 export function SessionEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['sessions', 'common']);
   const isNew = !id || id === 'new';
 
-  const t = {
-    loading: language === 'fr' ? 'Chargement...' : 'Loading...',
-    notFound: language === 'fr' ? 'Session introuvable' : 'Session not found',
-    cancel: language === 'fr' ? 'Annuler' : 'Cancel',
-    save: language === 'fr' ? 'Enregistrer' : 'Save',
-    saving: language === 'fr' ? 'Enregistrement...' : 'Saving...',
-    sessionName: language === 'fr' ? 'Nom de la session' : 'Session Name',
-    descriptionPlaceholder: language === 'fr' ? 'Description optionnelle' : 'Optional description',
-    newSession: language === 'fr' ? 'Nouvelle session' : 'New Session',
-    selectNode: language === 'fr' ? 'Sélectionnez un nœud pour le modifier' : 'Select a node to edit',
-    linearMode: language === 'fr' ? 'Linéaire' : 'Linear',
-    nodeMode: language === 'fr' ? 'Nœuds' : 'Nodes',
-    actions: language === 'fr' ? 'Actions' : 'Actions',
-    noActions: language === 'fr' ? 'Aucune action. Cliquez sur un type pour commencer.' : 'No actions. Click a type to get started.',
-    properties: language === 'fr' ? 'Propriétés' : 'Properties',
-    selectAction: language === 'fr' ? 'Sélectionnez une action pour la modifier' : 'Select an action to edit',
-    saveError: language === 'fr' ? 'Erreur lors de la sauvegarde' : 'Failed to save',
-    scheduledAt: language === 'fr' ? 'Programmée pour' : 'Scheduled for',
-    scheduledAtHelp: language === 'fr' ? 'Date et heure de déclenchement automatique' : 'Automatic trigger date and time',
-    selectMovie: language === 'fr' ? 'Sélectionner le film' : 'Select Movie',
-    searchMovie: language === 'fr' ? 'Rechercher un film...' : 'Search for a movie...',
-    noResults: language === 'fr' ? 'Aucun résultat' : 'No results',
-    movieRequired: language === 'fr' ? 'Un film est requis pour créer une session' : 'A movie is required to create a session',
-    changeMovie: language === 'fr' ? 'Changer' : 'Change',
-    extractingPalette: language === 'fr' ? 'Extraction de la palette...' : 'Extracting palette...',
-    colorPalette: language === 'fr' ? 'Palette de couleurs' : 'Color Palette',
-    selectionMode: language === 'fr' ? 'Mode de sélection du film' : 'Movie Selection Mode',
-    fixed: language === 'fr' ? 'Fixe' : 'Fixed',
-    fixedDesc: language === 'fr' ? 'Film choisi directement' : 'Directly chosen movie',
-    vote: language === 'fr' ? 'Vote' : 'Vote',
-    voteDesc: language === 'fr' ? 'Film déterminé par vote' : 'Movie determined by vote',
-    mystery: language === 'fr' ? 'Mystère' : 'Mystery',
-    mysteryDesc: language === 'fr' ? 'Film révélé plus tard' : 'Movie revealed later',
-    // Tab labels
-    tabGeneral: language === 'fr' ? 'Général' : 'General',
-    tabMovie: language === 'fr' ? 'Film' : 'Movie',
-    tabUsers: language === 'fr' ? 'Utilisateurs' : 'Users',
-    tabActions: language === 'fr' ? 'Actions' : 'Actions',
-    // General tab
-    generalInfo: language === 'fr' ? 'Informations générales' : 'General Information',
-    name: language === 'fr' ? 'Nom' : 'Name',
-    description: language === 'fr' ? 'Description' : 'Description',
-    schedule: language === 'fr' ? 'Planification' : 'Schedule',
-    // Display options
-    displayOptions: language === 'fr' ? 'Options d\'affichage' : 'Display Options',
-    pauseOnDisplayDisconnect: language === 'fr' ? 'Pause si display déconnecté' : 'Pause on display disconnect',
-    pauseOnDisplayDisconnectHelp: language === 'fr'
-      ? 'Met la session en pause automatiquement si la page d\'affichage est fermée, et reprend quand elle se reconnecte'
-      : 'Automatically pauses the session if the display page is closed, and resumes when it reconnects',
-    qrTickets: language === 'fr' ? 'Tickets QR Code' : 'QR Code Tickets',
-    qrTicketsHelp: language === 'fr'
-      ? 'Les participants recevront un ticket QR scannable a l\'entree'
-      : 'Participants will receive a scannable QR ticket at the entrance',
-    // Template
-    wallmountTemplate: language === 'fr' ? 'Template Wallmount' : 'Wallmount Template',
-    activeTemplateLabel: language === 'fr' ? 'Template actif (global)' : 'Active template (global)',
-    noActiveTemplate: language === 'fr' ? 'Aucun template actif' : 'No active template',
-    manageTemplates: language === 'fr' ? 'Gérer les templates' : 'Manage templates',
-    templateHelp: language === 'fr' ? 'Par défaut, le template actif global est utilisé. Vous pouvez choisir un template spécifique pour cette session.' : 'By default, the global active template is used. You can choose a specific template for this session.',
-    useGlobalTemplate: language === 'fr' ? 'Utiliser le template global actif' : 'Use global active template',
-    selectTemplate: language === 'fr' ? 'Choisir un template' : 'Select template',
-    customTemplate: language === 'fr' ? 'Template personnalisé' : 'Custom template',
-    // Blocks
-    block: language === 'fr' ? 'Bloc' : 'Block',
-    parallelActions: language === 'fr' ? 'Actions parallèles' : 'Parallel actions',
-    addToBlock: language === 'fr' ? 'Ajouter au bloc' : 'Add to block',
-    newBlock: language === 'fr' ? 'Nouveau bloc' : 'New block',
-    deleteBlock: language === 'fr' ? 'Supprimer le bloc' : 'Delete block',
-  };
-
+  const newSessionLabel = t('sessions:editor.newSession');
   const [session, setSession] = useState<Session | null>(
     isNew
       ? {
           id: '',
-          name: t.newSession,
+          name: newSessionLabel,
           description: '',
           status: 'draft',
           scheduled_at: null,
@@ -583,7 +514,7 @@ export function SessionEditor() {
       movie_source: movie.source,
       movie_genres: movie.genres || null,
       // Auto-set session name to movie title if creating new session with default name
-      name: session.name === t.newSession ? movie.title : session.name,
+      name: session.name === newSessionLabel ? movie.title : session.name,
     };
 
     setSession(updatedSession);
@@ -728,7 +659,7 @@ export function SessionEditor() {
       navigate('/sessions');
     } catch (error) {
       console.error('Failed to save session:', error);
-      alert(t.saveError);
+      alert(t('sessions:editor.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -1093,7 +1024,7 @@ export function SessionEditor() {
   if (!session) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-dark-muted">{t.notFound}</div>
+        <div className="text-dark-muted">{t('sessions:editor.notFound')}</div>
       </div>
     );
   }
@@ -1112,10 +1043,10 @@ export function SessionEditor() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-dark-text">
-              {isNew ? t.newSession : session.name}
+              {isNew ? t('sessions:editor.newSession') : session.name}
             </h1>
             <p className="text-dark-muted text-sm mt-1">
-              {session.description || (language === 'fr' ? 'Configurez votre session cinéma' : 'Configure your cinema session')}
+              {session.description || t('sessions:editor.configureSession')}
             </p>
           </div>
         </div>
@@ -1125,11 +1056,11 @@ export function SessionEditor() {
             size="sm"
             onClick={() => navigate('/sessions')}
           >
-            {t.cancel}
+            {t('sessions:editor.cancel')}
           </Button>
           <Button size="sm" onClick={handleSave} disabled={isSaving}>
             <Save size={16} className="mr-1" />
-            {isSaving ? t.saving : t.save}
+            {isSaving ? t('sessions:editor.saving') : t('sessions:editor.save')}
           </Button>
         </div>
       </div>
@@ -1145,7 +1076,7 @@ export function SessionEditor() {
           }`}
         >
           <Info size={16} className="inline mr-2" />
-          {t.tabGeneral}
+          {t('sessions:editor.tabGeneral')}
         </button>
         <button
           onClick={() => setActiveTab('movie')}
@@ -1156,7 +1087,7 @@ export function SessionEditor() {
           }`}
         >
           <Film size={16} className="inline mr-2" />
-          {t.tabMovie}
+          {t('sessions:editor.tabMovie')}
         </button>
         <button
           onClick={() => setActiveTab('participants')}
@@ -1167,7 +1098,7 @@ export function SessionEditor() {
           }`}
         >
           <Users size={16} className="inline mr-2" />
-          {t.tabUsers}
+          {t('sessions:editor.tabUsers')}
           {selectedParticipantIds.length > 0 && (
             <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-theatarr-500/20 text-theatarr-400">
               {selectedParticipantIds.length}
@@ -1183,7 +1114,7 @@ export function SessionEditor() {
           }`}
         >
           <Zap size={16} className="inline mr-2" />
-          {t.tabActions}
+          {t('sessions:editor.tabActions')}
           {actions.length > 0 && (
             <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-theatarr-500/20 text-theatarr-400">
               {actions.length}
@@ -1199,31 +1130,31 @@ export function SessionEditor() {
           <div className="space-y-4">
             {/* Name */}
             <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
-              <label className="text-sm font-medium text-dark-text block mb-2">{t.name}</label>
+              <label className="text-sm font-medium text-dark-text block mb-2">{t('sessions:editor.name')}</label>
               <input
                 type="text"
                 value={session.name}
                 onChange={(e) => setSession({ ...session, name: e.target.value })}
                 className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text placeholder:text-dark-muted"
-                placeholder={t.sessionName}
+                placeholder={t('sessions:editor.sessionName')}
               />
             </div>
 
             {/* Description */}
             <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
-              <label className="text-sm font-medium text-dark-text block mb-2">{t.description}</label>
+              <label className="text-sm font-medium text-dark-text block mb-2">{t('sessions:editor.description')}</label>
               <textarea
                 value={session.description || ''}
                 onChange={(e) => setSession({ ...session, description: e.target.value })}
                 className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text placeholder:text-dark-muted resize-none"
-                placeholder={t.descriptionPlaceholder}
+                placeholder={t('sessions:editor.descriptionPlaceholder')}
                 rows={3}
               />
             </div>
 
             {/* Schedule */}
             <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
-              <label className="text-sm font-medium text-dark-text block mb-2">{t.schedule}</label>
+              <label className="text-sm font-medium text-dark-text block mb-2">{t('sessions:editor.schedule')}</label>
               <div className="flex items-center gap-2">
                 <Calendar size={16} className="text-dark-muted flex-shrink-0" />
                 <input
@@ -1231,17 +1162,17 @@ export function SessionEditor() {
                   value={session.scheduled_at ? session.scheduled_at.slice(0, 16) : ''}
                   onChange={(e) => setSession({ ...session, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
                   className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-dark-text"
-                  title={t.scheduledAtHelp}
+                  title={t('sessions:editor.scheduledAtHelp')}
                 />
               </div>
-              <p className="text-xs text-dark-muted mt-2">{t.scheduledAtHelp}</p>
+              <p className="text-xs text-dark-muted mt-2">{t('sessions:editor.scheduledAtHelp')}</p>
             </div>
 
             {/* Display Options */}
             <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
               <label className="text-sm font-medium text-dark-text flex items-center gap-2 mb-3">
                 <ScreenShare size={16} className="text-theatarr-500" />
-                {t.displayOptions}
+                {t('sessions:editor.displayOptions')}
               </label>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
@@ -1251,8 +1182,8 @@ export function SessionEditor() {
                   className="mt-1 w-4 h-4 rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500 focus:ring-offset-0"
                 />
                 <div>
-                  <span className="text-sm text-dark-text">{t.qrTickets}</span>
-                  <p className="text-xs text-dark-muted mt-0.5">{t.qrTicketsHelp}</p>
+                  <span className="text-sm text-dark-text">{t('sessions:editor.qrTickets')}</span>
+                  <p className="text-xs text-dark-muted mt-0.5">{t('sessions:editor.qrTicketsHelp')}</p>
                 </div>
               </label>
               <label className="flex items-start gap-3 cursor-pointer mt-3">
@@ -1263,8 +1194,8 @@ export function SessionEditor() {
                   className="mt-1 w-4 h-4 rounded border-dark-border bg-dark-bg text-theatarr-500 focus:ring-theatarr-500 focus:ring-offset-0"
                 />
                 <div>
-                  <span className="text-sm text-dark-text">{t.pauseOnDisplayDisconnect}</span>
-                  <p className="text-xs text-dark-muted mt-0.5">{t.pauseOnDisplayDisconnectHelp}</p>
+                  <span className="text-sm text-dark-text">{t('sessions:editor.pauseOnDisplayDisconnect')}</span>
+                  <p className="text-xs text-dark-muted mt-0.5">{t('sessions:editor.pauseOnDisplayDisconnectHelp')}</p>
                 </div>
               </label>
             </div>
@@ -1274,13 +1205,13 @@ export function SessionEditor() {
               <div className="flex items-center justify-between mb-4">
                 <label className="text-sm font-medium text-dark-text flex items-center gap-2">
                   <Monitor size={16} className="text-theatarr-500" />
-                  {t.wallmountTemplate}
+                  {t('sessions:editor.wallmountTemplate')}
                 </label>
                 <Link
                   to="/templates"
                   className="text-xs text-theatarr-400 hover:text-theatarr-300 transition-colors"
                 >
-                  {t.manageTemplates}
+                  {t('sessions:editor.manageTemplates')}
                 </Link>
               </div>
 
@@ -1297,7 +1228,7 @@ export function SessionEditor() {
           <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
             {/* Mode Selector */}
             <div className="mb-4">
-              <label className="text-sm font-medium text-dark-text mb-2 block">{t.selectionMode}</label>
+              <label className="text-sm font-medium text-dark-text mb-2 block">{t('sessions:editor.selectionMode')}</label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
@@ -1310,8 +1241,8 @@ export function SessionEditor() {
                   )}
                 >
                   <Film size={20} className="mx-auto mb-1" />
-                  <div className="text-sm font-medium">{t.fixed}</div>
-                  <div className="text-xs opacity-70 hidden sm:block">{t.fixedDesc}</div>
+                  <div className="text-sm font-medium">{t('sessions:editor.fixed')}</div>
+                  <div className="text-xs opacity-70 hidden sm:block">{t('sessions:editor.fixedDesc')}</div>
                 </button>
                 <button
                   type="button"
@@ -1324,8 +1255,8 @@ export function SessionEditor() {
                   )}
                 >
                   <Vote size={20} className="mx-auto mb-1" />
-                  <div className="text-sm font-medium">{t.vote}</div>
-                  <div className="text-xs opacity-70 hidden sm:block">{t.voteDesc}</div>
+                  <div className="text-sm font-medium">{t('sessions:editor.vote')}</div>
+                  <div className="text-xs opacity-70 hidden sm:block">{t('sessions:editor.voteDesc')}</div>
                 </button>
                 <button
                   type="button"
@@ -1338,8 +1269,8 @@ export function SessionEditor() {
                   )}
                 >
                   <Shuffle size={20} className="mx-auto mb-1" />
-                  <div className="text-sm font-medium">{t.mystery}</div>
-                  <div className="text-xs opacity-70 hidden sm:block">{t.mysteryDesc}</div>
+                  <div className="text-sm font-medium">{t('sessions:editor.mystery')}</div>
+                  <div className="text-xs opacity-70 hidden sm:block">{t('sessions:editor.mysteryDesc')}</div>
                 </button>
               </div>
             </div>
@@ -1349,7 +1280,7 @@ export function SessionEditor() {
               <div className="border-t border-dark-border pt-4 mt-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Film size={16} className="text-theatarr-500" />
-                  <span className="text-sm font-medium text-dark-text">{t.selectMovie}</span>
+                  <span className="text-sm font-medium text-dark-text">{t('sessions:editor.selectMovie')}</span>
                 </div>
 
                 {session.movie_title && !isMovieSearchOpen ? (
@@ -1382,7 +1313,7 @@ export function SessionEditor() {
                       {isExtractingPalette && (
                         <div className="flex items-center gap-2 text-xs text-dark-muted">
                           <Spinner size="sm" />
-                          <span>{t.extractingPalette}</span>
+                          <span>{t('sessions:editor.extractingPalette')}</span>
                         </div>
                       )}
                       <button
@@ -1390,7 +1321,7 @@ export function SessionEditor() {
                         onClick={() => setIsMovieSearchOpen(true)}
                         className="px-3 py-1.5 text-sm bg-dark-bg hover:bg-dark-border text-dark-text rounded-lg"
                       >
-                        {t.changeMovie}
+                        {t('sessions:editor.changeMovie')}
                       </button>
                       <button
                         type="button"
@@ -1407,7 +1338,7 @@ export function SessionEditor() {
                       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted" />
                       <input
                         type="text"
-                        placeholder={t.searchMovie}
+                        placeholder={t('sessions:editor.searchMovie')}
                         value={movieSearchQuery}
                         onChange={(e) => { setMovieSearchQuery(e.target.value); setIsMovieSearchOpen(true); }}
                         onFocus={() => setIsMovieSearchOpen(true)}
@@ -1443,7 +1374,7 @@ export function SessionEditor() {
                             ))}
                           </div>
                         ) : (
-                          <div className="p-4 text-center text-dark-muted text-sm">{t.noResults}</div>
+                          <div className="p-4 text-center text-dark-muted text-sm">{t('sessions:editor.noResults')}</div>
                         )}
                       </div>
                     )}
@@ -1485,21 +1416,15 @@ export function SessionEditor() {
                 <div className="flex items-center gap-2 mb-2">
                   <Palette size={16} className="text-theatarr-500" />
                   <span className="text-sm font-medium text-dark-text">
-                    {language === 'fr' ? "Options d'enrichissement" : 'Enrichment Options'}
+                    {t('sessions:editor.enrichmentOptions')}
                   </span>
                 </div>
                 <p className="text-xs text-dark-muted mb-3">
                   {session.movie_selection_mode === 'vote'
-                    ? (language === 'fr'
-                      ? "L'enrichissement sera appliqué automatiquement quand le film sera voté."
-                      : 'Enrichment will be applied automatically when the movie is voted.')
+                    ? t('sessions:editor.enrichmentDesc.vote')
                     : session.movie_selection_mode === 'mystery'
-                      ? (language === 'fr'
-                        ? "L'enrichissement sera appliqué automatiquement quand le film sera révélé."
-                        : 'Enrichment will be applied automatically when the movie is revealed.')
-                      : (language === 'fr'
-                        ? "L'enrichissement sera appliqué à la sauvegarde."
-                        : 'Enrichment will be applied on save.')}
+                      ? t('sessions:editor.enrichmentDesc.mystery')
+                      : t('sessions:editor.enrichmentDesc.fixed')}
                 </p>
                 <div className="flex items-center gap-3">
                   {(['tmdb', 'fanart'] as const).map((source) => {
@@ -1509,12 +1434,12 @@ export function SessionEditor() {
                     const error = enrichmentErrors[source];
                     const label = source === 'tmdb' ? 'TMDB' : 'Fanart.tv';
                     const tooltip = !available
-                      ? (language === 'fr' ? `${label} non configuré` : `${label} not configured`)
+                      ? t('sessions:editor.enrichmentNotConfigured', { label })
                       : isEnriched && isEnabled
-                        ? (language === 'fr' ? `Déjà enrichi via ${label}` : `Already enriched from ${label}`)
+                        ? t('sessions:editor.enrichmentAlreadyDone', { label })
                         : isEnabled
-                          ? (language === 'fr' ? `${label} activé` : `${label} enabled`)
-                          : (language === 'fr' ? `Activer l'enrichissement ${label}` : `Enable ${label} enrichment`);
+                          ? t('sessions:editor.enrichmentEnabled', { label })
+                          : t('sessions:editor.enrichmentEnable', { label });
 
                     return (
                       <button
@@ -1576,7 +1501,7 @@ export function SessionEditor() {
                       : 'bg-dark-surface text-dark-muted'
                   )}
                 >
-                  {t.actions} ({actions.length})
+                  {t('sessions:editor.actions')} ({actions.length})
                 </button>
                 <button
                   onClick={() => setMobilePanel('properties')}
@@ -1587,7 +1512,7 @@ export function SessionEditor() {
                       : 'bg-dark-surface text-dark-muted'
                   )}
                 >
-                  {t.properties}
+                  {t('sessions:editor.properties')}
                 </button>
               </div>
             </div>
@@ -1601,7 +1526,7 @@ export function SessionEditor() {
                   mobilePanel === 'properties' ? 'hidden md:flex' : 'flex'
                 )}>
                   <div className="p-3 border-b border-dark-border">
-                    <h3 className="text-sm font-medium text-dark-text mb-2 hidden md:block">{t.actions}</h3>
+                    <h3 className="text-sm font-medium text-dark-text mb-2 hidden md:block">{t('sessions:editor.actions')}</h3>
                     {/* Add Action Buttons */}
                     <div className="flex flex-wrap gap-1.5">
                       {(Object.keys(actionTypeConfig) as ActionType[]).map((type) => {
@@ -1612,17 +1537,17 @@ export function SessionEditor() {
                             key={type}
                             onClick={() => { addAction(type); setMobilePanel('properties'); }}
                             className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${config.bgColor} ${config.color} hover:opacity-80 transition-opacity border ${config.color.replace('text-', 'border-').replace('400', '500/30')}`}
-                            title={language === 'fr' ? config.label.fr : config.label.en}
+                            title={t(config.labelKey)}
                           >
                             <Icon size={16} />
-                            {language === 'fr' ? config.label.fr : config.label.en}
+                            {t(config.labelKey)}
                           </button>
                         );
                       })}
                       <button
                         onClick={() => { addSmartActions(); setMobilePanel('properties'); }}
                         className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 hover:opacity-80 transition-opacity border border-amber-500/30"
-                        title={language === 'fr' ? 'Preset Smart : séance complète' : 'Smart preset: complete session'}
+                        title={t('sessions:editor.smartPreset')}
                       >
                         <Sparkles size={16} />
                         Smart
@@ -1633,7 +1558,7 @@ export function SessionEditor() {
                   <div className="flex-1 overflow-auto">
                     {actions.length === 0 ? (
                       <div className="text-center text-dark-muted text-xs p-6">
-                        {t.noActions}
+                        {t('sessions:editor.noActions')}
                       </div>
                     ) : (
                       <div className="p-2 space-y-2">
@@ -1661,7 +1586,7 @@ export function SessionEditor() {
                                 </div>
                                 <GripVertical size={14} className="text-dark-muted/50" />
                                 <span className="text-xs font-semibold text-dark-muted uppercase tracking-wider">
-                                  {t.block} {blockPos + 1}
+                                  {t('sessions:editor.block')} {blockPos + 1}
                                 </span>
                                 {isParallel && (
                                   <span className="flex items-center gap-0.5 text-[10px] text-theatarr-400 bg-theatarr-500/10 px-1.5 py-0.5 rounded">
@@ -1674,7 +1599,7 @@ export function SessionEditor() {
                                 <div className="relative group">
                                   <button
                                     className="p-1.5 text-dark-muted hover:text-theatarr-400 transition-colors rounded hover:bg-dark-bg/60"
-                                    title={t.addToBlock}
+                                    title={t('sessions:editor.addToBlock')}
                                   >
                                     <Plus size={16} />
                                   </button>
@@ -1689,7 +1614,7 @@ export function SessionEditor() {
                                           className="w-full flex items-center gap-2 px-2.5 py-1.5 text-sm text-dark-text hover:bg-dark-bg rounded transition-colors"
                                         >
                                           <TypeIcon size={14} className={cfg.color} />
-                                          {language === 'fr' ? cfg.label.fr : cfg.label.en}
+                                          {t(cfg.labelKey)}
                                         </button>
                                       );
                                     })}
@@ -1698,7 +1623,7 @@ export function SessionEditor() {
                                 <button
                                   onClick={() => deleteBlock(blockIndex)}
                                   className="p-1.5 text-dark-muted hover:text-red-400 transition-colors rounded hover:bg-dark-bg/60"
-                                  title={t.deleteBlock}
+                                  title={t('sessions:editor.deleteBlock')}
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -1732,14 +1657,14 @@ export function SessionEditor() {
                                             {action.command}
                                           </div>
                                           <div className="text-xs text-dark-muted truncate">
-                                            {language === 'fr' ? config.label.fr : config.label.en}
+                                            {t(config.labelKey)}
                                           </div>
                                         </div>
                                         {isParallel && (
                                           <button
                                             onClick={(e) => { e.stopPropagation(); removeActionFromBlock(globalIndex); }}
                                             className="p-1.5 text-dark-muted hover:text-amber-400 transition-colors rounded hover:bg-dark-bg/60"
-                                            title={language === 'fr' ? 'Extraire du bloc' : 'Extract from block'}
+                                            title={t('sessions:editor.extractFromBlock')}
                                           >
                                             <Layers size={14} />
                                           </button>
@@ -1765,7 +1690,7 @@ export function SessionEditor() {
                           className="w-full py-3 px-4 border border-dashed border-dark-border rounded-lg text-dark-muted text-sm hover:border-theatarr-500/50 hover:text-theatarr-400 transition-colors flex items-center justify-center gap-2"
                         >
                           <Plus size={16} />
-                          {t.newBlock}
+                          {t('sessions:editor.newBlock')}
                         </button>
                       </div>
                     )}
@@ -1778,7 +1703,7 @@ export function SessionEditor() {
                   mobilePanel === 'actions' ? 'hidden md:flex' : 'flex'
                 )}>
                   <div className="p-3 border-b border-dark-border hidden md:block">
-                    <h3 className="text-sm font-medium text-dark-text">{t.properties}</h3>
+                    <h3 className="text-sm font-medium text-dark-text">{t('sessions:editor.properties')}</h3>
                   </div>
                   <div className="flex-1 overflow-auto p-3 md:p-4">
                     {selectedAction ? (
@@ -1796,7 +1721,7 @@ export function SessionEditor() {
                       />
                     ) : (
                       <div className="text-center text-dark-muted text-sm py-12">
-                        {t.selectAction}
+                        {t('sessions:editor.selectAction')}
                       </div>
                     )}
                   </div>
@@ -1818,7 +1743,7 @@ export function SessionEditor() {
 
                 <div className="hidden md:flex w-72 bg-dark-surface border border-dark-border rounded-lg overflow-hidden flex-col">
                   <div className="p-3 border-b border-dark-border">
-                    <h3 className="text-sm font-medium text-dark-text">{t.properties}</h3>
+                    <h3 className="text-sm font-medium text-dark-text">{t('sessions:editor.properties')}</h3>
                   </div>
                   <div className="flex-1 overflow-auto">
                     {selectedNode ? (
@@ -1828,7 +1753,7 @@ export function SessionEditor() {
                         onDelete={handleNodeDelete}
                       />
                     ) : (
-                      <div className="p-4 text-sm text-dark-muted text-center">{t.selectNode}</div>
+                      <div className="p-4 text-sm text-dark-muted text-center">{t('sessions:editor.selectNode')}</div>
                     )}
                   </div>
                 </div>

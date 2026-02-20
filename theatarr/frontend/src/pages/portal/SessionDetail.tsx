@@ -7,7 +7,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Calendar, CalendarPlus, Check, X, Clock, MapPin, Film, QrCode, Vote, Shuffle, Sparkles, Eye, Trophy, Zap, Play, Timer, Star, MessageSquare, Send, Ticket } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../api/client';
+import { useLocaleFormat } from '../../hooks/useLocaleFormat';
 import { getMysteryRevealCountdown, getVoteRevealCountdown, getSessionStartCountdown } from '../../utils/countdown';
 import { useCountdown } from '../../hooks/useCountdown';
 import { useSetting } from '../../hooks/useSettings';
@@ -89,9 +91,7 @@ interface LiveState {
 // Timeline Helpers
 // ============================================================================
 
-function formatTimeShort(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-}
+// formatTimeShort is now handled via useLocaleFormat in the main component
 
 // ============================================================================
 // PortalTimeline
@@ -103,12 +103,14 @@ function PortalTimeline({
   elapsedMs,
   status,
   movieRuntimeMs,
+  t,
 }: {
   sequences: SequenceSummary[];
   currentIndex: number;
   elapsedMs: number;
   status: string;
   movieRuntimeMs: number;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -210,7 +212,7 @@ function PortalTimeline({
                       {formatDuration(getBlockDuration(seq, movieRuntimeMs, knownManualMs))}
                       {(seq.actions_count ?? 0) > 0 && (
                         <span className="ml-2">
-                          {seq.actions_count} action{(seq.actions_count ?? 0) > 1 ? 's' : ''}
+                          {seq.actions_count} {(seq.actions_count ?? 0) > 1 ? t('portal:sessionDetail.timeline.actions') : t('portal:sessionDetail.timeline.action')}
                         </span>
                       )}
                     </div>
@@ -245,7 +247,7 @@ function PortalTimeline({
           {currentSeq && (isActive || isComplete) && (
             <>
               <span>
-                Seq {currentIndex + 1}/{sequences.length}
+                {t('portal:sessionDetail.timeline.sequence', { current: currentIndex + 1, total: sequences.length })}
                 {' — '}
                 <span className="text-dark-text">{currentSeq.name}</span>
               </span>
@@ -329,6 +331,8 @@ function downloadIcs(session: SessionDetailData) {
 
 export function SessionDetail() {
   useCountdown();
+  const { t } = useTranslation(['portal', 'common']);
+  const { formatDate: fmtDate, formatTime, locale } = useLocaleFormat();
   const posterDisplay = useSetting<string>('voting.poster_display', 'animation');
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
@@ -380,9 +384,8 @@ export function SessionDetail() {
     },
   });
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('fr-FR', {
+  const formatDateFull = (dateStr: string) => {
+    return fmtDate(dateStr, {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
@@ -392,13 +395,15 @@ export function SessionDetail() {
     });
   };
 
+  const formatTimeShort = (dateStr: string) => formatTime(dateStr);
+
   const statusLabels: Record<string, string> = {
-    draft: 'Brouillon',
-    scheduled: 'Planifie',
-    running: 'En cours',
-    paused: 'En pause',
-    completed: 'Termine',
-    interrupted: 'Interrompu',
+    draft: t('portal:sessionDetail.status.draft'),
+    scheduled: t('portal:sessionDetail.status.scheduled'),
+    running: t('portal:sessionDetail.status.running'),
+    paused: t('portal:sessionDetail.status.paused'),
+    completed: t('portal:sessionDetail.status.completed'),
+    interrupted: t('portal:sessionDetail.status.interrupted'),
   };
 
   const statusColors: Record<string, string> = {
@@ -411,9 +416,9 @@ export function SessionDetail() {
   };
 
   const invitationLabels: Record<string, string> = {
-    pending: 'En attente de reponse',
-    accepted: 'Accepte',
-    declined: 'Decline',
+    pending: t('portal:sessionDetail.invitation.pending'),
+    accepted: t('portal:sessionDetail.invitation.accepted'),
+    declined: t('portal:sessionDetail.invitation.declined'),
   };
 
   // Compute timeline data from live state or session data
@@ -445,9 +450,9 @@ export function SessionDetail() {
   if (!session) {
     return (
       <div className="text-center py-12">
-        <p className="text-dark-muted">Session non trouvee</p>
+        <p className="text-dark-muted">{t('portal:sessionDetail.notFound')}</p>
         <Link to="/portal/sessions" className="text-theatarr-500 hover:underline mt-2 inline-block">
-          Retour aux sessions
+          {t('portal:sessionDetail.backToSessions')}
         </Link>
       </div>
     );
@@ -472,7 +477,7 @@ export function SessionDetail() {
         className="inline-flex items-center gap-2 text-dark-muted hover:text-dark-text transition-colors"
       >
         <ArrowLeft size={18} />
-        <span>Retour</span>
+        <span>{t('portal:sessionDetail.back')}</span>
       </Link>
 
       {/* Hero */}
@@ -549,7 +554,7 @@ export function SessionDetail() {
               {isLive && (currentStatus === 'running' || currentStatus === 'paused') && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400 animate-pulse">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                  Live
+                  {t('portal:sessionDetail.live')}
                 </span>
               )}
               {/* Ticket badge */}
@@ -561,7 +566,7 @@ export function SessionDetail() {
                     : 'bg-theatarr-500/20 text-theatarr-400'
                 )}>
                   <Ticket size={12} />
-                  {session.checked_in ? 'Ticket valide' : 'Ticket'}
+                  {session.checked_in ? t('portal:sessionDetail.ticketValid') : t('portal:sessionDetail.ticket')}
                 </span>
               )}
             </div>
@@ -570,7 +575,7 @@ export function SessionDetail() {
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <div className="flex items-center gap-1.5">
                   <Shuffle size={14} className="text-purple-400" />
-                  <span className="text-purple-300 font-medium">Film mystere</span>
+                  <span className="text-purple-300 font-medium">{t('portal:sessionDetail.mysteryMovie')}</span>
                 </div>
                 {session.mystery_reveal_at && (() => {
                   const reveal = getMysteryRevealCountdown(session.mystery_reveal_at);
@@ -590,7 +595,7 @@ export function SessionDetail() {
                 <div className="flex items-center gap-1.5">
                   <Vote size={14} className="text-blue-400" />
                   <span className="text-blue-300 font-medium">
-                    {session.linked_vote_is_open === false ? 'Vote clos' : 'En attente du vote'}
+                    {session.linked_vote_is_open === false ? t('portal:sessionDetail.voteClosed') : t('portal:sessionDetail.waitingVote')}
                   </span>
                 </div>
                 {session.vote_reveal_at && (() => {
@@ -632,21 +637,21 @@ export function SessionDetail() {
         {session.scheduled_at && (
           <div className="flex items-center gap-3 text-dark-text">
             <Calendar size={18} className="text-dark-muted" />
-            <span>{formatDate(session.scheduled_at)}</span>
+            <span>{formatDateFull(session.scheduled_at)}</span>
           </div>
         )}
 
         {session.movie_source && (
           <div className="flex items-center gap-3 text-dark-text">
             <MapPin size={18} className="text-dark-muted" />
-            <span>Source: {session.movie_source}</span>
+            <span>{t('portal:sessionDetail.source', { source: session.movie_source })}</span>
           </div>
         )}
       </div>
 
       {/* Invitation status */}
       <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
-        <h2 className="font-medium text-dark-text mb-3">Votre invitation</h2>
+        <h2 className="font-medium text-dark-text mb-3">{t('portal:sessionDetail.invitation.title')}</h2>
 
         <div className="flex items-center gap-3">
           {session.invitation_status === 'accepted' && (
@@ -670,7 +675,7 @@ export function SessionDetail() {
             </p>
             {session.responded_at && (
               <p className="text-sm text-dark-muted">
-                Repondu le {formatDate(session.responded_at)}
+                {t('portal:sessionDetail.invitation.respondedAt', { date: formatDateFull(session.responded_at) })}
               </p>
             )}
           </div>
@@ -683,7 +688,7 @@ export function SessionDetail() {
                 : 'bg-dark-bg text-dark-muted border border-dark-border'
             )}>
               {session.checked_in ? <Check size={12} /> : <Ticket size={12} />}
-              {session.checked_in ? 'Check-in OK' : 'Non scanne'}
+              {session.checked_in ? t('portal:sessionDetail.invitation.checkinOk') : t('portal:sessionDetail.invitation.notScanned')}
             </div>
           )}
         </div>
@@ -697,7 +702,7 @@ export function SessionDetail() {
               className="flex-1 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <Check size={18} />
-              Accepter
+              {t('portal:sessionDetail.actions.accept')}
             </button>
             <button
               onClick={() => respondMutation.mutate(false)}
@@ -705,7 +710,7 @@ export function SessionDetail() {
               className="flex-1 py-3 bg-dark-border text-dark-text rounded-lg font-medium hover:bg-dark-muted/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <X size={18} />
-              Decliner
+              {t('portal:sessionDetail.actions.decline')}
             </button>
           </div>
         )}
@@ -721,7 +726,7 @@ export function SessionDetail() {
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-theatarr-500 text-white rounded-lg text-sm font-semibold hover:bg-theatarr-600 transition-colors shadow-sm"
                 >
                   <QrCode size={18} />
-                  Mon Ticket
+                  {t('portal:sessionDetail.actions.myTicket')}
                 </button>
               )}
               {session.scheduled_at && (
@@ -730,7 +735,7 @@ export function SessionDetail() {
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors shadow-sm"
                 >
                   <CalendarPlus size={18} />
-                  Calendrier
+                  {t('portal:sessionDetail.actions.calendar')}
                 </button>
               )}
             </div>
@@ -741,7 +746,7 @@ export function SessionDetail() {
                 disabled={respondMutation.isPending}
                 className="w-full py-1.5 text-xs text-dark-muted hover:text-red-400 transition-colors disabled:opacity-50"
               >
-                Annuler ma participation
+                {t('portal:sessionDetail.actions.cancelParticipation')}
               </button>
             )}
           </div>
@@ -755,7 +760,7 @@ export function SessionDetail() {
               disabled={respondMutation.isPending}
               className="w-full py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50"
             >
-              Changer en Accepte
+              {t('portal:sessionDetail.actions.changeToAccepted')}
             </button>
           </div>
         )}
@@ -764,7 +769,7 @@ export function SessionDetail() {
       {/* Timeline + Time info — shown when session is running/paused/completed */}
       {showTimeline && (
         <div className="bg-dark-surface rounded-xl border border-dark-border p-4 space-y-4">
-          <h2 className="font-medium text-dark-text mb-1">Deroulement de la seance</h2>
+          <h2 className="font-medium text-dark-text mb-1">{t('portal:sessionDetail.timeline.title')}</h2>
 
           <PortalTimeline
             sequences={sequences}
@@ -772,6 +777,7 @@ export function SessionDetail() {
             elapsedMs={elapsedMs}
             status={currentStatus!}
             movieRuntimeMs={movieRuntimeMs}
+            t={t}
           />
 
           {/* Time info row */}
@@ -779,25 +785,25 @@ export function SessionDetail() {
             {session.started_at && (
               <div className="flex items-center gap-1.5">
                 <Play size={14} />
-                <span>Debut : <span className="text-dark-text">{formatTimeShort(session.started_at)}</span></span>
+                <span>{t('portal:sessionDetail.timeline.start')} <span className="text-dark-text">{formatTimeShort(session.started_at)}</span></span>
               </div>
             )}
             {totalDurationMs > 0 && (
               <div className="flex items-center gap-1.5">
                 <Timer size={14} />
-                <span>Duree : <span className="text-dark-text">{formatDuration(totalDurationMs)}</span></span>
+                <span>{t('portal:sessionDetail.timeline.duration')} <span className="text-dark-text">{formatDuration(totalDurationMs)}</span></span>
               </div>
             )}
             {expectedEndTime && currentStatus !== 'completed' && (
               <div className="flex items-center gap-1.5">
                 <Clock size={14} />
-                <span>Fin prevue : <span className="text-dark-text">{expectedEndTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span></span>
+                <span>{t('portal:sessionDetail.timeline.expectedEnd')} <span className="text-dark-text">{expectedEndTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</span></span>
               </div>
             )}
             {session.completed_at && (
               <div className="flex items-center gap-1.5">
                 <Check size={14} />
-                <span>Termine a <span className="text-dark-text">{formatTimeShort(session.completed_at)}</span></span>
+                <span>{t('portal:sessionDetail.timeline.completedAt')} <span className="text-dark-text">{formatTimeShort(session.completed_at)}</span></span>
               </div>
             )}
           </div>
@@ -812,7 +818,7 @@ export function SessionDetail() {
       {/* Vote section - show if there's a linked vote */}
       {session.movie_selection_mode === 'vote' && session.linked_vote_session_id && (
         <div className="bg-dark-surface rounded-xl border border-dark-border p-4">
-          <h2 className="font-medium text-dark-text mb-3">Vote pour le film</h2>
+          <h2 className="font-medium text-dark-text mb-3">{t('portal:sessionDetail.vote.title')}</h2>
 
           {session.movie_resolved ? (
             <div className="flex items-center gap-3">
@@ -820,9 +826,9 @@ export function SessionDetail() {
                 <Check className="text-green-400" size={20} />
               </div>
               <div>
-                <p className="font-medium text-dark-text">Vote termine</p>
+                <p className="font-medium text-dark-text">{t('portal:sessionDetail.vote.completed')}</p>
                 <p className="text-sm text-dark-muted">
-                  Le film a ete choisi: {session.movie_title}
+                  {t('portal:sessionDetail.vote.movieChosen', { title: session.movie_title })}
                 </p>
               </div>
             </div>
@@ -837,8 +843,8 @@ export function SessionDetail() {
                     <Vote className="text-theatarr-400" size={20} />
                   </div>
                   <div>
-                    <p className="font-medium text-dark-text">Votez pour le film</p>
-                    <p className="text-sm text-dark-muted">Le vote est ouvert</p>
+                    <p className="font-medium text-dark-text">{t('portal:sessionDetail.vote.voteForMovie')}</p>
+                    <p className="text-sm text-dark-muted">{t('portal:sessionDetail.vote.voteIsOpen')}</p>
                   </div>
                 </div>
                 <ArrowLeft size={18} className="text-dark-muted rotate-180" />
@@ -849,8 +855,8 @@ export function SessionDetail() {
                   <Clock className="text-yellow-400" size={20} />
                 </div>
                 <div>
-                  <p className="font-medium text-dark-text">Acceptez l'invitation pour voter</p>
-                  <p className="text-sm text-dark-muted">Le vote est ouvert mais vous devez d'abord accepter</p>
+                  <p className="font-medium text-dark-text">{t('portal:sessionDetail.vote.acceptToVote')}</p>
+                  <p className="text-sm text-dark-muted">{t('portal:sessionDetail.vote.acceptToVoteHint')}</p>
                 </div>
               </div>
             )
@@ -860,8 +866,8 @@ export function SessionDetail() {
                 <Clock className="text-dark-muted" size={20} />
               </div>
               <div>
-                <p className="font-medium text-dark-text">Vote en attente</p>
-                <p className="text-sm text-dark-muted">Le vote n'est pas encore ouvert</p>
+                <p className="font-medium text-dark-text">{t('portal:sessionDetail.vote.waitingTitle')}</p>
+                <p className="text-sm text-dark-muted">{t('portal:sessionDetail.vote.notYetOpen')}</p>
               </div>
             </div>
           )}
@@ -912,6 +918,7 @@ const ICON_MAP: Record<string, string> = {
 };
 
 function FeedbackSection({ sessionId, hasSubmitted: initialHasSubmitted }: { sessionId: string; hasSubmitted: boolean }) {
+  const { t, i18n } = useTranslation(['portal', 'common']);
   const queryClient = useQueryClient();
   const [ratings, setRatings] = useState<Record<string, { rating: number; comment: string }>>({});
   const [submitted, setSubmitted] = useState(initialHasSubmitted);
@@ -964,7 +971,7 @@ function FeedbackSection({ sessionId, hasSubmitted: initialHasSubmitted }: { ses
     <div id="feedback" className="bg-dark-surface rounded-xl border border-dark-border p-4">
       <div className="flex items-center gap-2 mb-4">
         <Star size={18} className="text-amber-400" />
-        <h2 className="font-medium text-dark-text">Donnez votre avis</h2>
+        <h2 className="font-medium text-dark-text">{t('portal:sessionDetail.feedback.title')}</h2>
       </div>
 
       {effectiveSubmitted ? (
@@ -974,10 +981,10 @@ function FeedbackSection({ sessionId, hasSubmitted: initialHasSubmitted }: { ses
               <Check className="text-teal-400" size={20} />
             </div>
             <div>
-              <p className="font-medium text-dark-text">Merci pour votre avis !</p>
+              <p className="font-medium text-dark-text">{t('portal:sessionDetail.feedback.thanksTitle')}</p>
               {myFeedback?.overall_rating != null && (
                 <p className="text-sm text-dark-muted">
-                  Votre note globale : {myFeedback.overall_rating.toFixed(1)}/10
+                  {t('portal:sessionDetail.feedback.overallRating', { rating: myFeedback.overall_rating.toFixed(1) })}
                 </p>
               )}
             </div>
@@ -992,7 +999,7 @@ function FeedbackSection({ sessionId, hasSubmitted: initialHasSubmitted }: { ses
                   <div key={slug} className="flex items-center justify-between text-sm">
                     <span className="text-dark-muted flex items-center gap-1.5">
                       <span>{ICON_MAP[cat?.icon || ''] || '📌'}</span>
-                      {cat?.label_fr || slug}
+                      {(i18n.language === 'en' ? cat?.label_en : cat?.label_fr) || slug}
                     </span>
                     <span className="text-dark-text font-medium">{data.rating}/10</span>
                   </div>
@@ -1011,7 +1018,7 @@ function FeedbackSection({ sessionId, hasSubmitted: initialHasSubmitted }: { ses
                 <div className="flex items-center justify-between">
                   <label className="text-sm text-dark-text flex items-center gap-1.5">
                     <span>{ICON_MAP[cat.icon] || '📌'}</span>
-                    {cat.label_fr}
+                    {i18n.language === 'en' ? cat.label_en : cat.label_fr}
                   </label>
                   <span className="text-sm font-medium text-dark-text tabular-nums">{r.rating}/10</span>
                 </div>
@@ -1039,7 +1046,7 @@ function FeedbackSection({ sessionId, hasSubmitted: initialHasSubmitted }: { ses
                         [cat.slug]: { ...prev[cat.slug], comment: e.target.value },
                       }))
                     }
-                    placeholder="Commentaire optionnel..."
+                    placeholder={t('portal:sessionDetail.feedback.commentPlaceholder')}
                     className="w-full bg-dark-bg border border-dark-border rounded-lg pl-8 pr-3 py-1.5 text-sm text-dark-text placeholder-dark-muted"
                   />
                 </div>
@@ -1053,12 +1060,12 @@ function FeedbackSection({ sessionId, hasSubmitted: initialHasSubmitted }: { ses
             className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-medium rounded-lg transition-colors disabled:opacity-50"
           >
             <Send size={16} />
-            {submitMutation.isPending ? 'Envoi...' : 'Envoyer mon avis'}
+            {submitMutation.isPending ? t('portal:sessionDetail.feedback.sending') : t('portal:sessionDetail.feedback.submit')}
           </button>
 
           {submitMutation.isError && (
             <p className="text-sm text-red-400 text-center">
-              Erreur lors de l'envoi. Veuillez reessayer.
+              {t('portal:sessionDetail.feedback.submitError')}
             </p>
           )}
         </div>

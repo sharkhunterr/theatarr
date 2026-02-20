@@ -1,0 +1,228 @@
+{
+  "page": {
+    "title": "Media",
+    "subtitle": "Trailer, pre-roll, suoni e modelli di visualizzazione"
+  },
+  "tabs": {
+    "trailers": "Trailer",
+    "prerolls": "Pre-roll",
+    "sounds": "Suoni",
+    "templates": "Modelli"
+  },
+  "actions": {
+    "create": "Crea",
+    "add": "Aggiungi",
+    "refreshBuiltin": "Aggiorna integrati"
+  },
+  "trailers": {
+    "subtabs": {
+      "library": "Libreria",
+      "rules": "Regole"
+    },
+    "filters": {
+      "all": "Tutti",
+      "ready": "Pronto",
+      "pending": "In attesa",
+      "error": "Errore"
+    },
+    "status": {
+      "ready": "Pronto",
+      "downloading": "{{progress}}%",
+      "pending": "In attesa",
+      "error": "Errore",
+      "unknownError": "Errore sconosciuto"
+    },
+    "empty": {
+      "title": "Nessun trailer",
+      "action": "Scarica un trailer"
+    },
+    "download": {
+      "title": "Scarica un trailer",
+      "movieTitle": "Titolo del film",
+      "movieTitlePlaceholder": "Blade Runner 2049",
+      "youtubeUrl": "URL YouTube",
+      "youtubeUrlPlaceholder": "https://www.youtube.com/watch?v=...",
+      "cancel": "Annulla",
+      "downloading": "Download in corso...",
+      "download": "Scarica"
+    },
+    "deleteConfirm": "Eliminare \"{{title}}\"?",
+    "openYoutube": "Apri su YouTube",
+    "delete": "Elimina",
+    "rules": {
+      "active": "Attiva",
+      "disabled": "Disabilitata",
+      "trailers": "trailer",
+      "genres": "Generi: {{genres}}",
+      "lastRun": "Ultima esecuzione: {{date}}",
+      "run": "Esegui",
+      "edit": "Modifica",
+      "empty": {
+        "title": "Nessuna regola configurata",
+        "action": "Crea una regola"
+      },
+      "modal": {
+        "editTitle": "Modifica regola",
+        "createTitle": "Crea una regola"
+      }
+    }
+  },
+  "prerolls": {
+    "filters": {
+      "all": "Tutti",
+      "ready": "Pronto",
+      "pending": "In attesa",
+      "error": "Errore"
+    },
+    "status": {
+      "ready": "Pronto",
+      "downloading": "{{progress}}%",
+      "pending": "In attesa",
+      "error": "Errore",
+      "unknownError": "Errore sconosciuto"
+    },
+    "sourceType": {
+      "youtube": "YouTube",
+      "upload": "Caricamento"
+    },
+    "empty": {
+      "title": "Nessun pre-roll nella libreria",
+      "action": "Aggiungi il tuo primo pre-roll"
+    },
+    "deleteConfirm": "Eliminare \"{{name}}\"?",
+    "delete": "Elimina",
+    "addModal": {
+      "title": "Aggiungi un pre-roll",
+      "uploadFile": "Carica un file",
+      "youtube": "YouTube",
+      "name": "Nome",
+      "namePlaceholder": "Nome del pre-roll",
+      "tags": "Tag (facoltativi, separati da virgola)",
+      "tagsPlaceholder": "studio, intro, personalizzato...",
+      "videoFile": "File video",
+      "youtubeUrl": "URL YouTube",
+      "youtubeUrlPlaceholder": "https://www.youtube.com/watch?v=...",
+      "errorPrefix": "Errore:",
+      "errorDefault": "Si e verificato un errore",
+      "cancel": "Annulla",
+      "importing": "Importazione...",
+      "import": "Importa",
+      "downloading": "Download in corso...",
+      "download": "Scarica"
+    }
+  },
+  "sounds": {
+    "filters": {
+      "all": "Tutti",
+      "ready": "Pronto",
+      "pending": "In attesa",
+      "error": "Errore"
+    },
+    "status": {
+      "ready": "Pronto",
+      "downloading": "{{progress}}%",
+      "pending": "In attesa",
+      "error": "Errore",
+      "unknownError": "Errore sconosciuto"
+    },
+    "empty": {
+      "title": "Nessun suono nella libreria",
+      "action": "Aggiungi il tuo primo suono"
+    },
+    "deleteConfirm": "Eliminare \"{{name}}\"?",
+    "delete": "Elimina",
+    "addModal": {
+      "title": "Aggiungi un suono",
+      "youtubeUrl": "URL YouTube",
+      "youtubeUrlPlaceholder": "https://www.youtube.com/watch?v=... o URL playlist",
+      "cancel": "Annulla",
+      "analyzing": "Analisi...",
+      "analyze": "Analizza",
+      "errorPrefix": "Errore:",
+      "analyzeError": "Impossibile analizzare l'URL",
+      "name": "Nome",
+      "namePlaceholder": "Nome del suono",
+      "tags": "Tag (separati da virgola)",
+      "tagsPlaceholder": "ambiente, musica, intro...",
+      "duration": "Durata: {{duration}}",
+      "chapters": "Capitoli ({{selected}}/{{total}})",
+      "tracks": "Tracce ({{selected}}/{{total}})",
+      "selectAll": "Seleziona tutto",
+      "deselectAll": "Deseleziona tutto",
+      "singleVideo": "Video singolo — l'audio completo verra estratto.",
+      "back": "Indietro",
+      "downloading": "Download in corso...",
+      "download": "Scarica",
+      "downloadError": "Download fallito",
+      "downloadStarted": "Download avviato!",
+      "downloadStartedHint": "I suoni appariranno nella libreria una volta pronti."
+    }
+  },
+  "templates": {
+    "filters": {
+      "all": "Tutti",
+      "wallmount": "Wallmount",
+      "waiting_screen": "Attesa",
+      "quiz": "Quiz",
+      "feedback": "Feedback",
+      "custom": "Personalizzato"
+    },
+    "status": {
+      "active": "Attivo",
+      "builtin": "Integrato"
+    },
+    "components": "componenti",
+    "activate": "Attiva",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "empty": {
+      "title": "Nessun modello trovato",
+      "createFirst": "Crea il tuo primo modello"
+    },
+    "backToList": "Torna alla lista",
+    "deleteConfirm": "Eliminare il modello \"{{name}}\"?",
+    "builtinsUpdated": "{{count}} modelli integrati aggiornati",
+    "errorLoading": "Errore nel caricamento dei modelli",
+    "modal": {
+      "createTitle": "Crea un modello",
+      "editTitle": "Modifica modello"
+    }
+  },
+  "movies": {
+    "title": "Film",
+    "subtitle": "Sfoglia i film dalla tua libreria multimediale",
+    "searchPlaceholder": "Cerca film...",
+    "allGenres": "Tutti i generi",
+    "unknownYear": "Anno sconosciuto",
+    "previous": "Precedente",
+    "next": "Successivo",
+    "noMovies": "Nessun film trovato",
+    "connectService": "Connetti un servizio multimediale (Plex, Jellyfin) per vedere la tua libreria",
+    "trailerAvailable": "Trailer disponibile",
+    "close": "Chiudi",
+    "createSession": "Crea sessione"
+  },
+  "display": {
+    "sessionDisplay": "Schermo sessione",
+    "enterCode": "Inserisci il codice sessione",
+    "enterAllChars": "Inserisci tutti i 6 caratteri",
+    "invalidCode": "Codice non valido",
+    "validating": "Convalida...",
+    "connectionError": "Errore di connessione al server",
+    "codeHint": "Il codice e visualizzato nei dettagli della sessione",
+    "invalidOrNotFound": "Codice non valido o sessione non trovata",
+    "sessionNotFound": "Sessione non trovata",
+    "back": "Indietro",
+    "fullscreen": "Schermo intero",
+    "enableSound": "Abilita audio",
+    "connected": "Connesso",
+    "connecting": "Connessione...",
+    "sessionPaused": "Sessione in pausa",
+    "status": {
+      "draft": "In attesa dell'inizio",
+      "scheduled": "Sessione programmata",
+      "paused": "Sessione in pausa",
+      "completed": "Sessione completata"
+    }
+  }
+}

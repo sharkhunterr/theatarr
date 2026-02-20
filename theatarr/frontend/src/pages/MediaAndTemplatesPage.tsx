@@ -1,22 +1,15 @@
+import { useTranslation } from 'react-i18next';
 import { PageHeader } from '../components/common';
 import { TrailersManager } from './TrailersManager';
-import { useLayoutStore } from '../stores/layoutStore';
 
 export function MediaAndTemplatesPage() {
-  const { language } = useLayoutStore();
-
-  const t = {
-    title: language === 'fr' ? 'Médias' : 'Media',
-    subtitle: language === 'fr'
-      ? 'Bandes-annonces, pré-rolls, sons et modèles d\'affichage'
-      : 'Trailers, pre-rolls, sounds and display templates',
-  };
+  const { t } = useTranslation(['media', 'common']);
 
   return (
     <div>
       <PageHeader
-        title={t.title}
-        subtitle={t.subtitle}
+        title={t('media:page.title')}
+        subtitle={t('media:page.subtitle')}
       />
       <TrailersManager />
     </div>

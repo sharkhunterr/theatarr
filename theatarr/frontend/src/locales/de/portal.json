@@ -1,0 +1,303 @@
+{
+  "nav": {
+    "home": "Startseite",
+    "sessions": "Sitzungen",
+    "votes": "Abstimmungen",
+    "quiz": "Quiz",
+    "profile": "Profil"
+  },
+  "header": {
+    "themeLight": "Helles Design",
+    "themeDark": "Dunkles Design",
+    "adminInterface": "Admin-Oberfläche",
+    "admin": "Admin",
+    "logout": "Abmelden",
+    "notifications": "Benachrichtigungen"
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "empty": "Nichts Neues"
+  },
+  "home": {
+    "stats": {
+      "upcoming": "Kommend",
+      "votes": "Abstimmungen",
+      "watched": "Gesehen",
+      "voted": "Abgestimmt"
+    },
+    "sessionsToday": "Sitzungen heute",
+    "pendingInvitations": "Ausstehende Einladungen",
+    "pendingVotes": "Ausstehende Abstimmungen",
+    "pendingQuiz": "Aktives Quiz",
+    "upcomingSessions": "Kommende Sitzungen",
+    "viewAll": "Alle anzeigen",
+    "emptyTitle": "Keine Aktivität im Moment",
+    "emptyDescription": "Sie werden benachrichtigt, wenn Sie zu einer Sitzung oder einer Abstimmung eingeladen werden.",
+    "countdown": {
+      "now": "Jetzt",
+      "inDaysHours": "in {{days}}T {{hours}}h",
+      "inHoursMinutes": "in {{hours}}h{{minutes}}",
+      "inMinutes": "in {{minutes}}Min."
+    },
+    "quiz": {
+      "questions": "{{count}} Fragen",
+      "notJoined": "Noch nicht beigetreten"
+    }
+  },
+  "sessions": {
+    "title": "Meine Sitzungen",
+    "tabs": {
+      "upcoming": "Kommend",
+      "all": "Alle",
+      "feedback": "Zu bewerten"
+    },
+    "empty": {
+      "feedbackTitle": "Keine ausstehenden Bewertungen",
+      "feedbackDescription": "Sie haben alle Ihre Sitzungen bewertet.",
+      "upcomingTitle": "Keine kommenden Sitzungen",
+      "upcomingDescription": "Derzeit keine Sitzungen geplant.",
+      "allTitle": "Keine Sitzungen",
+      "allDescription": "Sie wurden noch zu keiner Sitzung eingeladen."
+    }
+  },
+  "votes": {
+    "title": "Meine Abstimmungen",
+    "tabs": {
+      "pending": "Abstimmen",
+      "all": "Alle Abstimmungen"
+    },
+    "empty": {
+      "pendingTitle": "Keine ausstehenden Abstimmungen",
+      "pendingDescription": "Sie haben für alle offenen Sitzungen abgestimmt.",
+      "allTitle": "Keine Abstimmungen",
+      "allDescription": "Sie wurden noch zu keiner Abstimmung eingeladen."
+    }
+  },
+  "quiz": {
+    "title": "Meine Quizze",
+    "tabs": {
+      "pending": "Aktiv",
+      "all": "Alle Quizze"
+    },
+    "status": {
+      "draft": "Entwurf",
+      "open": "Offen",
+      "active": "Aktiv",
+      "completed": "Abgeschlossen"
+    },
+    "questions": "{{count}} Fragen",
+    "notJoined": "Noch nicht beigetreten",
+    "empty": {
+      "pendingTitle": "Kein aktives Quiz",
+      "pendingDescription": "Derzeit kein aktives Quiz.",
+      "allTitle": "Keine Quizze",
+      "allDescription": "Sie wurden noch zu keinem Quiz eingeladen."
+    }
+  },
+  "sessionCard": {
+    "invitation": {
+      "pending": "Ausstehend",
+      "accepted": "Angenommen",
+      "declined": "Abgelehnt"
+    },
+    "movie": {
+      "voteClosed": "Abstimmung geschlossen",
+      "waitingVote": "Warten auf Abstimmung",
+      "mystery": "Geheimfilm",
+      "movieNotSelected": "Film nicht ausgewählt"
+    },
+    "voteNow": "Jetzt abstimmen",
+    "acceptToVote": "Einladung annehmen, um abzustimmen",
+    "ticket": "Ticket",
+    "rate": "Bewerten"
+  },
+  "voteCard": {
+    "status": {
+      "closed": "Geschlossen",
+      "open": "Offen",
+      "daysRemaining": "Noch {{count}}T",
+      "hoursRemaining": "Noch {{count}}h",
+      "hoursMinutesRemaining": "Noch {{hours}}h{{minutes}}",
+      "minutesRemaining": "Noch {{count}}Min."
+    },
+    "voted": "Abgestimmt",
+    "toVote": "Abstimmen",
+    "notVoted": "Nicht abgestimmt"
+  },
+  "sessionDetail": {
+    "back": "Zurück",
+    "notFound": "Sitzung nicht gefunden",
+    "backToSessions": "Zurück zu Sitzungen",
+    "status": {
+      "draft": "Entwurf",
+      "scheduled": "Geplant",
+      "running": "Läuft",
+      "paused": "Pausiert",
+      "completed": "Abgeschlossen",
+      "interrupted": "Unterbrochen"
+    },
+    "live": "Live",
+    "ticketValid": "Ticket validiert",
+    "ticket": "Ticket",
+    "mysteryMovie": "Geheimfilm",
+    "voteClosed": "Abstimmung geschlossen",
+    "waitingVote": "Warten auf Abstimmung",
+    "source": "Quelle: {{source}}",
+    "invitation": {
+      "title": "Ihre Einladung",
+      "pending": "Antwort ausstehend",
+      "accepted": "Angenommen",
+      "declined": "Abgelehnt",
+      "respondedAt": "Beantwortet am {{date}}",
+      "checkinOk": "Check-in OK",
+      "notScanned": "Nicht gescannt"
+    },
+    "actions": {
+      "accept": "Annehmen",
+      "decline": "Ablehnen",
+      "myTicket": "Mein Ticket",
+      "calendar": "Kalender",
+      "cancelParticipation": "Teilnahme absagen",
+      "changeToAccepted": "Auf Angenommen ändern"
+    },
+    "timeline": {
+      "title": "Sitzungszeitachse",
+      "sequence": "Seq. {{current}}/{{total}}",
+      "action": "Aktion",
+      "actions": "Aktionen",
+      "start": "Start:",
+      "duration": "Dauer:",
+      "expectedEnd": "Voraussichtliches Ende:",
+      "completedAt": "Abgeschlossen um"
+    },
+    "vote": {
+      "title": "Filmabstimmung",
+      "completed": "Abstimmung abgeschlossen",
+      "movieChosen": "Der Film wurde gewählt: {{title}}",
+      "voteForMovie": "Für den Film abstimmen",
+      "voteIsOpen": "Die Abstimmung ist offen",
+      "acceptToVote": "Nehmen Sie die Einladung an, um abzustimmen",
+      "acceptToVoteHint": "Die Abstimmung ist offen, aber Sie müssen zuerst annehmen",
+      "waitingTitle": "Abstimmung ausstehend",
+      "notYetOpen": "Die Abstimmung hat noch nicht begonnen"
+    },
+    "feedback": {
+      "title": "Geben Sie Ihr Feedback",
+      "thanksTitle": "Vielen Dank für Ihr Feedback!",
+      "overallRating": "Ihre Gesamtbewertung: {{rating}}/10",
+      "commentPlaceholder": "Optionaler Kommentar...",
+      "sending": "Wird gesendet...",
+      "submit": "Feedback absenden",
+      "submitError": "Fehler beim Senden. Bitte versuchen Sie es erneut."
+    }
+  },
+  "voteDetail": {
+    "back": "Zurück",
+    "notFound": "Abstimmung nicht gefunden",
+    "backToVotes": "Zurück zu Abstimmungen",
+    "status": {
+      "closed": "Geschlossen",
+      "open": "Offen",
+      "daysRemaining": "Noch {{count}}T",
+      "hoursRemaining": "Noch {{count}}h",
+      "hoursMinutesRemaining": "Noch {{hours}}h{{minutes}}",
+      "minutesRemaining": "Noch {{count}}Min."
+    },
+    "voted": "Abgestimmt",
+    "toVote": "Abstimmen",
+    "votingInProgress": "Abstimmung...",
+    "voteFor": "Stimme für \"{{title}}\"",
+    "selectMovie": "Film auswählen",
+    "votes": "Stimmen",
+    "totalVotes": "{{count}} Stimme insgesamt",
+    "totalVotesPlural": "{{count}} Stimmen insgesamt"
+  },
+  "quizDetail": {
+    "back": "Zurück",
+    "notFound": "Quiz nicht gefunden",
+    "backToQuiz": "Zurück zu Quizzen",
+    "questions": "{{count}} Fragen",
+    "joining": "Verbinden...",
+    "joinQuiz": "Am Quiz teilnehmen",
+    "waitingStart": "Warten auf den Start des Quiz...",
+    "waitingStartHint": "Das Quiz beginnt, wenn der Administrator es startet.",
+    "question": "Frage {{current}}/{{total}}",
+    "hint": "Hinweis: {{hint}}",
+    "sending": "Wird gesendet...",
+    "validate": "Absenden",
+    "correct": "Richtig!",
+    "incorrect": "Falsch",
+    "score": "Punktzahl: {{score}}",
+    "waitingNextQuestion": "Warten auf die nächste Frage...",
+    "results": {
+      "title": "Quiz beendet!",
+      "score": "Punktzahl",
+      "position": "Platz",
+      "participants": "Teilnehmer",
+      "leaderboard": "Bestenliste",
+      "you": "(Sie)",
+      "questionReview": "Fragenrückblick"
+    }
+  },
+  "profile": {
+    "title": "Mein Profil",
+    "info": {
+      "title": "Informationen",
+      "edit": "Bearbeiten",
+      "cancel": "Abbrechen",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "email": "E-Mail",
+      "memberSince": "Mitglied seit",
+      "saving": "Speichern...",
+      "save": "Speichern"
+    },
+    "preferences": {
+      "title": "Einstellungen",
+      "autoAccept": "Einladungen automatisch annehmen",
+      "autoAcceptHint": "Die Abstimmung ist weiterhin erforderlich, wenn die Sitzung eine enthält."
+    },
+    "emailNotifications": {
+      "title": "E-Mail-Benachrichtigungen",
+      "noEmailHint": "Richten Sie eine E-Mail-Adresse in Ihren Informationen ein, um Benachrichtigungen zu erhalten.",
+      "sessionInvitation": "Sitzungseinladung",
+      "sessionStarted": "Sitzung gestartet",
+      "voteInvitation": "Abstimmungseinladung",
+      "voteClosed": "Abstimmungsergebnisse",
+      "quizInvitation": "Quiz-Einladung",
+      "quizCompleted": "Quiz-Ergebnisse"
+    },
+    "password": {
+      "title": "Passwort",
+      "change": "Ändern",
+      "current": "Aktuelles Passwort",
+      "new": "Neues Passwort",
+      "confirm": "Passwort bestätigen",
+      "secure": "Ihr Passwort ist sicher",
+      "minLength": "Neues Passwort muss mindestens 6 Zeichen lang sein",
+      "mismatch": "Passwörter stimmen nicht überein",
+      "changing": "Wird geändert...",
+      "cancel": "Abbrechen"
+    },
+    "admin": {
+      "title": "Admin-Oberfläche",
+      "description": "Zugang zum Verwaltungspanel"
+    },
+    "logout": "Abmelden"
+  },
+  "ticket": {
+    "title": "Mein Ticket",
+    "copyCode": "Code kopieren",
+    "checkedIn": "Check-in abgeschlossen",
+    "showQr": "Zeigen Sie diesen QR-Code am Eingang"
+  },
+  "wallmount": {
+    "countdown": {
+      "days": "Tage",
+      "hours": "Std.",
+      "minutes": "Min.",
+      "seconds": "Sek.",
+      "starting": "Beginnt..."
+    }
+  }
+}

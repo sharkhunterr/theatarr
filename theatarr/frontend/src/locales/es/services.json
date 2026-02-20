@@ -1,0 +1,80 @@
+{
+  "title": "Servicios",
+  "subtitle": "Configura servicios externos (iluminacion, reproductores, fuentes de medios)",
+  "addService": "Agregar servicio",
+  "refresh": "Actualizar",
+  "categories": {
+    "all": "Todos",
+    "lighting": "Iluminacion",
+    "player": "Reproductores",
+    "media_source": "Fuentes de medios",
+    "actuator": "Actuadores",
+    "metadata": "Metadatos"
+  },
+  "empty": {
+    "noServices": "No hay servicios configurados",
+    "addFirst": "Agrega tu primer servicio"
+  },
+  "stats": {
+    "services": "servicios",
+    "connected": "conectados",
+    "errors": "errores"
+  },
+  "modal": {
+    "editService": "Editar servicio",
+    "newService": "Nuevo servicio",
+    "deleteService": "Eliminar servicio",
+    "deleteConfirm": "¿Estas seguro de que quieres eliminar",
+    "deleteWarning": "Esta accion no se puede deshacer. Las secuencias que usen este servicio deberan actualizarse.",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "capabilities": "Capacidades"
+  },
+  "form": {
+    "name": "Nombre del servicio",
+    "type": "Tipo de servicio",
+    "selectType": "Seleccionar un tipo",
+    "enabled": "Activado",
+    "host": "Host / URL",
+    "apiKey": "Clave API",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "loadingLibraries": "Cargando bibliotecas...",
+    "basicInfo": "Informacion basica",
+    "description": "Descripcion",
+    "descriptionPlaceholder": "Descripcion opcional",
+    "enableService": "Activar este servicio",
+    "adapterConfig": "Configuracion del adaptador",
+    "category": "Categoria",
+    "adapterType": "Tipo de adaptador",
+    "selectAdapter": "Seleccionar un adaptador...",
+    "noAdapters": "No hay adaptadores disponibles para esta categoria",
+    "settings": "Ajustes",
+    "libraries": "Bibliotecas",
+    "librariesError": "Error al cargar las bibliotecas. Verifica la conexion.",
+    "noLibraries": "No se encontraron bibliotecas. Prueba la conexion del servicio primero.",
+    "librariesHelp": "Selecciona las bibliotecas a utilizar. Si no se selecciona ninguna, se usaran todas las bibliotecas de peliculas.",
+    "elements": "elementos",
+    "saving": "Guardando...",
+    "updateService": "Actualizar servicio",
+    "createService": "Crear servicio"
+  },
+  "card": {
+    "enabled": "Activado",
+    "disabled": "Desactivado",
+    "lastSeen": "Visto por ultima vez",
+    "capabilities": "capacidades",
+    "test": "Probar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "connected": "Conectado",
+    "disconnected": "Desconectado",
+    "error": "Error",
+    "unknown": "Desconocido",
+    "lighting": "Iluminacion",
+    "player": "Reproductor",
+    "media_source": "Fuente de medios",
+    "actuator": "Actuador",
+    "metadata": "Metadatos"
+  }
+}

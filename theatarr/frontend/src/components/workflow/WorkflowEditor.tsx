@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactFlow, {
   Node,
   Edge,
@@ -28,7 +29,6 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '../common';
-import { useLayoutStore } from '../../stores/layoutStore';
 
 // Simple UUID generator
 function generateId(): string {
@@ -203,6 +203,7 @@ function MergeNode({ selected }: { selected: boolean }) {
 }
 
 function ConditionNode({ data, selected }: { data: WorkflowNodeData; selected: boolean }) {
+  const { t } = useTranslation(['sessions', 'common']);
   return (
     <div
       className={`px-3 py-2 rounded border-2 bg-cyan-500/10 min-w-[90px] transition-all ${
@@ -218,8 +219,8 @@ function ConditionNode({ data, selected }: { data: WorkflowNodeData; selected: b
         <div className="text-[10px] text-dark-muted mt-1 truncate max-w-[80px]">{data.condition}</div>
       )}
       <div className="flex justify-between text-[9px] text-dark-muted mt-1">
-        <span>Yes</span>
-        <span>No</span>
+        <span>{t('common:common.yes')}</span>
+        <span>{t('common:common.no')}</span>
       </div>
       <Handle
         type="source"
@@ -272,7 +273,7 @@ export function WorkflowEditor({
   onNodeSelect,
   selectedNodeId,
 }: WorkflowEditorProps) {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['sessions', 'common']);
   const [nodes, setNodes, onNodesChange] = useNodesState(workflow.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(workflow.edges);
 
@@ -289,22 +290,6 @@ export function WorkflowEditor({
       prevWorkflowRef.current = workflow;
     }
   }, [workflow, setNodes, setEdges]);
-
-  const t = {
-    actionBlocks: language === 'fr' ? 'Blocs' : 'Blocks',
-    actions: language === 'fr' ? 'Actions' : 'Actions',
-    flow: language === 'fr' ? 'Flux' : 'Flow',
-    lighting: language === 'fr' ? 'Éclairage' : 'Lighting',
-    audio: 'Audio',
-    media: language === 'fr' ? 'Média' : 'Media',
-    display: language === 'fr' ? 'Affichage' : 'Display',
-    actuator: language === 'fr' ? 'Actionneur' : 'Actuator',
-    parallel: language === 'fr' ? 'Parallèle' : 'Parallel',
-    merge: language === 'fr' ? 'Fusionner' : 'Merge',
-    condition: 'If/Else',
-    delay: language === 'fr' ? 'Délai' : 'Delay',
-    deleteNode: language === 'fr' ? 'Supprimer' : 'Delete',
-  };
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -400,18 +385,18 @@ export function WorkflowEditor({
   }, [selectedNodeId, nodes, edges, setNodes, setEdges, onChange, onNodeSelect]);
 
   const actionBlocks: { type: ActionType; label: string; color: string }[] = [
-    { type: 'lighting', label: t.lighting, color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-    { type: 'audio', label: t.audio, color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-    { type: 'media', label: t.media, color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-    { type: 'display', label: t.display, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-    { type: 'actuator', label: t.actuator, color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+    { type: 'lighting', label: t('sessions:actionTypes.lighting'), color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+    { type: 'audio', label: t('sessions:actionTypes.audio'), color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+    { type: 'media', label: t('sessions:actionTypes.media'), color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+    { type: 'display', label: t('sessions:actionTypes.display'), color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+    { type: 'actuator', label: t('sessions:actionTypes.actuator'), color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
   ];
 
   const flowBlocks: { type: WorkflowNodeType; label: string; color: string }[] = [
-    { type: 'parallel', label: t.parallel, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-    { type: 'merge', label: t.merge, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-    { type: 'condition', label: t.condition, color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
-    { type: 'delay', label: t.delay, color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+    { type: 'parallel', label: t('sessions:workflowEditor.parallel'), color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+    { type: 'merge', label: t('sessions:workflowEditor.merge'), color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+    { type: 'condition', label: t('sessions:workflowEditor.condition'), color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+    { type: 'delay', label: t('sessions:workflowEditor.delay'), color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
   ];
 
   return (
@@ -444,12 +429,12 @@ export function WorkflowEditor({
       {/* Side Panel - Action Blocks */}
       <div className="w-36 border-l border-dark-border flex flex-col bg-dark-surface/50">
         <div className="p-2 border-b border-dark-border">
-          <h3 className="text-xs font-medium text-dark-text">{t.actionBlocks}</h3>
+          <h3 className="text-xs font-medium text-dark-text">{t('sessions:workflowEditor.blocks')}</h3>
         </div>
 
         {/* Actions */}
         <div className="p-2 border-b border-dark-border">
-          <div className="text-[10px] text-dark-muted mb-1.5">{t.actions}</div>
+          <div className="text-[10px] text-dark-muted mb-1.5">{t('sessions:workflowEditor.actions')}</div>
           <div className="space-y-1">
             {actionBlocks.map((block) => (
               <button
@@ -465,7 +450,7 @@ export function WorkflowEditor({
 
         {/* Flow Control */}
         <div className="p-2 border-b border-dark-border">
-          <div className="text-[10px] text-dark-muted mb-1.5">{t.flow}</div>
+          <div className="text-[10px] text-dark-muted mb-1.5">{t('sessions:workflowEditor.flow')}</div>
           <div className="space-y-1">
             {flowBlocks.map((block) => (
               <button
@@ -489,7 +474,7 @@ export function WorkflowEditor({
               className="w-full text-xs !py-1"
             >
               <Trash2 size={12} className="mr-1" />
-              {t.deleteNode}
+              {t('sessions:workflowEditor.deleteNode')}
             </Button>
           </div>
         )}

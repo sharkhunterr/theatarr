@@ -22,9 +22,9 @@ import {
   RefreshCw,
   Shuffle,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button, Card, Modal, Spinner, ButtonGroup } from '../components/common';
 import { apiClient } from '../api/client';
-import { useLayoutStore } from '../stores/layoutStore';
 
 interface QuizQuestion {
   text: string;
@@ -125,7 +125,7 @@ interface QuizSessionManagerProps {
 
 export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen, onAiQuizOpenChange }: QuizSessionManagerProps = {}) {
   const queryClient = useQueryClient();
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['votes', 'common']);
   const [selectedSession, setSelectedSession] = useState<QuizSession | null>(null);
   const [internalCreateOpen, setInternalCreateOpen] = useState(false);
   const isCreateOpen = createOpen ?? internalCreateOpen;
@@ -136,32 +136,6 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
   const [tokens, setTokens] = useState<QuizToken[]>([]);
   const [filter, setFilter] = useState<'all' | 'draft' | 'open' | 'active' | 'completed'>('all');
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
-
-  const t = {
-    title: 'Quiz',
-    subtitle: language === 'fr' ? 'Créez et gérez des quiz interactifs' : 'Create and manage interactive quizzes',
-    createButton: language === 'fr' ? 'Nouveau quiz' : 'New Quiz',
-    all: language === 'fr' ? 'Tous' : 'All',
-    draft: language === 'fr' ? 'Brouillon' : 'Draft',
-    open: language === 'fr' ? 'Ouvert' : 'Open',
-    active: language === 'fr' ? 'En cours' : 'Active',
-    completed: language === 'fr' ? 'Terminé' : 'Completed',
-    questions: language === 'fr' ? 'questions' : 'questions',
-    participants: language === 'fr' ? 'participants' : 'participants',
-    openQuiz: language === 'fr' ? 'Ouvrir' : 'Open',
-    startQuiz: language === 'fr' ? 'Démarrer' : 'Start',
-    nextQuestion: language === 'fr' ? 'Question suivante' : 'Next Question',
-    endQuiz: language === 'fr' ? 'Terminer' : 'End',
-    tokens: language === 'fr' ? 'Liens' : 'Links',
-    results: language === 'fr' ? 'Résultats' : 'Results',
-    delete: language === 'fr' ? 'Supprimer' : 'Delete',
-    noSessions: language === 'fr' ? 'Aucun quiz' : 'No quizzes',
-    createFirst: language === 'fr' ? 'Créer votre premier quiz' : 'Create Your First Quiz',
-    generateTokens: language === 'fr' ? 'Générer 5 liens' : 'Generate 5 Links',
-    noTokens: language === 'fr' ? 'Aucun lien généré.' : 'No links generated yet.',
-    copied: language === 'fr' ? 'Copié !' : 'Copied!',
-    invite: language === 'fr' ? 'Inviter' : 'Invite',
-  };
 
   const { data, isLoading, error } = useQuery<QuizSessionListResponse>({
     queryKey: ['quiz-sessions', filter],
@@ -232,7 +206,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
   };
 
   const handleDelete = async (session: QuizSession) => {
-    if (window.confirm(`${language === 'fr' ? 'Supprimer le quiz' : 'Delete quiz'} "${session.name}"?`)) {
+    if (window.confirm(`${t('votes:quizManager.deleteConfirm')} "${session.name}"?`)) {
       await deleteMutation.mutateAsync(session.id);
     }
   };
@@ -256,10 +230,10 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      draft: t.draft,
-      open: t.open,
-      active: t.active,
-      completed: t.completed,
+      draft: t('votes:quizManager.draft'),
+      open: t('votes:quizManager.open'),
+      active: t('votes:quizManager.active'),
+      completed: t('votes:quizManager.completed'),
     };
     return labels[status] || status;
   };
@@ -276,7 +250,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
     return (
       <div className="p-4">
         <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400">
-          {language === 'fr' ? 'Erreur lors du chargement des quiz' : 'Failed to load quizzes'}
+          {t('votes:quizManager.loadError')}
         </div>
       </div>
     );
@@ -287,11 +261,11 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
       <div className="mb-4">
         <ButtonGroup
           options={[
-            { key: 'all' as const, label: t.all },
-            { key: 'draft' as const, label: t.draft },
-            { key: 'open' as const, label: t.open },
-            { key: 'active' as const, label: t.active },
-            { key: 'completed' as const, label: t.completed },
+            { key: 'all' as const, label: t('votes:quizManager.all') },
+            { key: 'draft' as const, label: t('votes:quizManager.draft') },
+            { key: 'open' as const, label: t('votes:quizManager.open') },
+            { key: 'active' as const, label: t('votes:quizManager.active') },
+            { key: 'completed' as const, label: t('votes:quizManager.completed') },
           ]}
           value={filter}
           onChange={setFilter}
@@ -331,11 +305,11 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
                     <div className="flex flex-wrap items-center gap-3 text-xs text-dark-muted">
                       <span className="flex items-center gap-1">
                         <HelpCircle size={12} />
-                        {session.question_count} {t.questions}
+                        {session.question_count} {t('votes:quizManager.questions')}
                       </span>
                       <span className="flex items-center gap-1">
                         <Users size={12} />
-                        {session.participant_count} {t.participants}
+                        {session.participant_count} {t('votes:quizManager.participants')}
                       </span>
                       {session.status === 'active' && (
                         <span className="text-green-400">
@@ -356,7 +330,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
                       disabled={openMutation.isPending}
                     >
                       <Play size={14} className="mr-1" />
-                      {t.openQuiz}
+                      {t('votes:quizManager.openQuiz')}
                     </Button>
                   )}
 
@@ -368,7 +342,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
                       disabled={startMutation.isPending}
                     >
                       <Play size={14} className="mr-1" />
-                      {t.startQuiz}
+                      {t('votes:quizManager.startQuiz')}
                     </Button>
                   )}
 
@@ -381,7 +355,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
                         disabled={nextQuestionMutation.isPending}
                       >
                         <SkipForward size={14} className="mr-1" />
-                        {t.nextQuestion}
+                        {t('votes:quizManager.nextQuestion')}
                       </Button>
                       <Button
                         variant="secondary"
@@ -390,7 +364,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
                         disabled={endMutation.isPending}
                       >
                         <Square size={14} className="mr-1" />
-                        {t.endQuiz}
+                        {t('votes:quizManager.endQuiz')}
                       </Button>
                     </>
                   )}
@@ -402,7 +376,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
                       onClick={() => { setSelectedSession(session); setIsInviteOpen(true); }}
                     >
                       <UserPlus size={14} className="mr-1" />
-                      {t.invite}
+                      {t('votes:quizManager.invite')}
                     </Button>
                   )}
 
@@ -413,7 +387,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
                       onClick={() => handleViewTokens(session)}
                     >
                       <Link2 size={14} className="mr-1" />
-                      {t.tokens}
+                      {t('votes:quizManager.tokens')}
                     </Button>
                   )}
 
@@ -424,7 +398,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
                       onClick={() => handleViewResults(session)}
                     >
                       <BarChart2 size={14} className="mr-1" />
-                      {t.results}
+                      {t('votes:quizManager.results')}
                     </Button>
                   )}
 
@@ -444,10 +418,10 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
       ) : (
         <Card className="p-8 text-center">
           <HelpCircle size={32} className="mx-auto text-dark-muted mb-3" />
-          <p className="text-sm text-dark-muted mb-3">{t.noSessions}</p>
+          <p className="text-sm text-dark-muted mb-3">{t('votes:quizManager.noSessions')}</p>
           <Button size="sm" onClick={() => setIsCreateOpen(true)}>
             <Plus size={14} className="mr-1" />
-            {t.createFirst}
+            {t('votes:quizManager.createFirst')}
           </Button>
         </Card>
       )}
@@ -456,11 +430,10 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title={language === 'fr' ? 'Nouveau quiz' : 'New Quiz'}
+        title={t('votes:quizManager.newQuizTitle')}
         size="lg"
       >
         <QuizCreateForm
-          language={language}
           onSave={() => {
             setIsCreateOpen(false);
             queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
@@ -476,7 +449,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
           setIsTokensOpen(false);
           setTokens([]);
         }}
-        title={`${t.tokens} - ${selectedSession?.name}`}
+        title={`${t('votes:quizManager.tokens')} - ${selectedSession?.name}`}
         size="lg"
       >
         <div className="space-y-4">
@@ -490,7 +463,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
               disabled={createTokensMutation.isPending}
             >
               <Plus size={14} className="mr-2" />
-              {t.generateTokens}
+              {t('votes:quizManager.generateTokens')}
             </Button>
           </div>
 
@@ -521,7 +494,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
                         {copiedToken === token.id ? (
                           <>
                             <Check size={14} className="mr-1" />
-                            {t.copied}
+                            {t('votes:quizManager.copied')}
                           </>
                         ) : (
                           <Copy size={14} />
@@ -541,7 +514,7 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
               ))}
             </div>
           ) : (
-            <p className="text-dark-muted text-center py-8">{t.noTokens}</p>
+            <p className="text-dark-muted text-center py-8">{t('votes:quizManager.noTokens')}</p>
           )}
         </div>
       </Modal>
@@ -550,22 +523,21 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
       <Modal
         isOpen={isResultsOpen}
         onClose={() => setIsResultsOpen(false)}
-        title={`${t.results} - ${selectedSession?.name}`}
+        title={`${t('votes:quizManager.results')} - ${selectedSession?.name}`}
         size="lg"
       >
-        {selectedSession && <QuizResultsAdmin session={selectedSession} language={language} />}
+        {selectedSession && <QuizResultsAdmin session={selectedSession} />}
       </Modal>
 
       {/* Invite Modal */}
       <Modal
         isOpen={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
-        title={`${t.invite} - ${selectedSession?.name}`}
+        title={`${t('votes:quizManager.invite')} - ${selectedSession?.name}`}
       >
         {selectedSession && (
           <QuizInviteUsers
             sessionId={selectedSession.id}
-            language={language}
             onDone={() => {
               setIsInviteOpen(false);
               queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
@@ -578,11 +550,10 @@ export function QuizSessionManager({ createOpen, onCreateOpenChange, aiQuizOpen,
       <Modal
         isOpen={aiQuizOpen ?? false}
         onClose={() => onAiQuizOpenChange?.(false)}
-        title={language === 'fr' ? 'Générer un quiz par IA' : 'AI Quiz Generator'}
+        title={t('votes:quizManager.aiQuizGenerator')}
         size="lg"
       >
         <AIQuizGenerator
-          language={language}
           onCreated={() => {
             onAiQuizOpenChange?.(false);
             queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
@@ -605,14 +576,13 @@ interface QuizTemplate {
 }
 
 function QuizCreateForm({
-  language,
   onSave,
   onCancel,
 }: {
-  language: 'en' | 'fr';
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation(['votes', 'common']);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [questions, setQuestions] = useState<QuizQuestion[]>([{ ...emptyQuestion }]);
@@ -625,7 +595,7 @@ function QuizCreateForm({
     queryKey: ['templates-quiz'],
     queryFn: () => apiClient.get<{ items: QuizTemplate[] }>('/templates'),
     select: (data) => ({
-      items: data.items.filter((t) => t.template_type === 'quiz'),
+      items: data.items.filter((tmpl) => tmpl.template_type === 'quiz'),
     }),
   });
 
@@ -710,34 +680,6 @@ function QuizCreateForm({
 
   const quizTemplates = templatesData?.items || [];
 
-  const tForm = {
-    name: language === 'fr' ? 'Nom du quiz' : 'Quiz Name',
-    description: language === 'fr' ? 'Description (optionnel)' : 'Description (optional)',
-    displayTemplate: language === 'fr' ? 'Template d\'affichage' : 'Display Template',
-    noTemplate: language === 'fr' ? 'Aucun' : 'None',
-    questions: language === 'fr' ? 'Questions' : 'Questions',
-    addQuestion: language === 'fr' ? 'Ajouter une question' : 'Add Question',
-    questionText: language === 'fr' ? 'Question' : 'Question',
-    choices: language === 'fr' ? 'Choix' : 'Choices',
-    addChoice: language === 'fr' ? 'Ajouter un choix' : 'Add Choice',
-    correctAnswer: language === 'fr' ? 'Bonne réponse' : 'Correct answer',
-    allowMultiple: language === 'fr' ? 'Plusieurs réponses' : 'Multiple answers',
-    timeLimit: language === 'fr' ? 'Temps (s)' : 'Time (s)',
-    hint: language === 'fr' ? 'Indice' : 'Hint',
-    config: language === 'fr' ? 'Configuration' : 'Configuration',
-    liveResults: language === 'fr' ? 'Résultats en direct' : 'Live results',
-    anonymous: language === 'fr' ? 'Anonyme' : 'Anonymous',
-    named: language === 'fr' ? 'Nommé' : 'Named',
-    disabled: language === 'fr' ? 'Désactivé' : 'Disabled',
-    showScoresLive: language === 'fr' ? 'Scores en direct' : 'Live scores',
-    autoAdvance: language === 'fr' ? 'Avancer auto si tous ont répondu' : 'Auto-advance when all answered',
-    defaultTimeLimit: language === 'fr' ? 'Temps par défaut (s)' : 'Default time (s)',
-    showFeedback: language === 'fr' ? 'Afficher les bonnes réponses entre les questions' : 'Show correct answers between questions',
-    feedbackDelay: language === 'fr' ? 'Délai d\'affichage (s)' : 'Display delay (s)',
-    save: language === 'fr' ? 'Créer' : 'Create',
-    cancel: language === 'fr' ? 'Annuler' : 'Cancel',
-  };
-
   return (
     <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
       {/* Name & Description */}
@@ -746,27 +688,27 @@ function QuizCreateForm({
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={tForm.name}
+          placeholder={t('votes:quizForm.name')}
           className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:border-theatarr-500"
         />
         <input
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder={tForm.description}
+          placeholder={t('votes:quizForm.description')}
           className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:border-theatarr-500"
         />
         {quizTemplates.length > 0 && (
           <div>
-            <label className="text-xs text-dark-muted mb-1 block">{tForm.displayTemplate}</label>
+            <label className="text-xs text-dark-muted mb-1 block">{t('votes:quizForm.displayTemplate')}</label>
             <select
               value={templateId || ''}
               onChange={(e) => setTemplateId(e.target.value || null)}
               className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:outline-none focus:border-theatarr-500 text-sm"
             >
-              <option value="">{tForm.noTemplate}</option>
-              {quizTemplates.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+              <option value="">{t('votes:quizForm.noTemplate')}</option>
+              {quizTemplates.map((tmpl) => (
+                <option key={tmpl.id} value={tmpl.id}>{tmpl.name}</option>
               ))}
             </select>
           </div>
@@ -775,7 +717,7 @@ function QuizCreateForm({
 
       {/* Questions */}
       <div>
-        <h3 className="text-sm font-medium text-dark-text mb-3">{tForm.questions}</h3>
+        <h3 className="text-sm font-medium text-dark-text mb-3">{t('votes:quizForm.questions')}</h3>
         <div className="space-y-3">
           {questions.map((question, qIndex) => (
             <div key={qIndex} className="border border-dark-border rounded-lg overflow-hidden">
@@ -785,7 +727,7 @@ function QuizCreateForm({
                 className="w-full flex items-center justify-between p-3 bg-dark-surface hover:bg-dark-border/50 transition-colors"
               >
                 <span className="text-sm font-medium text-dark-text">
-                  Q{qIndex + 1}: {question.text || (language === 'fr' ? '(sans titre)' : '(untitled)')}
+                  Q{qIndex + 1}: {question.text || t('votes:quizForm.untitled')}
                 </span>
                 <div className="flex items-center gap-2">
                   {questions.length > 1 && (
@@ -807,13 +749,13 @@ function QuizCreateForm({
                     type="text"
                     value={question.text}
                     onChange={(e) => updateQuestion(qIndex, { text: e.target.value })}
-                    placeholder={tForm.questionText}
+                    placeholder={t('votes:quizForm.questionText')}
                     className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:border-theatarr-500"
                   />
 
                   {/* Choices */}
                   <div className="space-y-2">
-                    <label className="text-xs text-dark-muted">{tForm.choices}</label>
+                    <label className="text-xs text-dark-muted">{t('votes:quizForm.choices')}</label>
                     {question.choices.map((choice, cIndex) => (
                       <div key={cIndex} className="flex items-center gap-2">
                         <button
@@ -823,7 +765,7 @@ function QuizCreateForm({
                               ? 'border-green-500 bg-green-500/20'
                               : 'border-dark-border hover:border-dark-muted'
                           }`}
-                          title={tForm.correctAnswer}
+                          title={t('votes:quizForm.correctAnswer')}
                         >
                           {question.correct_indices.includes(cIndex) && (
                             <Check size={12} className="text-green-400" />
@@ -833,7 +775,7 @@ function QuizCreateForm({
                           type="text"
                           value={choice}
                           onChange={(e) => updateChoice(qIndex, cIndex, e.target.value)}
-                          placeholder={`${language === 'fr' ? 'Choix' : 'Choice'} ${cIndex + 1}`}
+                          placeholder={t('votes:quizForm.choiceLabel', { index: cIndex + 1 })}
                           className="flex-1 px-3 py-1.5 bg-dark-surface border border-dark-border rounded text-dark-text placeholder-dark-muted text-sm focus:outline-none focus:border-theatarr-500"
                         />
                         {question.choices.length > 2 && (
@@ -851,7 +793,7 @@ function QuizCreateForm({
                         onClick={() => addChoice(qIndex)}
                         className="text-sm text-theatarr-500 hover:text-theatarr-400"
                       >
-                        + {tForm.addChoice}
+                        + {t('votes:quizForm.addChoice')}
                       </button>
                     )}
                   </div>
@@ -865,10 +807,10 @@ function QuizCreateForm({
                         onChange={(e) => updateQuestion(qIndex, { allow_multiple: e.target.checked })}
                         className="rounded"
                       />
-                      {tForm.allowMultiple}
+                      {t('votes:quizForm.allowMultiple')}
                     </label>
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-dark-muted">{tForm.timeLimit}</label>
+                      <label className="text-sm text-dark-muted">{t('votes:quizForm.timeLimit')}</label>
                       <input
                         type="number"
                         value={question.time_limit_seconds ?? ''}
@@ -888,7 +830,7 @@ function QuizCreateForm({
                     type="text"
                     value={question.hint ?? ''}
                     onChange={(e) => updateQuestion(qIndex, { hint: e.target.value || null })}
-                    placeholder={tForm.hint}
+                    placeholder={t('votes:quizForm.hint')}
                     className="w-full px-3 py-1.5 bg-dark-surface border border-dark-border rounded text-dark-text placeholder-dark-muted text-sm focus:outline-none focus:border-theatarr-500"
                   />
                 </div>
@@ -900,16 +842,16 @@ function QuizCreateForm({
           onClick={addQuestion}
           className="mt-3 text-sm text-theatarr-500 hover:text-theatarr-400 font-medium"
         >
-          + {tForm.addQuestion}
+          + {t('votes:quizForm.addQuestion')}
         </button>
       </div>
 
       {/* Config */}
       <div>
-        <h3 className="text-sm font-medium text-dark-text mb-3">{tForm.config}</h3>
+        <h3 className="text-sm font-medium text-dark-text mb-3">{t('votes:quizForm.config')}</h3>
         <div className="space-y-3 p-3 bg-dark-surface rounded-lg border border-dark-border">
           <div className="flex items-center gap-3">
-            <label className="text-sm text-dark-muted min-w-[140px]">{tForm.liveResults}</label>
+            <label className="text-sm text-dark-muted min-w-[140px]">{t('votes:quizForm.liveResults')}</label>
             <select
               value={config.show_live_results}
               onChange={(e) =>
@@ -917,9 +859,9 @@ function QuizCreateForm({
               }
               className="px-2 py-1 bg-dark-bg border border-dark-border rounded text-dark-text text-sm focus:outline-none focus:border-theatarr-500"
             >
-              <option value="anonymous">{tForm.anonymous}</option>
-              <option value="named">{tForm.named}</option>
-              <option value="disabled">{tForm.disabled}</option>
+              <option value="anonymous">{t('votes:quizForm.anonymous')}</option>
+              <option value="named">{t('votes:quizForm.named')}</option>
+              <option value="disabled">{t('votes:quizForm.disabled')}</option>
             </select>
           </div>
           <label className="flex items-center gap-2 text-sm text-dark-muted">
@@ -929,7 +871,7 @@ function QuizCreateForm({
               onChange={(e) => setConfig({ ...config, show_scores_live: e.target.checked })}
               className="rounded"
             />
-            {tForm.showScoresLive}
+            {t('votes:quizForm.showScoresLive')}
           </label>
           <label className="flex items-center gap-2 text-sm text-dark-muted">
             <input
@@ -938,10 +880,10 @@ function QuizCreateForm({
               onChange={(e) => setConfig({ ...config, auto_advance: e.target.checked })}
               className="rounded"
             />
-            {tForm.autoAdvance}
+            {t('votes:quizForm.autoAdvance')}
           </label>
           <div className="flex items-center gap-3">
-            <label className="text-sm text-dark-muted min-w-[140px]">{tForm.defaultTimeLimit}</label>
+            <label className="text-sm text-dark-muted min-w-[140px]">{t('votes:quizForm.defaultTimeLimit')}</label>
             <input
               type="number"
               value={config.default_time_limit_seconds}
@@ -958,11 +900,11 @@ function QuizCreateForm({
               onChange={(e) => setConfig({ ...config, show_feedback: e.target.checked })}
               className="rounded"
             />
-            {tForm.showFeedback}
+            {t('votes:quizForm.showFeedback')}
           </label>
           {config.show_feedback && (
             <div className="flex items-center gap-3 ml-6">
-              <label className="text-sm text-dark-muted min-w-[140px]">{tForm.feedbackDelay}</label>
+              <label className="text-sm text-dark-muted min-w-[140px]">{t('votes:quizForm.feedbackDelay')}</label>
               <input
                 type="number"
                 min={2}
@@ -981,10 +923,10 @@ function QuizCreateForm({
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-4 border-t border-dark-border">
         <Button variant="ghost" onClick={onCancel}>
-          {tForm.cancel}
+          {t('votes:quizForm.cancel')}
         </Button>
         <Button onClick={() => createMutation.mutate()} disabled={!isValid || createMutation.isPending}>
-          {tForm.save}
+          {t('votes:quizForm.save')}
         </Button>
       </div>
 
@@ -1001,7 +943,8 @@ function QuizCreateForm({
 // Quiz Results Admin
 // ============================================================================
 
-function QuizResultsAdmin({ session, language }: { session: QuizSession; language: 'en' | 'fr' }) {
+function QuizResultsAdmin({ session }: { session: QuizSession }) {
+  const { t } = useTranslation(['votes', 'common']);
   const { data, isLoading } = useQuery<QuizResults>({
     queryKey: ['quiz-results', session.id],
     queryFn: async () => {
@@ -1020,7 +963,7 @@ function QuizResultsAdmin({ session, language }: { session: QuizSession; languag
   if (!data) {
     return (
       <p className="text-dark-muted text-center py-8">
-        {language === 'fr' ? 'Aucun résultat disponible' : 'No results available'}
+        {t('votes:quizResults.noResults')}
       </p>
     );
   }
@@ -1030,7 +973,7 @@ function QuizResultsAdmin({ session, language }: { session: QuizSession; languag
       {/* Scoreboard */}
       <div>
         <h3 className="text-sm font-medium text-dark-text mb-3">
-          {language === 'fr' ? 'Classement' : 'Scoreboard'}
+          {t('votes:quizResults.scoreboard')}
         </h3>
         {data.scoreboard.length > 0 ? (
           <div className="space-y-2">
@@ -1066,7 +1009,7 @@ function QuizResultsAdmin({ session, language }: { session: QuizSession; languag
           </div>
         ) : (
           <p className="text-dark-muted text-center py-4">
-            {language === 'fr' ? 'Aucun participant' : 'No participants'}
+            {t('votes:quizResults.noParticipants')}
           </p>
         )}
       </div>
@@ -1074,7 +1017,7 @@ function QuizResultsAdmin({ session, language }: { session: QuizSession; languag
       {/* Question Stats */}
       <div>
         <h3 className="text-sm font-medium text-dark-text mb-3">
-          {language === 'fr' ? 'Statistiques par question' : 'Per-Question Stats'}
+          {t('votes:quizResults.perQuestionStats')}
         </h3>
         <div className="space-y-3">
           {data.question_stats.map((stat) => (
@@ -1090,7 +1033,7 @@ function QuizResultsAdmin({ session, language }: { session: QuizSession; languag
                   )}
                 </span>
                 <span className="text-sm text-dark-muted">
-                  {stat.correct_count}/{stat.total_answers} {language === 'fr' ? 'correct' : 'correct'}
+                  {stat.correct_count}/{stat.total_answers} {t('votes:quizResults.correct')}
                 </span>
               </div>
               {/* Distribution bar */}
@@ -1141,25 +1084,20 @@ interface InviteUser {
 // AI Quiz Generator (The Trivia API)
 // ============================================================================
 
-const TRIVIA_CATEGORIES = [
-  { slug: 'film_and_tv', label: { fr: 'Film & TV', en: 'Film & TV' } },
-  { slug: 'music', label: { fr: 'Musique', en: 'Music' } },
-  { slug: 'general_knowledge', label: { fr: 'Culture générale', en: 'General Knowledge' } },
-  { slug: 'arts_and_literature', label: { fr: 'Arts & Littérature', en: 'Arts & Literature' } },
-  { slug: 'science', label: { fr: 'Science', en: 'Science' } },
-  { slug: 'history', label: { fr: 'Histoire', en: 'History' } },
-  { slug: 'geography', label: { fr: 'Géographie', en: 'Geography' } },
-  { slug: 'sport_and_leisure', label: { fr: 'Sport & Loisirs', en: 'Sport & Leisure' } },
-  { slug: 'society_and_culture', label: { fr: 'Société & Culture', en: 'Society & Culture' } },
-  { slug: 'food_and_drink', label: { fr: 'Gastronomie', en: 'Food & Drink' } },
-];
+const TRIVIA_CATEGORY_SLUGS = [
+  'film_and_tv',
+  'music',
+  'general_knowledge',
+  'arts_and_literature',
+  'science',
+  'history',
+  'geography',
+  'sport_and_leisure',
+  'society_and_culture',
+  'food_and_drink',
+] as const;
 
-const TRIVIA_DIFFICULTIES = [
-  { key: 'mixed', label: { fr: 'Mélangé', en: 'Mixed' } },
-  { key: 'easy', label: { fr: 'Facile', en: 'Easy' } },
-  { key: 'medium', label: { fr: 'Moyen', en: 'Medium' } },
-  { key: 'hard', label: { fr: 'Difficile', en: 'Hard' } },
-];
+const TRIVIA_DIFFICULTY_KEYS = ['mixed', 'easy', 'medium', 'hard'] as const;
 
 interface TriviaApiQuestion {
   id: string;
@@ -1198,14 +1136,13 @@ function convertTriviaToQuiz(triviaQuestions: TriviaApiQuestion[]): QuizQuestion
 }
 
 function AIQuizGenerator({
-  language,
   onCreated,
   onCancel,
 }: {
-  language: 'en' | 'fr';
   onCreated: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation(['votes', 'common']);
   const [step, setStep] = useState<'config' | 'preview'>('config');
   const [name, setName] = useState('');
   const [category, setCategory] = useState('film_and_tv');
@@ -1217,27 +1154,6 @@ function AIQuizGenerator({
   const [generatedQuestions, setGeneratedQuestions] = useState<QuizQuestion[]>([]);
   const [triviaRaw, setTriviaRaw] = useState<TriviaApiQuestion[]>([]);
   const [creating, setCreating] = useState(false);
-
-  const t = {
-    quizName: language === 'fr' ? 'Nom du quiz' : 'Quiz name',
-    category: language === 'fr' ? 'Catégorie' : 'Category',
-    difficulty: language === 'fr' ? 'Difficulté' : 'Difficulty',
-    questionCount: language === 'fr' ? 'Nombre de questions' : 'Number of questions',
-    tags: language === 'fr' ? 'Tags (optionnel)' : 'Tags (optional)',
-    tagsHelp: language === 'fr' ? 'Séparer par des virgules (ex: james_bond, marvel)' : 'Comma separated (e.g. james_bond, marvel)',
-    generate: language === 'fr' ? 'Générer' : 'Generate',
-    regenerate: language === 'fr' ? 'Regénérer' : 'Regenerate',
-    create: language === 'fr' ? 'Créer le quiz' : 'Create quiz',
-    cancel: language === 'fr' ? 'Annuler' : 'Cancel',
-    back: language === 'fr' ? 'Retour' : 'Back',
-    preview: language === 'fr' ? 'Aperçu des questions' : 'Questions preview',
-    generating: language === 'fr' ? 'Génération en cours...' : 'Generating...',
-    noQuestions: language === 'fr' ? 'Aucune question trouvée pour ces critères.' : 'No questions found for these criteria.',
-    englishNote: language === 'fr' ? 'Les questions sont en anglais (API gratuite).' : 'Questions are in English (free API).',
-    correct: language === 'fr' ? 'Correcte' : 'Correct',
-    source: language === 'fr' ? 'Source : The Trivia API' : 'Source: The Trivia API',
-    shuffleChoices: language === 'fr' ? 'Mélanger les choix' : 'Shuffle choices',
-  };
 
   const fetchQuestions = async () => {
     setFetching(true);
@@ -1261,7 +1177,7 @@ function AIQuizGenerator({
       const data: TriviaApiQuestion[] = await response.json();
 
       if (data.length === 0) {
-        setFetchError(t.noQuestions);
+        setFetchError(t('votes:aiQuiz.noQuestions'));
         setFetching(false);
         return;
       }
@@ -1271,9 +1187,9 @@ function AIQuizGenerator({
 
       // Auto-generate name if empty
       if (!name.trim()) {
-        const catLabel = TRIVIA_CATEGORIES.find((c) => c.slug === category)?.label[language] || category;
+        const catLabel = t(`votes:aiQuiz.categories.${category}`);
         const diffLabel = difficulty !== 'mixed'
-          ? ` - ${TRIVIA_DIFFICULTIES.find((d) => d.key === difficulty)?.label[language]}`
+          ? ` - ${t(`votes:aiQuiz.difficulties.${difficulty}`)}`
           : '';
         setName(`Quiz ${catLabel}${diffLabel}`);
       }
@@ -1295,7 +1211,7 @@ function AIQuizGenerator({
     try {
       await apiClient.post('/quiz-sessions', {
         name: name.trim() || 'AI Quiz',
-        description: `${t.source} (${TRIVIA_CATEGORIES.find((c) => c.slug === category)?.label[language]})`,
+        description: `${t('votes:aiQuiz.source')} (${t(`votes:aiQuiz.categories.${category}`)})`,
         questions: generatedQuestions,
         config: { ...defaultConfig },
       });
@@ -1314,15 +1230,15 @@ function AIQuizGenerator({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-dark-text">{name}</h3>
-            <p className="text-xs text-dark-muted">{generatedQuestions.length} questions &middot; {t.englishNote}</p>
+            <p className="text-xs text-dark-muted">{generatedQuestions.length} questions &middot; {t('votes:aiQuiz.englishNote')}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={reshuffleAll} title={t.shuffleChoices}>
+            <Button variant="ghost" size="sm" onClick={reshuffleAll} title={t('votes:aiQuiz.shuffleChoices')}>
               <Shuffle size={14} />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { setStep('config'); setFetchError(null); }}>
               <RefreshCw size={14} className="mr-1" />
-              {t.regenerate}
+              {t('votes:aiQuiz.regenerate')}
             </Button>
           </div>
         </div>
@@ -1371,7 +1287,7 @@ function AIQuizGenerator({
 
         {/* Name input */}
         <div>
-          <label className="text-xs text-dark-muted mb-1 block">{t.quizName}</label>
+          <label className="text-xs text-dark-muted mb-1 block">{t('votes:aiQuiz.quizName')}</label>
           <input
             type="text"
             value={name}
@@ -1387,11 +1303,11 @@ function AIQuizGenerator({
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-3 border-t border-dark-border">
           <Button variant="ghost" onClick={onCancel}>
-            {t.cancel}
+            {t('votes:aiQuiz.cancel')}
           </Button>
           <Button onClick={createQuiz} disabled={creating || generatedQuestions.length === 0}>
             {creating ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Sparkles size={14} className="mr-1" />}
-            {t.create}
+            {t('votes:aiQuiz.create')}
           </Button>
         </div>
       </div>
@@ -1403,45 +1319,45 @@ function AIQuizGenerator({
     <div className="space-y-5">
       {/* Quiz name */}
       <div>
-        <label className="text-xs text-dark-muted mb-1 block">{t.quizName}</label>
+        <label className="text-xs text-dark-muted mb-1 block">{t('votes:aiQuiz.quizName')}</label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={language === 'fr' ? 'Auto-généré si vide' : 'Auto-generated if empty'}
+          placeholder={t('votes:aiQuiz.autoGenerated')}
           className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:border-theatarr-500 text-sm"
         />
       </div>
 
       {/* Category */}
       <div>
-        <label className="text-xs text-dark-muted mb-1 block">{t.category}</label>
+        <label className="text-xs text-dark-muted mb-1 block">{t('votes:aiQuiz.category')}</label>
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text focus:outline-none focus:border-theatarr-500 text-sm"
         >
-          {TRIVIA_CATEGORIES.map((cat) => (
-            <option key={cat.slug} value={cat.slug}>{cat.label[language]}</option>
+          {TRIVIA_CATEGORY_SLUGS.map((slug) => (
+            <option key={slug} value={slug}>{t(`votes:aiQuiz.categories.${slug}`)}</option>
           ))}
         </select>
       </div>
 
       {/* Difficulty */}
       <div>
-        <label className="text-xs text-dark-muted mb-1 block">{t.difficulty}</label>
+        <label className="text-xs text-dark-muted mb-1 block">{t('votes:aiQuiz.difficulty')}</label>
         <div className="flex gap-2 flex-wrap">
-          {TRIVIA_DIFFICULTIES.map((diff) => (
+          {TRIVIA_DIFFICULTY_KEYS.map((key) => (
             <button
-              key={diff.key}
-              onClick={() => setDifficulty(diff.key)}
+              key={key}
+              onClick={() => setDifficulty(key)}
               className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
-                difficulty === diff.key
+                difficulty === key
                   ? 'bg-theatarr-500 text-white border-theatarr-500'
                   : 'bg-dark-surface text-dark-muted border-dark-border hover:border-dark-muted'
               }`}
             >
-              {diff.label[language]}
+              {t(`votes:aiQuiz.difficulties.${key}`)}
             </button>
           ))}
         </div>
@@ -1449,7 +1365,7 @@ function AIQuizGenerator({
 
       {/* Question count */}
       <div>
-        <label className="text-xs text-dark-muted mb-1 block">{t.questionCount}: {questionCount}</label>
+        <label className="text-xs text-dark-muted mb-1 block">{t('votes:aiQuiz.questionCount')}: {questionCount}</label>
         <input
           type="range"
           min={5}
@@ -1466,18 +1382,18 @@ function AIQuizGenerator({
 
       {/* Tags */}
       <div>
-        <label className="text-xs text-dark-muted mb-1 block">{t.tags}</label>
+        <label className="text-xs text-dark-muted mb-1 block">{t('votes:aiQuiz.tags')}</label>
         <input
           type="text"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
-          placeholder={t.tagsHelp}
+          placeholder={t('votes:aiQuiz.tagsHelp')}
           className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:border-theatarr-500 text-sm"
         />
       </div>
 
       {/* English note */}
-      <p className="text-xs text-dark-muted italic">{t.englishNote}</p>
+      <p className="text-xs text-dark-muted italic">{t('votes:aiQuiz.englishNote')}</p>
 
       {fetchError && (
         <p className="text-red-400 text-sm">{fetchError}</p>
@@ -1486,11 +1402,11 @@ function AIQuizGenerator({
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-3 border-t border-dark-border">
         <Button variant="ghost" onClick={onCancel}>
-          {t.cancel}
+          {t('votes:aiQuiz.cancel')}
         </Button>
         <Button onClick={fetchQuestions} disabled={fetching}>
           {fetching ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Sparkles size={14} className="mr-1" />}
-          {fetching ? t.generating : t.generate}
+          {fetching ? t('votes:aiQuiz.generating') : t('votes:aiQuiz.generate')}
         </Button>
       </div>
     </div>
@@ -1503,13 +1419,12 @@ function AIQuizGenerator({
 
 function QuizInviteUsers({
   sessionId,
-  language,
   onDone,
 }: {
   sessionId: string;
-  language: 'en' | 'fr';
   onDone: () => void;
 }) {
+  const { t } = useTranslation(['votes', 'common']);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<InviteUser[]>([]);
   const [inviteResult, setInviteResult] = useState<{ count: number } | null>(null);
@@ -1543,20 +1458,11 @@ function QuizInviteUsers({
     inviteMutation.mutate(selectedUsers.map((u) => u.id));
   };
 
-  const tInvite = {
-    search: language === 'fr' ? 'Rechercher un utilisateur...' : 'Search user...',
-    selected: language === 'fr' ? 'Sélectionnés' : 'Selected',
-    invite: language === 'fr' ? 'Inviter' : 'Invite',
-    noResults: language === 'fr' ? 'Aucun résultat' : 'No results',
-    success: language === 'fr' ? 'utilisateur(s) invité(s)' : 'user(s) invited',
-    done: language === 'fr' ? 'Fermer' : 'Done',
-  };
-
   return (
     <div className="space-y-4">
       {inviteResult && (
         <div className="p-3 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm">
-          {inviteResult.count} {tInvite.success}
+          {inviteResult.count} {t('votes:quizInvite.success')}
         </div>
       )}
 
@@ -1565,7 +1471,7 @@ function QuizInviteUsers({
         type="text"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        placeholder={tInvite.search}
+        placeholder={t('votes:quizInvite.search')}
         className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-dark-text placeholder-dark-muted focus:outline-none focus:border-theatarr-500"
       />
 
@@ -1597,7 +1503,7 @@ function QuizInviteUsers({
                 );
               })
             : !isSearching && (
-                <p className="text-dark-muted text-sm text-center py-2">{tInvite.noResults}</p>
+                <p className="text-dark-muted text-sm text-center py-2">{t('votes:quizInvite.noResults')}</p>
               )}
         </div>
       )}
@@ -1606,7 +1512,7 @@ function QuizInviteUsers({
       {selectedUsers.length > 0 && (
         <div>
           <p className="text-xs text-dark-muted mb-2">
-            {tInvite.selected} ({selectedUsers.length})
+            {t('votes:quizInvite.selected')} ({selectedUsers.length})
           </p>
           <div className="flex flex-wrap gap-2">
             {selectedUsers.map((user) => (
@@ -1627,14 +1533,14 @@ function QuizInviteUsers({
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-2 border-t border-dark-border">
         <Button variant="ghost" onClick={onDone}>
-          {tInvite.done}
+          {t('votes:quizInvite.done')}
         </Button>
         <Button
           onClick={handleInvite}
           disabled={selectedUsers.length === 0 || inviteMutation.isPending}
         >
           <UserPlus size={14} className="mr-2" />
-          {tInvite.invite} ({selectedUsers.length})
+          {t('votes:quizInvite.invite')} ({selectedUsers.length})
         </Button>
       </div>
     </div>

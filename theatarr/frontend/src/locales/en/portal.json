@@ -1,0 +1,303 @@
+{
+  "nav": {
+    "home": "Home",
+    "sessions": "Sessions",
+    "votes": "Votes",
+    "quiz": "Quiz",
+    "profile": "Profile"
+  },
+  "header": {
+    "themeLight": "Light theme",
+    "themeDark": "Dark theme",
+    "adminInterface": "Admin Interface",
+    "admin": "Admin",
+    "logout": "Logout",
+    "notifications": "Notifications"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "Nothing new"
+  },
+  "home": {
+    "stats": {
+      "upcoming": "Upcoming",
+      "votes": "Votes",
+      "watched": "Watched",
+      "voted": "Voted"
+    },
+    "sessionsToday": "Sessions today",
+    "pendingInvitations": "Pending invitations",
+    "pendingVotes": "Pending votes",
+    "pendingQuiz": "Active quiz",
+    "upcomingSessions": "Upcoming sessions",
+    "viewAll": "View all",
+    "emptyTitle": "No activity at the moment",
+    "emptyDescription": "You will be notified when you are invited to a session or a vote.",
+    "countdown": {
+      "now": "Now",
+      "inDaysHours": "in {{days}}d {{hours}}h",
+      "inHoursMinutes": "in {{hours}}h{{minutes}}",
+      "inMinutes": "in {{minutes}}min"
+    },
+    "quiz": {
+      "questions": "{{count}} questions",
+      "notJoined": "Not joined yet"
+    }
+  },
+  "sessions": {
+    "title": "My Sessions",
+    "tabs": {
+      "upcoming": "Upcoming",
+      "all": "All",
+      "feedback": "To rate"
+    },
+    "empty": {
+      "feedbackTitle": "No ratings pending",
+      "feedbackDescription": "You have rated all your sessions.",
+      "upcomingTitle": "No upcoming sessions",
+      "upcomingDescription": "No sessions scheduled at the moment.",
+      "allTitle": "No sessions",
+      "allDescription": "You haven't been invited to any sessions yet."
+    }
+  },
+  "votes": {
+    "title": "My Votes",
+    "tabs": {
+      "pending": "To vote",
+      "all": "All votes"
+    },
+    "empty": {
+      "pendingTitle": "No pending votes",
+      "pendingDescription": "You have voted for all open sessions.",
+      "allTitle": "No votes",
+      "allDescription": "You haven't been invited to vote yet."
+    }
+  },
+  "quiz": {
+    "title": "My Quizzes",
+    "tabs": {
+      "pending": "Active",
+      "all": "All quizzes"
+    },
+    "status": {
+      "draft": "Draft",
+      "open": "Open",
+      "active": "Active",
+      "completed": "Completed"
+    },
+    "questions": "{{count}} questions",
+    "notJoined": "Not joined yet",
+    "empty": {
+      "pendingTitle": "No active quiz",
+      "pendingDescription": "No active quiz at the moment.",
+      "allTitle": "No quizzes",
+      "allDescription": "You haven't been invited to any quizzes yet."
+    }
+  },
+  "sessionCard": {
+    "invitation": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "declined": "Declined"
+    },
+    "movie": {
+      "voteClosed": "Vote closed",
+      "waitingVote": "Waiting for vote",
+      "mystery": "Mystery movie",
+      "movieNotSelected": "Movie not selected"
+    },
+    "voteNow": "Vote now",
+    "acceptToVote": "Accept the invitation to vote",
+    "ticket": "Ticket",
+    "rate": "Rate"
+  },
+  "voteCard": {
+    "status": {
+      "closed": "Closed",
+      "open": "Open",
+      "daysRemaining": "{{count}}d remaining",
+      "hoursRemaining": "{{count}}h remaining",
+      "hoursMinutesRemaining": "{{hours}}h{{minutes}} remaining",
+      "minutesRemaining": "{{count}}min remaining"
+    },
+    "voted": "Voted",
+    "toVote": "To vote",
+    "notVoted": "Not voted"
+  },
+  "sessionDetail": {
+    "back": "Back",
+    "notFound": "Session not found",
+    "backToSessions": "Back to sessions",
+    "status": {
+      "draft": "Draft",
+      "scheduled": "Scheduled",
+      "running": "Running",
+      "paused": "Paused",
+      "completed": "Completed",
+      "interrupted": "Interrupted"
+    },
+    "live": "Live",
+    "ticketValid": "Ticket validated",
+    "ticket": "Ticket",
+    "mysteryMovie": "Mystery movie",
+    "voteClosed": "Vote closed",
+    "waitingVote": "Waiting for vote",
+    "source": "Source: {{source}}",
+    "invitation": {
+      "title": "Your invitation",
+      "pending": "Awaiting response",
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "respondedAt": "Responded on {{date}}",
+      "checkinOk": "Check-in OK",
+      "notScanned": "Not scanned"
+    },
+    "actions": {
+      "accept": "Accept",
+      "decline": "Decline",
+      "myTicket": "My Ticket",
+      "calendar": "Calendar",
+      "cancelParticipation": "Cancel my participation",
+      "changeToAccepted": "Change to Accepted"
+    },
+    "timeline": {
+      "title": "Session timeline",
+      "sequence": "Seq {{current}}/{{total}}",
+      "action": "action",
+      "actions": "actions",
+      "start": "Start:",
+      "duration": "Duration:",
+      "expectedEnd": "Expected end:",
+      "completedAt": "Completed at"
+    },
+    "vote": {
+      "title": "Movie vote",
+      "completed": "Vote completed",
+      "movieChosen": "The movie has been chosen: {{title}}",
+      "voteForMovie": "Vote for the movie",
+      "voteIsOpen": "Voting is open",
+      "acceptToVote": "Accept the invitation to vote",
+      "acceptToVoteHint": "Voting is open but you need to accept first",
+      "waitingTitle": "Vote pending",
+      "notYetOpen": "Voting has not opened yet"
+    },
+    "feedback": {
+      "title": "Give your feedback",
+      "thanksTitle": "Thanks for your feedback!",
+      "overallRating": "Your overall rating: {{rating}}/10",
+      "commentPlaceholder": "Optional comment...",
+      "sending": "Sending...",
+      "submit": "Submit my feedback",
+      "submitError": "Error while sending. Please try again."
+    }
+  },
+  "voteDetail": {
+    "back": "Back",
+    "notFound": "Vote not found",
+    "backToVotes": "Back to votes",
+    "status": {
+      "closed": "Closed",
+      "open": "Open",
+      "daysRemaining": "{{count}}d remaining",
+      "hoursRemaining": "{{count}}h remaining",
+      "hoursMinutesRemaining": "{{hours}}h{{minutes}} remaining",
+      "minutesRemaining": "{{count}}min remaining"
+    },
+    "voted": "Voted",
+    "toVote": "To vote",
+    "votingInProgress": "Voting...",
+    "voteFor": "Vote for \"{{title}}\"",
+    "selectMovie": "Select a movie",
+    "votes": "votes",
+    "totalVotes": "{{count}} vote in total",
+    "totalVotesPlural": "{{count}} votes in total"
+  },
+  "quizDetail": {
+    "back": "Back",
+    "notFound": "Quiz not found",
+    "backToQuiz": "Back to quizzes",
+    "questions": "{{count}} questions",
+    "joining": "Connecting...",
+    "joinQuiz": "Join the quiz",
+    "waitingStart": "Waiting for the quiz to start...",
+    "waitingStartHint": "The quiz will begin when the administrator starts it.",
+    "question": "Question {{current}}/{{total}}",
+    "hint": "Hint: {{hint}}",
+    "sending": "Sending...",
+    "validate": "Submit",
+    "correct": "Correct!",
+    "incorrect": "Incorrect",
+    "score": "Score: {{score}}",
+    "waitingNextQuestion": "Waiting for the next question...",
+    "results": {
+      "title": "Quiz finished!",
+      "score": "Score",
+      "position": "Position",
+      "participants": "Participants",
+      "leaderboard": "Leaderboard",
+      "you": "(you)",
+      "questionReview": "Question review"
+    }
+  },
+  "profile": {
+    "title": "My Profile",
+    "info": {
+      "title": "Information",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "memberSince": "Member since",
+      "saving": "Saving...",
+      "save": "Save"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "autoAccept": "Automatically accept invitations",
+      "autoAcceptHint": "Voting is still required if the session includes one."
+    },
+    "emailNotifications": {
+      "title": "Email notifications",
+      "noEmailHint": "Set up an email address in your information to receive notifications.",
+      "sessionInvitation": "Session invitation",
+      "sessionStarted": "Session started",
+      "voteInvitation": "Vote invitation",
+      "voteClosed": "Vote results",
+      "quizInvitation": "Quiz invitation",
+      "quizCompleted": "Quiz results"
+    },
+    "password": {
+      "title": "Password",
+      "change": "Change",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm password",
+      "secure": "Your password is secure",
+      "minLength": "New password must be at least 6 characters",
+      "mismatch": "Passwords do not match",
+      "changing": "Changing...",
+      "cancel": "Cancel"
+    },
+    "admin": {
+      "title": "Admin Interface",
+      "description": "Access the administration panel"
+    },
+    "logout": "Log out"
+  },
+  "ticket": {
+    "title": "My Ticket",
+    "copyCode": "Copy code",
+    "checkedIn": "Check-in completed",
+    "showQr": "Show this QR code at the entrance"
+  },
+  "wallmount": {
+    "countdown": {
+      "days": "days",
+      "hours": "hrs",
+      "minutes": "min",
+      "seconds": "sec",
+      "starting": "Starting..."
+    }
+  }
+}

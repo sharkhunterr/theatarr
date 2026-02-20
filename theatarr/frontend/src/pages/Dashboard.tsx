@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import {
   Activity,
@@ -31,7 +32,7 @@ import { Button, Card, CardContent } from '../components/common';
 import { apiClient } from '../api/client';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCountdown } from '../hooks/useCountdown';
-import { useLayoutStore } from '../stores/layoutStore';
+import { useLocaleFormat } from '../hooks/useLocaleFormat';
 import type { Session, SessionState, Sequence } from '../stores/sessionStore';
 import { getSessionStartCountdown } from '../utils/countdown';
 import {
@@ -77,43 +78,6 @@ interface ActivityEvent {
 }
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-function formatDateShort(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function relativeTime(dateStr: string, language: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return language === 'fr' ? "A l'instant" : 'Just now';
-  if (minutes < 60) return language === 'fr' ? `Il y a ${minutes}m` : `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return language === 'fr' ? `Il y a ${hours}h` : `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return language === 'fr' ? `Il y a ${days}j` : `${days}d ago`;
-}
-
-function eventLabel(eventType: string, language: string): string {
-  const labels: Record<string, { fr: string; en: string }> = {
-    session_running: { fr: 'Session lancee', en: 'Session started' },
-    session_completed: { fr: 'Session terminee', en: 'Session completed' },
-    session_paused: { fr: 'Session en pause', en: 'Session paused' },
-    session_updated: { fr: 'Session modifiee', en: 'Session updated' },
-  };
-  const entry = labels[eventType];
-  if (entry) return language === 'fr' ? entry.fr : entry.en;
-  return eventType;
-}
-
-// ============================================================================
 // DashboardTimeline
 // ============================================================================
 
@@ -122,16 +86,15 @@ function DashboardTimeline({
   currentIndex,
   elapsedMs,
   status,
-  language,
   movieRuntimeMs,
 }: {
   sequences: Sequence[];
   currentIndex: number;
   elapsedMs: number;
   status: string;
-  language: string;
   movieRuntimeMs: number;
 }) {
+  const { t } = useTranslation(['admin', 'common']);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Stable widths — computed from sequence definitions + movie runtime, NOT elapsed time
@@ -148,7 +111,7 @@ function DashboardTimeline({
   if (sequences.length === 0) {
     return (
       <div className="text-sm text-dark-muted text-center py-4">
-        {language === 'fr' ? 'Aucune sequence' : 'No sequences'}
+        {t('admin:dashboard.noSequences')}
       </div>
     );
   }
@@ -276,7 +239,7 @@ function DashboardTimeline({
           {currentSeq && (isActive || isComplete) && (
             <>
               <span>
-                {language === 'fr' ? 'Seq' : 'Seq'} {currentIndex + 1}/{sequences.length}
+                Seq {currentIndex + 1}/{sequences.length}
                 {' — '}
                 <span className="text-dark-text">{currentSeq.name}</span>
               </span>
@@ -311,11 +274,11 @@ function DashboardTimeline({
 
 function ActionLogPanel({
   entries,
-  language,
 }: {
   entries: ActionLogEntry[];
-  language: string;
 }) {
+  const { t } = useTranslation(['admin', 'common']);
+
   if (entries.length === 0) return null;
 
   const recent = [...entries].reverse().slice(0, 10);
@@ -323,7 +286,7 @@ function ActionLogPanel({
   return (
     <div className="mt-3 border-t border-dark-border pt-3">
       <h4 className="text-xs font-medium text-dark-muted mb-2">
-        {language === 'fr' ? 'Journal des actions' : 'Action Log'}
+        {t('admin:dashboard.actionLog')}
       </h4>
       <div className="space-y-1 max-h-32 sm:max-h-40 overflow-y-auto">
         {recent.map((entry, i) => {
@@ -370,7 +333,6 @@ function NowPlayingHero({
   detail,
   liveState,
   actionLog,
-  language,
   onControl,
   controllingAction,
   controlError,
@@ -379,11 +341,11 @@ function NowPlayingHero({
   detail: Session | null;
   liveState: SessionState | null;
   actionLog: ActionLogEntry[];
-  language: string;
   onControl: (action: 'play' | 'pause' | 'stop' | 'skip') => Promise<void>;
   controllingAction: string | null;
   controlError: string | null;
 }) {
+  const { t } = useTranslation(['admin', 'common']);
   const [copiedCode, setCopiedCode] = useState(false);
 
   const currentStatus = liveState?.status || session.status;
@@ -398,20 +360,7 @@ function NowPlayingHero({
 
   const bgColor = session.color_palette?.primary || '#1a1a2e';
 
-  const t = {
-    nowPlaying: language === 'fr' ? 'En cours' : 'Now Playing',
-    pause: 'Pause',
-    resume: language === 'fr' ? 'Reprendre' : 'Resume',
-    stop: language === 'fr' ? 'Arreter' : 'Stop',
-    skip: language === 'fr' ? 'Suivant' : 'Skip',
-    display: 'Display',
-    wallmount: 'Wallmount',
-    running: language === 'fr' ? 'En cours' : 'Running',
-    paused: language === 'fr' ? 'En pause' : 'Paused',
-    participants: language === 'fr' ? 'participants' : 'participants',
-  };
-
-  const statusLabel = currentStatus === 'running' ? t.running : t.paused;
+  const statusLabel = currentStatus === 'running' ? t('admin:dashboard.running') : t('admin:dashboard.paused');
   const statusColor = currentStatus === 'running'
     ? 'bg-green-500/20 text-green-400 border-green-500/30'
     : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
@@ -466,7 +415,7 @@ function NowPlayingHero({
               {(session.participants_total ?? 0) > 0 && (
                 <span className="flex items-center gap-1">
                   <Users size={12} />
-                  {session.participants_accepted ?? 0}/{session.participants_total} {t.participants}
+                  {session.participants_accepted ?? 0}/{session.participants_total} {t('admin:dashboard.participants')}
                 </span>
               )}
               {session.display_code && (
@@ -494,7 +443,6 @@ function NowPlayingHero({
             currentIndex={currentIndex}
             elapsedMs={elapsedMs}
             status={currentStatus}
-            language={language}
             movieRuntimeMs={(detail?.movie_runtime_minutes ?? 0) * 60 * 1000}
           />
         )}
@@ -510,7 +458,7 @@ function NowPlayingHero({
               isLoading={controllingAction === 'play'}
             >
               <Play size={14} className="mr-1" />
-              {t.resume}
+              {t('admin:dashboard.resume')}
             </Button>
           )}
           {canPause && (
@@ -522,7 +470,7 @@ function NowPlayingHero({
               isLoading={controllingAction === 'pause'}
             >
               <Pause size={14} className="mr-1" />
-              {t.pause}
+              {t('admin:dashboard.pause')}
             </Button>
           )}
           {canSkip && (
@@ -535,7 +483,7 @@ function NowPlayingHero({
               className="text-white/70 hover:text-white hover:bg-white/10"
             >
               <SkipForward size={14} className="mr-1" />
-              {t.skip}
+              {t('admin:dashboard.skip')}
             </Button>
           )}
           {canStop && (
@@ -548,7 +496,7 @@ function NowPlayingHero({
               className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
             >
               <Square size={14} className="mr-1" />
-              {t.stop}
+              {t('admin:dashboard.stop')}
             </Button>
           )}
 
@@ -559,7 +507,7 @@ function NowPlayingHero({
               href={`/display/${session.display_code}`}
               target="_blank"
               rel="noopener noreferrer"
-              title={t.display}
+              title={t('admin:dashboard.display')}
               className="p-1.5 rounded-lg text-white/50 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
             >
               <ScreenShare size={16} />
@@ -567,7 +515,7 @@ function NowPlayingHero({
           )}
           <Link
             to={`/sessions/${session.id}`}
-            title={language === 'fr' ? 'Details' : 'Details'}
+            title={t('admin:dashboard.details')}
             className="p-1.5 rounded-lg text-white/50 hover:text-theatarr-500 hover:bg-theatarr-500/10 transition-colors"
           >
             <Monitor size={16} />
@@ -582,7 +530,7 @@ function NowPlayingHero({
         )}
 
         {/* Action Log */}
-        <ActionLogPanel entries={actionLog} language={language} />
+        <ActionLogPanel entries={actionLog} />
       </div>
     </div>
   );
@@ -599,7 +547,6 @@ function StatsRow({
   totalSessions,
   readyTrailers,
   totalTrailers,
-  language,
 }: {
   connectedServices: number;
   totalServices: number;
@@ -607,15 +554,16 @@ function StatsRow({
   totalSessions: number;
   readyTrailers: number;
   totalTrailers: number;
-  language: string;
 }) {
+  const { t } = useTranslation(['admin', 'common']);
+
   const cards = [
     {
       icon: Lightbulb,
       color: 'bg-green-500/20',
       iconColor: 'text-green-500',
       value: `${connectedServices}/${totalServices}`,
-      label: language === 'fr' ? 'Services connectes' : 'Connected Services',
+      label: t('admin:dashboard.connectedServices'),
       path: '/services',
     },
     {
@@ -623,8 +571,8 @@ function StatsRow({
       color: 'bg-theatarr-500/20',
       iconColor: 'text-theatarr-500',
       value: `${sessionsToday}`,
-      label: language === 'fr' ? "Sessions aujourd'hui" : 'Sessions Today',
-      sublabel: `${totalSessions} total`,
+      label: t('admin:dashboard.sessionsToday'),
+      sublabel: `${totalSessions} ${t('admin:dashboard.total')}`,
       path: '/sessions',
     },
     {
@@ -632,7 +580,7 @@ function StatsRow({
       color: 'bg-purple-500/20',
       iconColor: 'text-purple-500',
       value: `${readyTrailers}/${totalTrailers}`,
-      label: language === 'fr' ? 'Bandes-annonces' : 'Trailers',
+      label: t('admin:dashboard.trailers'),
       path: '/media',
     },
     {
@@ -640,7 +588,7 @@ function StatsRow({
       color: 'bg-blue-500/20',
       iconColor: 'text-blue-500',
       value: `${totalSessions}`,
-      label: language === 'fr' ? 'Total sessions' : 'Total Sessions',
+      label: t('admin:dashboard.totalSessions'),
       path: '/history',
     },
   ];
@@ -650,7 +598,7 @@ function StatsRow({
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <Link key={card.label} to={card.path}>
+          <Link key={card.path} to={card.path}>
             <Card variant="interactive">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-3">
@@ -677,11 +625,12 @@ function StatsRow({
 
 function UpcomingSessions({
   sessions,
-  language,
 }: {
   sessions: Session[];
-  language: string;
 }) {
+  const { t } = useTranslation(['admin', 'common']);
+  const { formatDate } = useLocaleFormat();
+
   if (sessions.length === 0) return null;
 
   return (
@@ -690,10 +639,10 @@ function UpcomingSessions({
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-medium uppercase tracking-wider text-dark-muted flex items-center gap-2">
             <Calendar size={12} className="text-purple-400" />
-            {language === 'fr' ? 'Prochaines seances' : 'Upcoming Sessions'}
+            {t('admin:dashboard.upcomingSessions')}
           </h3>
           <Link to="/sessions" className="text-xs text-theatarr-500 hover:text-theatarr-400 flex items-center gap-1">
-            {language === 'fr' ? 'Voir tout' : 'View all'}
+            {t('admin:dashboard.viewAll')}
             <ArrowRight size={12} />
           </Link>
         </div>
@@ -718,7 +667,7 @@ function UpcomingSessions({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-dark-text truncate">{session.name}</p>
                   <p className="text-xs text-dark-muted truncate">
-                    {session.movie_title || (language === 'fr' ? 'Film non defini' : 'No movie set')}
+                    {session.movie_title || t('admin:dashboard.noMovieSet')}
                   </p>
                 </div>
                 {countdown && countdown.urgency !== 'low' && (
@@ -734,7 +683,12 @@ function UpcomingSessions({
                 )}
                 {countdown && countdown.urgency === 'low' && session.scheduled_at && (
                   <span className="text-[10px] sm:text-xs text-dark-muted flex-shrink-0">
-                    {formatDateShort(session.scheduled_at)}
+                    {formatDate(session.scheduled_at, {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </span>
                 )}
               </Link>
@@ -752,11 +706,11 @@ function UpcomingSessions({
 
 function RecentActivity({
   events,
-  language,
 }: {
   events: ActivityEvent[];
-  language: string;
 }) {
+  const { t } = useTranslation(['admin', 'common']);
+
   const eventIcons: Record<string, typeof Activity> = {
     session_running: Play,
     session_completed: Check,
@@ -771,16 +725,37 @@ function RecentActivity({
     session_updated: 'text-dark-muted',
   };
 
+  function getEventLabel(eventType: string): string {
+    const labelMap: Record<string, string> = {
+      session_running: t('admin:dashboard.sessionStarted'),
+      session_completed: t('admin:dashboard.sessionCompleted'),
+      session_paused: t('admin:dashboard.sessionPaused'),
+      session_updated: t('admin:dashboard.sessionUpdated'),
+    };
+    return labelMap[eventType] || eventType;
+  }
+
+  function getRelativeTime(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return t('admin:dashboard.justNow');
+    if (minutes < 60) return t('admin:dashboard.minutesAgo', { minutes });
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return t('admin:dashboard.hoursAgo', { hours });
+    const days = Math.floor(hours / 24);
+    return t('admin:dashboard.daysAgo', { days });
+  }
+
   return (
     <Card>
       <CardContent className="p-3 sm:p-4">
         <h3 className="text-xs font-medium uppercase tracking-wider text-dark-muted flex items-center gap-2 mb-3">
           <Activity size={12} className="text-theatarr-500" />
-          {language === 'fr' ? 'Activite recente' : 'Recent Activity'}
+          {t('admin:dashboard.recentActivity')}
         </h3>
         {events.length === 0 ? (
           <p className="text-sm text-dark-muted py-4 text-center">
-            {language === 'fr' ? 'Aucune activite recente' : 'No recent activity'}
+            {t('admin:dashboard.noRecentActivity')}
           </p>
         ) : (
           <div className="space-y-2">
@@ -796,10 +771,10 @@ function RecentActivity({
                   <Icon size={14} className={clsx(iconColor, 'flex-shrink-0')} />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-dark-text truncate">{event.session_name}</p>
-                    <p className="text-[10px] text-dark-muted">{eventLabel(event.event_type, language)}</p>
+                    <p className="text-[10px] text-dark-muted">{getEventLabel(event.event_type)}</p>
                   </div>
                   <span className="text-[10px] text-dark-muted flex-shrink-0">
-                    {relativeTime(event.timestamp, language)}
+                    {getRelativeTime(event.timestamp)}
                   </span>
                 </Link>
               );
@@ -815,32 +790,34 @@ function RecentActivity({
 // QuickActions
 // ============================================================================
 
-function QuickActions({ language }: { language: string }) {
+function QuickActions() {
+  const { t } = useTranslation(['admin', 'common']);
+
   const actions = [
     {
       icon: Plus,
-      label: language === 'fr' ? 'Nouvelle session' : 'New Session',
+      label: t('admin:dashboard.newSession'),
       color: 'text-theatarr-500',
       bg: 'bg-theatarr-500/10 hover:bg-theatarr-500/20',
       path: '/sessions/new',
     },
     {
       icon: Vote,
-      label: language === 'fr' ? 'Vote' : 'Vote',
+      label: t('admin:dashboard.vote'),
       color: 'text-blue-500',
       bg: 'bg-blue-500/10 hover:bg-blue-500/20',
       path: '/votes',
     },
     {
       icon: ScreenShare,
-      label: language === 'fr' ? 'Templates' : 'Templates',
+      label: t('admin:dashboard.templates'),
       color: 'text-purple-500',
       bg: 'bg-purple-500/10 hover:bg-purple-500/20',
       path: '/media?tab=templates',
     },
     {
       icon: Lightbulb,
-      label: language === 'fr' ? 'Services' : 'Services',
+      label: t('admin:dashboard.services'),
       color: 'text-green-500',
       bg: 'bg-green-500/10 hover:bg-green-500/20',
       path: '/services',
@@ -851,7 +828,7 @@ function QuickActions({ language }: { language: string }) {
     <Card>
       <CardContent className="p-3 sm:p-4">
         <h3 className="text-xs font-medium uppercase tracking-wider text-dark-muted mb-3">
-          {language === 'fr' ? 'Actions rapides' : 'Quick Actions'}
+          {t('admin:dashboard.quickActions')}
         </h3>
         <div className="grid grid-cols-2 gap-2">
           {actions.map((action) => {
@@ -882,7 +859,6 @@ function QuickActions({ language }: { language: string }) {
 
 export function Dashboard() {
   useCountdown(1000);
-  const { language } = useLayoutStore();
   const token = localStorage.getItem('theatarr_token');
 
   // Real-time state via WebSocket
@@ -1006,7 +982,6 @@ export function Dashboard() {
           detail={activeSessionDetail ?? null}
           liveState={liveState?.session_id === activeSession.id ? liveState : null}
           actionLog={actionLog || []}
-          language={language}
           onControl={handleControl}
           controllingAction={controllingAction}
           controlError={controlError}
@@ -1021,19 +996,18 @@ export function Dashboard() {
         totalSessions={sessionStats?.total_sessions ?? sessions.length}
         readyTrailers={trailerStats?.ready_trailers ?? 0}
         totalTrailers={trailerStats?.total_trailers ?? 0}
-        language={language}
       />
 
       {/* Upcoming Sessions */}
-      <UpcomingSessions sessions={upcomingSessions} language={language} />
+      <UpcomingSessions sessions={upcomingSessions} />
 
       {/* Recent Activity + Quick Actions */}
       <div className="grid md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
-          <RecentActivity events={recentActivity || []} language={language} />
+          <RecentActivity events={recentActivity || []} />
         </div>
         <div>
-          <QuickActions language={language} />
+          <QuickActions />
         </div>
       </div>
     </div>

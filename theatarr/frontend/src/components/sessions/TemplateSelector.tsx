@@ -4,8 +4,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Monitor, Check, Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../api/client';
-import { useLayoutStore } from '../../stores/layoutStore';
 import { Spinner } from '../common';
 import clsx from 'clsx';
 
@@ -24,15 +24,7 @@ interface TemplateSelectorProps {
 }
 
 export function TemplateSelector({ selectedTemplateId, onChange }: TemplateSelectorProps) {
-  const { language } = useLayoutStore();
-
-  const t = {
-    templates: language === 'fr' ? 'Templates' : 'Templates',
-    useGlobal: language === 'fr' ? 'Utiliser le template actif global' : 'Use global active template',
-    globalActive: language === 'fr' ? 'Actif global' : 'Global active',
-    builtin: language === 'fr' ? 'Intégré' : 'Built-in',
-    noTemplates: language === 'fr' ? 'Aucun template disponible' : 'No templates available',
-  };
+  const { t } = useTranslation('sessions');
 
   // Fetch all templates
   const { data: templatesData, isLoading } = useQuery({
@@ -95,7 +87,7 @@ export function TemplateSelector({ selectedTemplateId, onChange }: TemplateSelec
 
         {/* Info */}
         <div className="flex-1 text-left">
-          <div className="text-sm font-medium text-dark-text">{t.useGlobal}</div>
+          <div className="text-sm font-medium text-dark-text">{t('sessions:templateSelector.useGlobal')}</div>
           <div className="text-xs text-dark-muted">
             {activeTemplate ? activeTemplate.name : 'Aucun template actif'}
           </div>
@@ -103,7 +95,7 @@ export function TemplateSelector({ selectedTemplateId, onChange }: TemplateSelec
 
         {activeTemplate && selectedTemplateId === null && (
           <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full flex-shrink-0">
-            {t.globalActive}
+            {t('sessions:templateSelector.globalActive')}
           </span>
         )}
       </button>
@@ -111,7 +103,7 @@ export function TemplateSelector({ selectedTemplateId, onChange }: TemplateSelec
       {/* Divider */}
       <div className="flex items-center gap-3">
         <div className="flex-1 border-t border-dark-border" />
-        <span className="text-xs text-dark-muted">{language === 'fr' ? 'ou choisir' : 'or choose'}</span>
+        <span className="text-xs text-dark-muted">{t('sessions:templateSelector.orChoose')}</span>
         <div className="flex-1 border-t border-dark-border" />
       </div>
 
@@ -163,7 +155,7 @@ export function TemplateSelector({ selectedTemplateId, onChange }: TemplateSelec
                     </span>
                     {template.is_active && (
                       <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-[10px] rounded flex-shrink-0">
-                        Actif
+                        {t('sessions:templateSelector.active')}
                       </span>
                     )}
                   </div>
@@ -178,7 +170,7 @@ export function TemplateSelector({ selectedTemplateId, onChange }: TemplateSelec
                     </span>
                     {template.is_builtin && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-dark-border text-dark-muted">
-                        {t.builtin}
+                        {t('sessions:templateSelector.builtin')}
                       </span>
                     )}
                   </div>
@@ -190,7 +182,7 @@ export function TemplateSelector({ selectedTemplateId, onChange }: TemplateSelec
       ) : (
         <div className="text-center py-8 text-dark-muted">
           <Monitor size={32} className="mx-auto mb-2 opacity-50" />
-          <p className="text-sm">{t.noTemplates}</p>
+          <p className="text-sm">{t('sessions:templateSelector.noTemplates')}</p>
         </div>
       )}
     </div>

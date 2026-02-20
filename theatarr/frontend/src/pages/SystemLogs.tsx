@@ -16,8 +16,9 @@ import {
   Play,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../api/client';
-import { useLayoutStore } from '../stores/layoutStore';
+import { useLocaleFormat } from '../hooks/useLocaleFormat';
 import { PageHeader, ButtonGroup } from '../components/common';
 
 interface LogEntry {
@@ -30,17 +31,7 @@ interface LogEntry {
 type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
 type LogCategory = 'scheduler' | 'sessions' | 'vote' | 'services' | 'enrichment' | 'movies' | 'auth' | 'system';
 
-const CATEGORIES: { value: LogCategory | ''; label: string; labelFr: string }[] = [
-  { value: '', label: 'All', labelFr: 'Tout' },
-  { value: 'scheduler', label: 'Scheduler', labelFr: 'Planificateur' },
-  { value: 'sessions', label: 'Sessions', labelFr: 'Sessions' },
-  { value: 'vote', label: 'Vote', labelFr: 'Vote' },
-  { value: 'services', label: 'Services', labelFr: 'Services' },
-  { value: 'enrichment', label: 'Enrichment', labelFr: 'Enrichissement' },
-  { value: 'movies', label: 'Movies', labelFr: 'Films' },
-  { value: 'auth', label: 'Auth', labelFr: 'Auth' },
-  { value: 'system', label: 'System', labelFr: 'Systeme' },
-];
+const CATEGORY_VALUES: (LogCategory | '')[] = ['', 'scheduler', 'sessions', 'vote', 'services', 'enrichment', 'movies', 'auth', 'system'];
 
 function getLevelIcon(level: string) {
   switch (level) {
@@ -93,7 +84,8 @@ function getCategoryBadge(loggerName: string) {
 }
 
 export function SystemLogs() {
-  const { language } = useLayoutStore();
+  const { t } = useTranslation(['settings', 'common']);
+  const { locale } = useLocaleFormat();
   const [level, setLevel] = useState<LogLevel | ''>('');
   const [category, setCategory] = useState<LogCategory | ''>('');
   const [search, setSearch] = useState('');
@@ -129,28 +121,12 @@ export function SystemLogs() {
     setAutoScroll(scrollHeight - scrollTop - clientHeight < 50);
   };
 
-  const t = language === 'fr' ? {
-    title: 'Logs systeme',
-    autoRefresh: 'Auto-refresh',
-    search: 'Rechercher...',
-    noLogs: 'Aucun log',
-    paused: 'En pause',
-    live: 'En direct',
-  } : {
-    title: 'System Logs',
-    autoRefresh: 'Auto-refresh',
-    search: 'Search...',
-    noLogs: 'No logs',
-    paused: 'Paused',
-    live: 'Live',
-  };
-
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
       <PageHeader
-        title={t.title}
-        subtitle={`${logs?.length ?? 0} entries`}
+        title={t('settings:logs.title')}
+        subtitle={`${logs?.length ?? 0} ${t('settings:logs.entries')}`}
         actions={
           <div className="flex items-center gap-2">
             <span className={clsx(
@@ -158,7 +134,7 @@ export function SystemLogs() {
               autoRefresh ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
             )}>
               <span className={clsx('w-1.5 h-1.5 rounded-full', autoRefresh ? 'bg-green-400 animate-pulse' : 'bg-yellow-400')} />
-              {autoRefresh ? t.live : t.paused}
+              {autoRefresh ? t('settings:logs.live') : t('settings:logs.paused')}
             </span>
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
@@ -166,7 +142,7 @@ export function SystemLogs() {
                 'h-9 w-9 flex items-center justify-center rounded-md transition-colors',
                 autoRefresh ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'border border-dark-border text-dark-muted hover:bg-dark-border/50'
               )}
-              title={t.autoRefresh}
+              title={t('settings:logs.autoRefresh')}
             >
               {autoRefresh ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </button>
@@ -190,7 +166,7 @@ export function SystemLogs() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={t.search}
+            placeholder={t('settings:logs.search')}
             className="h-9 w-full pl-9 pr-3 bg-dark-bg border border-dark-border rounded-md text-sm text-dark-text placeholder:text-dark-muted focus:outline-none focus:border-theatarr-500/50 focus:ring-2 focus:ring-theatarr-500/20"
           />
         </div>
@@ -198,11 +174,11 @@ export function SystemLogs() {
         {/* Level filter */}
         <ButtonGroup
           options={[
-            { key: '' as const, label: 'All' },
-            { key: 'DEBUG' as const, label: 'DEBUG' },
-            { key: 'INFO' as const, label: 'INFO' },
-            { key: 'WARNING' as const, label: 'WARN' },
-            { key: 'ERROR' as const, label: 'ERROR' },
+            { key: '' as const, label: t('settings:logs.levels.all') },
+            { key: 'DEBUG' as const, label: t('settings:logs.levels.debug') },
+            { key: 'INFO' as const, label: t('settings:logs.levels.info') },
+            { key: 'WARNING' as const, label: t('settings:logs.levels.warning') },
+            { key: 'ERROR' as const, label: t('settings:logs.levels.error') },
           ]}
           value={level}
           onChange={(v) => setLevel(v as LogLevel | '')}
@@ -214,9 +190,9 @@ export function SystemLogs() {
           onChange={(e) => setCategory(e.target.value as LogCategory | '')}
           className="h-9 px-3 bg-dark-bg border border-dark-border rounded-md text-sm text-dark-text focus:outline-none focus:border-theatarr-500/50"
         >
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {language === 'fr' ? c.labelFr : c.label}
+          {CATEGORY_VALUES.map((c) => (
+            <option key={c} value={c}>
+              {c === '' ? t('settings:logs.categories.all') : t(`settings:logs.categories.${c}`)}
             </option>
           ))}
         </select>
@@ -248,13 +224,13 @@ export function SystemLogs() {
           </div>
         ) : !logs || logs.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-dark-muted text-sm">
-            {t.noLogs}
+            {t('settings:logs.noLogs')}
           </div>
         ) : (
           <div className="p-2 space-y-px">
             {[...logs].reverse().map((entry, i) => {
               const ts = new Date(entry.timestamp);
-              const time = ts.toLocaleTimeString('fr-FR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+              const time = ts.toLocaleTimeString(locale, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
               const ms = String(ts.getMilliseconds()).padStart(3, '0');
 
               return (

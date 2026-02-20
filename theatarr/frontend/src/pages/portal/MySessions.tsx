@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Calendar, Star } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../api/client';
 import { SessionCard } from '../../components/portal/SessionCard';
 import { useCountdown } from '../../hooks/useCountdown';
@@ -37,6 +38,7 @@ type TabType = 'all' | 'upcoming' | 'feedback';
 
 export function MySessions() {
   useCountdown();
+  const { t } = useTranslation(['portal', 'common']);
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const { items } = usePortalNotifications();
   const invitationCount = items.find((i) => i.id === 'invitations')?.count || 0;
@@ -62,16 +64,16 @@ export function MySessions() {
     : data?.items || [];
 
   const tabs: Array<{ key: TabType; label: string; badge?: number; badgeColor?: string }> = [
-    { key: 'upcoming', label: 'A venir', badge: invitationCount, badgeColor: 'bg-orange-500' },
-    { key: 'all', label: 'Tous' },
-    { key: 'feedback', label: 'A noter', badge: feedbackCount, badgeColor: 'bg-yellow-500' },
+    { key: 'upcoming', label: t('portal:sessions.tabs.upcoming'), badge: invitationCount, badgeColor: 'bg-orange-500' },
+    { key: 'all', label: t('portal:sessions.tabs.all') },
+    { key: 'feedback', label: t('portal:sessions.tabs.feedback'), badge: feedbackCount, badgeColor: 'bg-yellow-500' },
   ];
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-dark-text">Mes Sessions</h1>
+        <h1 className="text-xl font-bold text-dark-text">{t('portal:sessions.title')}</h1>
       </div>
 
       {/* Tabs */}
@@ -149,17 +151,17 @@ export function MySessions() {
           <Calendar size={48} className="mx-auto text-dark-muted mb-4" />
           <h3 className="text-lg font-medium text-dark-text mb-2">
             {activeTab === 'feedback'
-              ? 'Aucune notation en attente'
+              ? t('portal:sessions.empty.feedbackTitle')
               : activeTab === 'upcoming'
-              ? 'Aucune session a venir'
-              : 'Aucune session'}
+              ? t('portal:sessions.empty.upcomingTitle')
+              : t('portal:sessions.empty.allTitle')}
           </h3>
           <p className="text-dark-muted">
             {activeTab === 'feedback'
-              ? 'Vous avez note toutes vos sessions.'
+              ? t('portal:sessions.empty.feedbackDescription')
               : activeTab === 'upcoming'
-              ? 'Aucune session planifiee pour le moment.'
-              : "Vous n'avez pas encore ete invite a des sessions."}
+              ? t('portal:sessions.empty.upcomingDescription')
+              : t('portal:sessions.empty.allDescription')}
           </p>
         </div>
       )}

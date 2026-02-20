@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Save, RefreshCw, Plus, Trash2, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button, Input, Card } from '../common';
 import { apiClient } from '../../api/client';
@@ -248,6 +249,7 @@ const SETTINGS_SCHEMA: SettingDefinition[] = [
 ];
 
 export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, renderActions }: SettingsFormProps) {
+  const { t } = useTranslation(['settings', 'common']);
   const [localSettings, setLocalSettings] = useState<Record<string, unknown>>({});
   const [customSettings, setCustomSettings] = useState<Array<{ key: string; value: string }>>([]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -359,7 +361,7 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
               onChange={(e) => updateSetting(def.key, e.target.checked)}
               className="w-4 h-4 rounded border-dark-border bg-dark-bg text-theatarr-500"
             />
-            <span className="text-sm text-dark-text">Enabled</span>
+            <span className="text-sm text-dark-text">{t('settings:config.settings.enabled')}</span>
           </label>
         );
       case 'number':
@@ -443,7 +445,7 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
                     type="email"
                     value={testEmailAddress}
                     onChange={(e) => setTestEmailAddress(e.target.value)}
-                    placeholder="Adresse email de test"
+                    placeholder={t('settings:config.settings.emailTestPlaceholder')}
                     className="max-w-xs"
                   />
                   <Button
@@ -471,14 +473,14 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
                   >
                     <Send size={14} />
                     <span className="ml-1.5">
-                      {testEmailStatus.loading ? 'Envoi...' : 'Tester'}
+                      {testEmailStatus.loading ? t('settings:config.settings.emailSending') : t('settings:config.settings.emailTest')}
                     </span>
                   </Button>
                 </div>
                 <div className="mt-2">
                   {testEmailStatus.success === true && (
                     <span className="flex items-center gap-1 text-sm text-green-400">
-                      <CheckCircle size={14} /> Email envoye avec succes
+                      <CheckCircle size={14} /> {t('settings:config.settings.emailSuccess')}
                     </span>
                   )}
                   {testEmailStatus.success === false && testEmailStatus.error && (
@@ -488,7 +490,7 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
                   )}
                 </div>
                 <p className="text-xs text-dark-muted mt-1">
-                  Enregistrez d'abord vos parametres SMTP, puis saisissez une adresse et cliquez sur Tester.
+                  {t('settings:config.settings.emailSaveFirst')}
                 </p>
               </div>
             )}
@@ -500,15 +502,15 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
       <Card>
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-dark-text">Parametres personnalises</h2>
+            <h2 className="text-lg font-semibold text-dark-text">{t('settings:config.settings.customSettings')}</h2>
             <Button variant="ghost" size="sm" onClick={addCustomSetting}>
               <Plus size={14} />
-              <span className="ml-1">Ajouter</span>
+              <span className="ml-1">{t('common:actions.add')}</span>
             </Button>
           </div>
 
           {customSettings.length === 0 ? (
-            <p className="text-dark-muted text-sm">Aucun parametre personnalise. Cliquez sur "Ajouter" pour en creer un.</p>
+            <p className="text-dark-muted text-sm">{t('settings:config.settings.noCustomSettings')}</p>
           ) : (
             <div className="space-y-3">
               {customSettings.map((setting, index) => (
@@ -516,13 +518,13 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
                   <Input
                     value={setting.key}
                     onChange={(e) => updateCustomSetting(index, 'key', e.target.value)}
-                    placeholder="Cle du parametre"
+                    placeholder={t('settings:config.settings.settingKey')}
                     className="flex-1"
                   />
                   <Input
                     value={setting.value}
                     onChange={(e) => updateCustomSetting(index, 'value', e.target.value)}
-                    placeholder="Valeur (JSON ou texte)"
+                    placeholder={t('settings:config.settings.settingValue')}
                     className="flex-[2]"
                   />
                   <Button
@@ -546,20 +548,20 @@ export function SettingsForm({ settings, onSave, isSaving, onHasChangesChange, r
       ) : (
         <div className="flex items-center justify-between p-4 bg-dark-surface border border-dark-border rounded-lg sticky bottom-4">
           <div className="text-sm text-dark-muted">
-            {hasChanges ? 'Modifications non enregistrees' : 'Tous les changements sont enregistres'}
+            {hasChanges ? t('settings:config.settings.unsavedChanges') : t('settings:config.settings.allSaved')}
           </div>
           <div className="flex gap-4">
             <Button variant="ghost" onClick={handleReset} disabled={!hasChanges}>
               <RefreshCw size={14} />
-              <span className="ml-1">Reinitialiser</span>
+              <span className="ml-1">{t('settings:config.actions.reset')}</span>
             </Button>
             <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
               {isSaving ? (
-                'Enregistrement...'
+                t('settings:config.actions.saving')
               ) : (
                 <>
                   <Save size={14} />
-                  <span className="ml-1">Enregistrer</span>
+                  <span className="ml-1">{t('settings:config.actions.save')}</span>
                 </>
               )}
             </Button>

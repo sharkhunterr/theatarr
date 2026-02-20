@@ -16,6 +16,7 @@ import {
   Clock,
   RotateCcw,
 } from 'lucide-react';
+import i18n from '../../i18n';
 
 interface SessionEvent {
   id: string;
@@ -31,27 +32,30 @@ interface EventTimelineProps {
   sessionStartedAt?: string | null;
 }
 
-const EVENT_CONFIG: Record<string, { icon: typeof Play; color: string; label: string }> = {
-  session_started: { icon: Play, color: 'text-green-400', label: 'Session demarrée' },
-  session_paused: { icon: Pause, color: 'text-yellow-400', label: 'Session en pause' },
-  session_resumed: { icon: RotateCcw, color: 'text-blue-400', label: 'Session reprise' },
-  session_stopped: { icon: Square, color: 'text-red-400', label: 'Session arretee' },
-  session_completed: { icon: CheckCircle, color: 'text-green-400', label: 'Session terminee' },
-  session_interrupted: { icon: AlertCircle, color: 'text-red-400', label: 'Session interrompue' },
-  sequence_started: { icon: Play, color: 'text-blue-400', label: 'Sequence demarrée' },
-  sequence_completed: { icon: CheckCircle, color: 'text-blue-300', label: 'Sequence terminee' },
-  sequence_skipped: { icon: SkipForward, color: 'text-yellow-400', label: 'Sequence sautee' },
-  action_executed: { icon: Zap, color: 'text-purple-400', label: 'Action executee' },
-  trailer_resolved: { icon: Film, color: 'text-indigo-400', label: 'Bande-annonce resolue' },
-  preroll_resolved: { icon: Clapperboard, color: 'text-indigo-400', label: 'Pre-roll resolu' },
-  playback_ended: { icon: Square, color: 'text-orange-400', label: 'Lecture terminee' },
-  display_connected: { icon: Monitor, color: 'text-green-400', label: 'Display connecte' },
-  display_disconnected: { icon: MonitorOff, color: 'text-red-400', label: 'Display deconnecte' },
+const LOCALE_MAP: Record<string, string> = { fr: 'fr-FR', en: 'en-US' };
+function getLocale() { return LOCALE_MAP[i18n.language] || 'fr-FR'; }
+
+const EVENT_ICON_CONFIG: Record<string, { icon: typeof Play; color: string; labelKey: string }> = {
+  session_started: { icon: Play, color: 'text-green-400', labelKey: 'settings:history.events.sessionStarted' },
+  session_paused: { icon: Pause, color: 'text-yellow-400', labelKey: 'settings:history.events.sessionPaused' },
+  session_resumed: { icon: RotateCcw, color: 'text-blue-400', labelKey: 'settings:history.events.sessionResumed' },
+  session_stopped: { icon: Square, color: 'text-red-400', labelKey: 'settings:history.events.sessionStopped' },
+  session_completed: { icon: CheckCircle, color: 'text-green-400', labelKey: 'settings:history.events.sessionCompleted' },
+  session_interrupted: { icon: AlertCircle, color: 'text-red-400', labelKey: 'settings:history.events.sessionInterrupted' },
+  sequence_started: { icon: Play, color: 'text-blue-400', labelKey: 'settings:history.events.sequenceStarted' },
+  sequence_completed: { icon: CheckCircle, color: 'text-blue-300', labelKey: 'settings:history.events.sequenceCompleted' },
+  sequence_skipped: { icon: SkipForward, color: 'text-yellow-400', labelKey: 'settings:history.events.sequenceSkipped' },
+  action_executed: { icon: Zap, color: 'text-purple-400', labelKey: 'settings:history.events.actionExecuted' },
+  trailer_resolved: { icon: Film, color: 'text-indigo-400', labelKey: 'settings:history.events.trailerResolved' },
+  preroll_resolved: { icon: Clapperboard, color: 'text-indigo-400', labelKey: 'settings:history.events.prerollResolved' },
+  playback_ended: { icon: Square, color: 'text-orange-400', labelKey: 'settings:history.events.playbackEnded' },
+  display_connected: { icon: Monitor, color: 'text-green-400', labelKey: 'settings:history.events.displayConnected' },
+  display_disconnected: { icon: MonitorOff, color: 'text-red-400', labelKey: 'settings:history.events.displayDisconnected' },
 };
 
 function formatTime(timestamp: string): string {
   const d = new Date(timestamp);
-  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return d.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function formatDurationMs(ms: number): string {
@@ -130,7 +134,8 @@ function getEventDescription(event: SessionEvent): string {
 
 function EventRow({ event, sessionStartedAt }: { event: SessionEvent; sessionStartedAt?: string | null }) {
   const [expanded, setExpanded] = useState(false);
-  const config = EVENT_CONFIG[event.event_type] || { icon: Zap, color: 'text-dark-muted', label: event.event_type };
+  const rawConfig = EVENT_ICON_CONFIG[event.event_type] || { icon: Zap, color: 'text-dark-muted', labelKey: '' };
+  const config = { ...rawConfig, label: rawConfig.labelKey ? i18n.t(rawConfig.labelKey) : event.event_type };
   const Icon = config.icon;
   const description = getEventDescription(event);
   const isAction = event.event_type === 'action_executed';
@@ -225,7 +230,7 @@ export function EventTimeline({ events, sessionStartedAt }: EventTimelineProps) 
   if (events.length === 0) {
     return (
       <div className="text-center py-8 text-dark-muted text-sm">
-        Aucun evenement enregistre pour cette session
+        {i18n.t('settings:history.events.noEventsForSession')}
       </div>
     );
   }

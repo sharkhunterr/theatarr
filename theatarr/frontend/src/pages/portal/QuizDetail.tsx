@@ -7,6 +7,7 @@ import { ArrowLeft, Check, Clock, Trophy, X } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../api/client';
 import { useWebSocket } from '../../hooks/useWebSocket';
 
@@ -76,6 +77,7 @@ interface AnswerResult {
 type Screen = 'loading' | 'waiting' | 'question' | 'feedback' | 'results';
 
 export function QuizDetail() {
+  const { t } = useTranslation(['portal', 'common']);
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const authToken = localStorage.getItem('theatarr_token');
@@ -276,9 +278,9 @@ export function QuizDetail() {
   if (!quiz) {
     return (
       <div className="text-center py-12">
-        <p className="text-dark-muted">Quiz non trouve</p>
+        <p className="text-dark-muted">{t('portal:quizDetail.notFound')}</p>
         <Link to="/portal/quiz" className="text-theatarr-500 hover:underline mt-2 inline-block">
-          Retour aux quiz
+          {t('portal:quizDetail.backToQuiz')}
         </Link>
       </div>
     );
@@ -292,7 +294,7 @@ export function QuizDetail() {
         className="inline-flex items-center gap-2 text-dark-muted hover:text-dark-text transition-colors"
       >
         <ArrowLeft size={18} />
-        <span>Retour</span>
+        <span>{t('portal:quizDetail.back')}</span>
       </Link>
 
       {/* Header */}
@@ -302,7 +304,7 @@ export function QuizDetail() {
           <p className="text-dark-muted mt-1 text-sm">{quiz.description}</p>
         )}
         <div className="flex items-center gap-4 mt-3 text-sm">
-          <span className="text-dark-muted">{quiz.question_count} questions</span>
+          <span className="text-dark-muted">{t('portal:quizDetail.questions', { count: quiz.question_count })}</span>
           {myScore > 0 && (
             <span className="flex items-center gap-1 text-yellow-400">
               <Trophy size={14} />
@@ -319,7 +321,7 @@ export function QuizDetail() {
           disabled={joinMutation.isPending}
           className="w-full py-4 bg-theatarr-500 text-white font-medium rounded-xl hover:bg-theatarr-600 transition-colors"
         >
-          {joinMutation.isPending ? 'Connexion...' : 'Rejoindre le quiz'}
+          {joinMutation.isPending ? t('portal:quizDetail.joining') : t('portal:quizDetail.joinQuiz')}
         </button>
       )}
 
@@ -327,9 +329,9 @@ export function QuizDetail() {
       {screen === 'waiting' && quiz.has_joined && (
         <div className="text-center py-8">
           <div className="w-12 h-12 mx-auto mb-4 border-4 border-theatarr-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-dark-text font-medium">En attente du demarrage...</p>
+          <p className="text-dark-text font-medium">{t('portal:quizDetail.waitingStart')}</p>
           <p className="text-dark-muted text-sm mt-1">
-            Le quiz commencera lorsque l'administrateur le demarrera.
+            {t('portal:quizDetail.waitingStartHint')}
           </p>
         </div>
       )}
@@ -339,7 +341,7 @@ export function QuizDetail() {
         <div>
           {/* Progress */}
           <div className="flex items-center justify-between mb-3 text-sm text-dark-muted">
-            <span>Question {currentQuestionIndex + 1}/{totalQuestions}</span>
+            <span>{t('portal:quizDetail.question', { current: currentQuestionIndex + 1, total: totalQuestions })}</span>
             {timeRemaining != null && (
               <span className={clsx('flex items-center gap-1 font-mono', timeRemaining <= 5 && 'text-red-400')}>
                 <Clock size={14} />
@@ -361,7 +363,7 @@ export function QuizDetail() {
 
           {currentQuestion.hint && (
             <p className="text-sm text-yellow-400/80 text-center mb-3 italic">
-              Indice : {currentQuestion.hint}
+              {t('portal:quizDetail.hint', { hint: currentQuestion.hint })}
             </p>
           )}
 
@@ -406,7 +408,7 @@ export function QuizDetail() {
                 : 'bg-dark-surface text-dark-muted border border-dark-border cursor-not-allowed'
             )}
           >
-            {answerMutation.isPending ? 'Envoi...' : 'Valider'}
+            {answerMutation.isPending ? t('portal:quizDetail.sending') : t('portal:quizDetail.validate')}
           </button>
         </div>
       )}
@@ -419,14 +421,14 @@ export function QuizDetail() {
               <div className="w-16 h-16 mx-auto mb-3 bg-green-500/20 rounded-full flex items-center justify-center">
                 <Check size={32} className="text-green-400" />
               </div>
-              <h2 className="text-xl font-bold text-green-400">Correct !</h2>
+              <h2 className="text-xl font-bold text-green-400">{t('portal:quizDetail.correct')}</h2>
             </div>
           ) : (
             <div className="mb-4">
               <div className="w-16 h-16 mx-auto mb-3 bg-red-500/20 rounded-full flex items-center justify-center">
                 <X size={32} className="text-red-400" />
               </div>
-              <h2 className="text-xl font-bold text-red-400">Incorrect</h2>
+              <h2 className="text-xl font-bold text-red-400">{t('portal:quizDetail.incorrect')}</h2>
             </div>
           )}
 
@@ -457,10 +459,10 @@ export function QuizDetail() {
 
           <div className="flex items-center justify-center gap-2">
             <Trophy size={18} className="text-yellow-400" />
-            <span className="text-dark-text font-bold">Score : {answerResult.score}</span>
+            <span className="text-dark-text font-bold">{t('portal:quizDetail.score', { score: answerResult.score })}</span>
           </div>
 
-          <p className="text-dark-muted text-sm mt-4">En attente de la prochaine question...</p>
+          <p className="text-dark-muted text-sm mt-4">{t('portal:quizDetail.waitingNextQuestion')}</p>
         </div>
       )}
 
@@ -470,22 +472,22 @@ export function QuizDetail() {
           {/* Score summary */}
           <div className="bg-dark-surface rounded-xl border border-dark-border p-5 text-center">
             <Trophy size={36} className="mx-auto text-yellow-400 mb-2" />
-            <h2 className="text-xl font-bold text-dark-text">Quiz termine !</h2>
+            <h2 className="text-xl font-bold text-dark-text">{t('portal:quizDetail.results.title')}</h2>
             <div className="flex items-center justify-center gap-6 mt-3">
               <div>
                 <p className="text-2xl font-bold text-yellow-400">{myScore}<span className="text-base text-dark-muted">/{totalQuestions}</span></p>
-                <p className="text-[11px] text-dark-muted">Score</p>
+                <p className="text-[11px] text-dark-muted">{t('portal:quizDetail.results.score')}</p>
               </div>
               {quiz?.my_rank && (
                 <div>
                   <p className="text-2xl font-bold text-theatarr-400">{quiz.my_rank}<span className="text-base text-dark-muted">e</span></p>
-                  <p className="text-[11px] text-dark-muted">Position</p>
+                  <p className="text-[11px] text-dark-muted">{t('portal:quizDetail.results.position')}</p>
                 </div>
               )}
               {scoreboard.length > 0 && (
                 <div>
                   <p className="text-2xl font-bold text-dark-text">{scoreboard.length}</p>
-                  <p className="text-[11px] text-dark-muted">Participants</p>
+                  <p className="text-[11px] text-dark-muted">{t('portal:quizDetail.results.participants')}</p>
                 </div>
               )}
             </div>
@@ -494,7 +496,7 @@ export function QuizDetail() {
           {/* Scoreboard */}
           {scoreboard.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-dark-muted mb-2">Classement</h3>
+              <h3 className="text-sm font-medium text-dark-muted mb-2">{t('portal:quizDetail.results.leaderboard')}</h3>
               <div className="space-y-1.5">
                 {scoreboard.map((entry, idx) => {
                   const isMe = entry.token_id === quiz?.my_token_id;
@@ -516,7 +518,7 @@ export function QuizDetail() {
                           {idx + 1}
                         </span>
                         <span className={clsx('text-sm', isMe ? 'text-theatarr-400 font-semibold' : 'text-dark-text')}>
-                          {entry.participant_name}{isMe ? ' (vous)' : ''}
+                          {entry.participant_name}{isMe ? ` ${t('portal:quizDetail.results.you')}` : ''}
                         </span>
                       </div>
                       <span className="text-sm text-dark-text font-bold">
@@ -532,7 +534,7 @@ export function QuizDetail() {
           {/* Question review */}
           {quiz?.review && quiz.review.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-dark-muted mb-2">Detail des questions</h3>
+              <h3 className="text-sm font-medium text-dark-muted mb-2">{t('portal:quizDetail.results.questionReview')}</h3>
               <div className="space-y-3">
                 {quiz.review.map((item) => (
                   <div
