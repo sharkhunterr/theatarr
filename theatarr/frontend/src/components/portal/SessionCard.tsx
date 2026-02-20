@@ -258,7 +258,7 @@ export function SessionCard({
                   statusColors[status] || statusColors.draft
                 )}
               >
-                {status}
+                {t(`portal:sessionCard.status.${status}`, status)}
               </span>
               {/* Session start countdown badge */}
               {scheduledAt && (status === 'scheduled' || status === 'draft') && (() => {

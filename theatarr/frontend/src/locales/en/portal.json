@@ -95,6 +95,14 @@
     }
   },
   "sessionCard": {
+    "status": {
+      "draft": "Draft",
+      "scheduled": "Scheduled",
+      "running": "Running",
+      "paused": "Paused",
+      "completed": "Completed",
+      "interrupted": "Interrupted"
+    },
     "invitation": {
       "pending": "Pending",
       "accepted": "Accepted",

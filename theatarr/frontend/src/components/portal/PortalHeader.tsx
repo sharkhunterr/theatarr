@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
-import { useLayoutStore } from '../../stores/layoutStore';
+import { useLayoutStore, type Language } from '../../stores/layoutStore';
 import { NotificationBell } from './NotificationBell';
 import { TheatarrLogo } from '../common';
 
@@ -78,13 +78,16 @@ export function PortalHeader() {
 
 // Language Selector for Portal
 interface PortalLanguageSelectorProps {
-  language: 'en' | 'fr';
-  setLanguage: (lang: 'en' | 'fr') => void;
+  language: Language;
+  setLanguage: (lang: Language) => void;
 }
 
-const LANGUAGES = [
-  { code: 'fr' as const, label: 'Français', flag: '\u{1F1EB}\u{1F1F7}' },
-  { code: 'en' as const, label: 'English', flag: '\u{1F1EC}\u{1F1E7}' },
+const LANGUAGES: { code: Language; label: string; flag: string }[] = [
+  { code: 'fr', label: 'Français', flag: '\u{1F1EB}\u{1F1F7}' },
+  { code: 'en', label: 'English', flag: '\u{1F1EC}\u{1F1E7}' },
+  { code: 'it', label: 'Italiano', flag: '\u{1F1EE}\u{1F1F9}' },
+  { code: 'es', label: 'Español', flag: '\u{1F1EA}\u{1F1F8}' },
+  { code: 'de', label: 'Deutsch', flag: '\u{1F1E9}\u{1F1EA}' },
 ];
 
 function PortalLanguageSelector({ language, setLanguage }: PortalLanguageSelectorProps) {
