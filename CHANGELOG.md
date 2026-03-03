@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.2](https://github.com/sharkhunterr/theatarr/-/compare/v0.1.1...v0.1.2) (2026-03-03)
+
+
+### Bug Fixes
+
+* corriger CI backend/frontend et rendre PWA configurable ([c2751d8](https://github.com/sharkhunterr/theatarr/-/commit/c2751d82b7e8797cf401296bc285d6c40bd5ef9a))
+
 ### 0.1.1 (2026-03-03)
 
 
