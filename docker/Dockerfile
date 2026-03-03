@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Install Python dependencies
-COPY backend/pyproject.toml ./
+COPY backend/pyproject.toml backend/README.md ./
 COPY backend/src/ ./src/
 
 RUN pip install --no-cache-dir .
