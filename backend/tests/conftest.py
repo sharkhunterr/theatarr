@@ -2,7 +2,6 @@
 
 import asyncio
 from collections.abc import AsyncGenerator, Generator
-from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -14,7 +13,6 @@ from theatarr.database import Base, get_db
 from theatarr.main import app
 from theatarr.models.user import User
 from theatarr.services.auth import create_access_token, hash_password
-
 
 # Use in-memory SQLite for tests
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

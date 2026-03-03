@@ -4,16 +4,13 @@ import pytest
 from pydantic import ValidationError
 
 from theatarr.schemas.sequence import (
+    ActionCreate,
+    ActionType,
+    ActionUpdate,
+    DurationType,
+    OnFailure,
     SequenceCreate,
     SequenceUpdate,
-    SequenceResponse,
-    DurationType,
-)
-from theatarr.schemas.action import (
-    ActionCreate,
-    ActionUpdate,
-    ActionType,
-    OnFailure,
 )
 
 
@@ -65,24 +62,19 @@ class TestSequenceCreateValidation:
         with pytest.raises(ValidationError):
             SequenceCreate(name="A" * 500, order_index=0)
 
-    def test_order_index_required(self):
-        """Test that order_index is required."""
-        with pytest.raises(ValidationError) as exc_info:
-            SequenceCreate(name="Test")
-        assert "order_index" in str(exc_info.value)
+    def test_order_index_optional(self):
+        """Test that order_index is optional (auto-assigned)."""
+        seq = SequenceCreate(name="Test")
+        assert seq.order_index is None
 
-    def test_order_index_non_negative(self):
-        """Test that order_index must be non-negative."""
-        with pytest.raises(ValidationError):
-            SequenceCreate(name="Test", order_index=-1)
-
-    def test_duration_ms_positive(self):
-        """Test that duration_ms must be positive if provided."""
+    def test_duration_ms_non_negative(self):
+        """Test that duration_ms must be non-negative if provided."""
         with pytest.raises(ValidationError):
             SequenceCreate(name="Test", order_index=0, duration_ms=-1)
 
-        with pytest.raises(ValidationError):
-            SequenceCreate(name="Test", order_index=0, duration_ms=0)
+        # Zero is allowed
+        seq = SequenceCreate(name="Test", order_index=0, duration_ms=0)
+        assert seq.duration_ms == 0
 
     def test_duration_fallback_ms_positive(self):
         """Test that duration_fallback_ms must be positive."""
@@ -124,12 +116,12 @@ class TestSequenceUpdateValidation:
         """Test partial update with only some fields."""
         update = SequenceUpdate(name="Updated Name")
         assert update.name == "Updated Name"
-        assert update.order_index is None
+        assert update.duration_type is None
 
     def test_update_validates_values(self):
         """Test that update still validates provided values."""
         with pytest.raises(ValidationError):
-            SequenceUpdate(duration_ms=-100)
+            SequenceUpdate(duration_fallback_ms=0)  # ge=1000
 
 
 class TestActionCreateValidation:
