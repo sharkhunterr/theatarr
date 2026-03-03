@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.5](https://github.com/sharkhunterr/theatarr/-/compare/v0.1.4...v0.1.5) (2026-03-03)
+
+
+### Bug Fixes
+
+* **docker:** ajouter email-validator aux dépendances Python ([113b6ee](https://github.com/sharkhunterr/theatarr/-/commit/113b6ee312c03d7f7a8196213bdf958ffb9583e1))
+
 ### [0.1.4](https://github.com/sharkhunterr/theatarr/-/compare/v0.1.3...v0.1.4) (2026-03-03)
 
 
