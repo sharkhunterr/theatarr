@@ -3,6 +3,8 @@
 FROM node:20-alpine AS frontend-build
 ARG THEATARR_PWA=true
 ENV VITE_PWA=${THEATARR_PWA}
+# Force empty API URL so the frontend calls the same origin (no dev .env leak)
+ENV VITE_API_URL=
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
