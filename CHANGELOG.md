@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.4](https://github.com/sharkhunterr/theatarr/-/compare/v0.1.3...v0.1.4) (2026-03-03)
+
+
+### Bug Fixes
+
+* **docker:** copier README.md pour hatchling metadata ([da620d7](https://github.com/sharkhunterr/theatarr/-/commit/da620d76ea9cbe9de857a6a4d1e7d17ca814b1d8))
+
 ### [0.1.3](https://github.com/sharkhunterr/theatarr/-/compare/v0.1.2...v0.1.3) (2026-03-03)
 
 
