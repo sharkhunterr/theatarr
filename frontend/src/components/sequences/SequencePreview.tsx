@@ -15,7 +15,7 @@ interface ActionPreviewState {
 
 export function SequencePreview({ sequence }: SequencePreviewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentActionIndex, setCurrentActionIndex] = useState(-1);
+  const [, setCurrentActionIndex] = useState(-1);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [actionStates, setActionStates] = useState<ActionPreviewState[]>([]);
   const intervalRef = useRef<number | null>(null);

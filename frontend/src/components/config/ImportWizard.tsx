@@ -71,10 +71,7 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
 
   const previewMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await apiClient.post('/config/import/preview', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return response.data as ImportPreview;
+      return apiClient.postForm<ImportPreview>('/config/import/preview', formData);
     },
     onSuccess: (data) => {
       setPreview(data);
@@ -105,10 +102,7 @@ export function ImportWizard({ isOpen, onClose, onComplete }: ImportWizardProps)
         formData.append('conflict_resolutions', JSON.stringify(resolutions));
       }
 
-      const response = await apiClient.post('/config/import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return response.data as ImportResult;
+      return apiClient.postForm<ImportResult>('/config/import', formData);
     },
     onSuccess: (data) => {
       setResult(data);

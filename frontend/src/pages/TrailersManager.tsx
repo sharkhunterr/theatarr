@@ -56,10 +56,20 @@ interface TrailerRule {
   description?: string;
   is_enabled: boolean;
   genres?: string[];
+  min_year?: number;
+  max_year?: number;
+  min_rating?: number;
+  max_rating?: number;
   preferred_quality: string;
+  min_quality: string;
   max_storage_gb: number;
+  max_trailer_count?: number;
+  max_downloads_per_run: number;
   storage_used_gb: number;
   frequency: string;
+  rotation_enabled: boolean;
+  rotation_keep_most_recent: number;
+  rotation_keep_most_played: number;
   last_run_at?: string;
   next_run_at?: string;
   total_downloads: number;
@@ -238,7 +248,7 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
     }
   }, [createOpen]);
 
-  const { data: trailersData, isLoading: trailersLoading } = useQuery({
+  const { data: trailersData, isLoading: trailersLoading } = useQuery<{ items: Trailer[]; total: number }>({
     queryKey: ['trailers', filter],
     queryFn: async () => {
       const params = filter !== 'all' ? `?status_filter=${filter}` : '';
@@ -247,13 +257,13 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
     enabled: activeSubTab === 'library',
   });
 
-  const { data: rulesData, isLoading: rulesLoading } = useQuery({
+  const { data: rulesData, isLoading: rulesLoading } = useQuery<{ items: TrailerRule[]; total: number }>({
     queryKey: ['trailer-rules'],
     queryFn: async () => apiClient.get('/trailers/rules'),
     enabled: activeSubTab === 'rules',
   });
 
-  const { data: storageStats } = useQuery<StorageStatsData>({
+  useQuery<StorageStatsData>({
     queryKey: ['trailer-stats'],
     queryFn: async () => apiClient.get('/trailers/stats'),
   });
@@ -345,9 +355,9 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
 
           {trailersLoading ? (
             <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
-          ) : trailersData?.items?.length > 0 ? (
+          ) : (trailersData?.items?.length ?? 0) > 0 ? (
             <div className="rounded-lg border border-dark-border bg-dark-surface overflow-hidden divide-y divide-dark-border">
-              {trailersData.items.map((trailer: Trailer) => {
+              {trailersData!.items.map((trailer: Trailer) => {
                 const fmtDur = (seconds: number) => {
                   const mins = Math.floor(seconds / 60);
                   const secs = seconds % 60;
@@ -460,9 +470,9 @@ function TrailersTab({ createOpen, onCreateOpenChange, activeSubTab, onSubTabCha
         <>
           {rulesLoading ? (
             <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
-          ) : rulesData?.items?.length > 0 ? (
+          ) : (rulesData?.items?.length ?? 0) > 0 ? (
             <div className="space-y-4">
-              {rulesData.items.map((rule: TrailerRule) => (
+              {rulesData!.items.map((rule: TrailerRule) => (
                 <Card key={rule.id}>
                   <div className="p-6">
                     <div className="flex items-start justify-between">
@@ -543,7 +553,7 @@ function PreRollsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
   const { t } = useTranslation('media');
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, _setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'ready' | 'pending' | 'error'>('all');
 
   useEffect(() => {
@@ -909,7 +919,7 @@ function SoundsTab({ createOpen, onCreateOpenChange }: MediaTabProps) {
   const { t } = useTranslation('media');
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, _setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'ready' | 'pending' | 'error'>('all');
 
   useEffect(() => {

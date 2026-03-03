@@ -119,8 +119,8 @@ data/
 *.sqlite
 *.sqlite3
 
-# Trailers (large media files)
-trailers/
+# Trailers (large media files in data directory only)
+/data/trailers/
 
 # Reference project (not part of Theatarr)
 exemple/

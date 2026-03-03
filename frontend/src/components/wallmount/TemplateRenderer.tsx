@@ -345,6 +345,8 @@ interface TemplateConfig {
   show_overview?: boolean;
   cast_scroll?: boolean;
   transparent_bg?: boolean;
+  ticket_color?: string;
+  typography?: string;
 }
 
 interface TemplateRendererProps {

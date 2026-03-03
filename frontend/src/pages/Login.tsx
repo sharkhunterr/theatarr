@@ -8,7 +8,7 @@ export function Login() {
   const { t } = useTranslation(['settings', 'common']);
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoading, error, clearError, user } = useAuthStore();
+  const { login, isLoading, error, clearError } = useAuthStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

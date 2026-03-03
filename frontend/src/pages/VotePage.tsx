@@ -57,12 +57,14 @@ export function VotePage() {
   });
 
   // WebSocket for real-time updates
-  const { lastMessage } = useWebSocket({
+  useWebSocket({
     autoConnect: !!session?.show_results_during_voting,
     onMessage: (message) => {
-      if (message.type === 'vote_cast' && message.payload?.vote_session_id === session?.id) {
-        setLocalResults(message.payload.results?.vote_counts || {});
-      } else if (message.type === 'vote_closed' && message.payload?.vote_session_id === session?.id) {
+      const payload = message.payload as Record<string, unknown> | undefined;
+      if (message.type === 'vote_cast' && payload?.vote_session_id === session?.id) {
+        const results = payload?.results as Record<string, unknown> | undefined;
+        setLocalResults((results?.vote_counts as Record<number, number>) || {});
+      } else if (message.type === 'vote_closed' && payload?.vote_session_id === session?.id) {
         queryClient.invalidateQueries({ queryKey: ['vote-session', token] });
       }
     },

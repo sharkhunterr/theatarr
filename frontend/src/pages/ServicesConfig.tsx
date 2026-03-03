@@ -142,9 +142,6 @@ export function ServicesConfig() {
     {} as Record<string, Service[]>
   );
 
-  // Stats
-  const connectedCount = services.filter((s) => s.connection_status === 'connected').length;
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">

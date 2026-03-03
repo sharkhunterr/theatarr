@@ -431,7 +431,7 @@ data.template // { name }`}</pre>
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Components</h3>
-              <Button type="button" variant="outline" size="sm" onClick={handleAddComponent}>
+              <Button type="button" variant="secondary" size="sm" onClick={handleAddComponent}>
                 <Plus size={14} />
                 <span className="ml-1">Add Component</span>
               </Button>

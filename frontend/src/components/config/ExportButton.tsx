@@ -32,11 +32,10 @@ export function ExportButton() {
 
   const exportMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiClient.post('/config/export', {
+      return apiClient.post('/config/export', {
         ...options,
         encryption_password: options.encrypt_secrets ? password : null,
       });
-      return response.data;
     },
     onSuccess: (data) => {
       // Create and download file

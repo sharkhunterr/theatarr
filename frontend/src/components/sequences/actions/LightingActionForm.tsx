@@ -21,10 +21,6 @@ export function LightingActionForm({
   onCommandChange,
   onParametersChange,
 }: LightingActionFormProps) {
-  const handleParameterChange = (key: string, value: unknown) => {
-    onParametersChange({ ...parameters, key: value });
-  };
-
   return (
     <div className="space-y-4">
       {/* Command Select */}

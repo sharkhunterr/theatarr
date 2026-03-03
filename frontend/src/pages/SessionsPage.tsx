@@ -64,7 +64,7 @@ export function SessionsPage() {
     autoConnect: true,
     onMessage: (message) => {
       if (message.type === 'session_state' && message.payload) {
-        updateSessionState(message.payload as SessionState);
+        updateSessionState(message.payload as unknown as SessionState);
       }
     },
   });

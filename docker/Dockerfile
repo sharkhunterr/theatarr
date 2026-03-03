@@ -1,6 +1,8 @@
 # Multi-stage Dockerfile for Theatarr (Backend + Frontend)
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend-build
+ARG THEATARR_PWA=true
+ENV VITE_PWA=${THEATARR_PWA}
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci

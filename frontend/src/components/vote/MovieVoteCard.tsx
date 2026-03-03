@@ -24,7 +24,6 @@ interface MovieVoteCardProps {
 
 export function MovieVoteCard({
   movie,
-  index,
   isSelected,
   hasVoted,
   voteCount = 0,

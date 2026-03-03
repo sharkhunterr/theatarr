@@ -6,6 +6,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        - THEATARR_PWA=${THEATARR_PWA:-true}
     container_name: theatarr
     ports:
       - "${THEATARR_PORT:-8080}:${THEATARR_PORT:-8080}"

@@ -51,6 +51,8 @@ stages:
 # =============================================================================
 .python_template: &python_template
   image: python:${PYTHON_VERSION}-slim
+  variables:
+    SECRET_KEY: "ci-testing-secret-key-at-least-32-characters-long"
   cache:
     key: ${CI_COMMIT_REF_SLUG}-backend
     paths:
@@ -61,10 +63,12 @@ stages:
     - python -m venv venv
     - . venv/bin/activate
     - pip install -e ".[dev]"
-    - pip install ruff pytest-cov httpx pytest-asyncio
+    - pip install ruff pytest-cov httpx pytest-asyncio email-validator
 
 .node_template: &node_template
   image: node:${NODE_VERSION}-alpine
+  variables:
+    VITE_PWA: "false"
   cache:
     key: ${CI_COMMIT_REF_SLUG}-frontend
     paths:

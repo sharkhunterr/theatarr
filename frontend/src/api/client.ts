@@ -74,8 +74,9 @@ async function request<T>(
 ): Promise<T> {
   const { skipAuth = false, ...fetchOptions } = options;
 
+  const isFormData = fetchOptions.body instanceof FormData;
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...fetchOptions.headers,
   };
 
@@ -193,4 +194,6 @@ export const apiClient = {
   patch: <T>(endpoint: string, body: unknown) =>
     request<T>(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' }),
+  postForm: <T>(endpoint: string, formData: FormData) =>
+    request<T>(endpoint, { method: 'POST', body: formData }),
 };

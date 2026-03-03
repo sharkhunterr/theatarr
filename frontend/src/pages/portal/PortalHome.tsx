@@ -7,7 +7,6 @@ import { Calendar, Vote, CheckCircle, Film, HelpCircle, Mail, Play, Clock } from
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../api/client';
-import { useAuthStore } from '../../stores/authStore';
 import { VoteCard } from '../../components/portal/VoteCard';
 import { SessionCard } from '../../components/portal/SessionCard';
 import { useCountdown } from '../../hooks/useCountdown';
@@ -66,9 +65,6 @@ interface PortalVote {
 export function PortalHome() {
   useCountdown();
   const { t } = useTranslation(['portal', 'common']);
-  const { user } = useAuthStore();
-  const displayName = user?.first_name || user?.username || 'User';
-
   const { data: stats } = useQuery({
     queryKey: ['portal', 'stats'],
     queryFn: () => apiClient.get<PortalStats>('/portal/stats'),

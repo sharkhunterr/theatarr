@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { useWebSocket } from './useWebSocket';
-import { useSessionStore, SessionState } from '../stores/sessionStore';
+import { useSessionStore, Session, SessionState } from '../stores/sessionStore';
 import { apiClient } from '../api/client';
 
 interface UseSessionOptions {
@@ -13,7 +13,7 @@ interface UseSessionOptions {
 }
 
 interface UseSessionReturn {
-  session: ReturnType<typeof useSessionStore>['currentSession'];
+  session: Session | null;
   sessionState: SessionState | null;
   isLoading: boolean;
   error: string | null;
@@ -38,18 +38,17 @@ export function useSession(options: UseSessionOptions = {}): UseSessionReturn {
     sessionState,
     setCurrentSession,
     updateSessionState,
-    sessions,
     setSessions,
   } = useSessionStore();
 
   const token = localStorage.getItem('theatarr_token');
 
-  const { subscribe, unsubscribe, lastMessage, isConnected } = useWebSocket({
+  const { subscribe, unsubscribe, isConnected } = useWebSocket({
     token,
     autoConnect: !!sessionId,
     onMessage: (message) => {
       if (message.type === 'session_state' && message.payload) {
-        updateSessionState(message.payload as SessionState);
+        updateSessionState(message.payload as unknown as SessionState);
       }
     },
   });
