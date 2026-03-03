@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.6](https://github.com/sharkhunterr/theatarr/-/compare/v0.1.5...v0.1.6) (2026-03-03)
+
+
+### Features
+
+* créer automatiquement le compte admin au premier lancement ([4f4af31](https://github.com/sharkhunterr/theatarr/-/commit/4f4af31563add94bc6e650439ee0185d850383d5))
+
 ### [0.1.5](https://github.com/sharkhunterr/theatarr/-/compare/v0.1.4...v0.1.5) (2026-03-03)
 
 
