@@ -1,6 +1,6 @@
 {
   "name": "theatarr",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Theatarr - Home Cinema Orchestration System",
   "scripts": {
     "predev": "npm run kill",

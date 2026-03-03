@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.7](https://github.com/sharkhunterr/theatarr/-/compare/v0.1.6...v0.1.7) (2026-03-03)
+
+
+### Bug Fixes
+
+* **docker:** forcer VITE_API_URL vide pour éviter le leak du .env de dev ([3300047](https://github.com/sharkhunterr/theatarr/-/commit/330004777ba64156e3a9a08ff1ff18a839dbf446))
+
 ### [0.1.6](https://github.com/sharkhunterr/theatarr/-/compare/v0.1.5...v0.1.6) (2026-03-03)
 
 
