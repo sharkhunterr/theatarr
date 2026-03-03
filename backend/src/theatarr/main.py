@@ -3,11 +3,13 @@
 import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from theatarr import __version__
@@ -178,6 +180,23 @@ async def get_info() -> dict:
             "trailers": True,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Static frontend serving (production Docker only — /app/static must exist)
+# ---------------------------------------------------------------------------
+_static_dir = Path("/app/static")
+if _static_dir.is_dir():
+    # Serve Vite hashed assets
+    app.mount("/assets", StaticFiles(directory=_static_dir / "assets"), name="static-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def _serve_spa(full_path: str):
+        """Serve the SPA frontend; falls back to index.html for client-side routing."""
+        candidate = _static_dir / full_path
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_static_dir / "index.html")
 
 
 @app.websocket("/api/v1/ws")

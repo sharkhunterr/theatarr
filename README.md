@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="theatarr/assets/branding/banner.svg" alt="Theatarr Banner" width="800"/>
+<img src="assets/branding/banner.svg" alt="Theatarr Banner" width="800"/>
 
 <br/><br/>
 
@@ -171,7 +171,7 @@ Design cinema sessions with timed sequences — dim the lights, play trailers, d
 ### Backend
 
 ```bash
-cd theatarr/backend
+cd backend
 
 # Create virtual environment
 python -m venv venv
@@ -190,7 +190,7 @@ python -m uvicorn theatarr.main:app --host 0.0.0.0 --port 2273 --reload --app-di
 ### Frontend
 
 ```bash
-cd theatarr/frontend
+cd frontend
 
 # Install dependencies
 npm install
@@ -427,7 +427,6 @@ All settings are configurable from the web UI under **Settings**:
 ## 📁 Project Structure
 
 ```
-theatarr/
 ├── backend/
 │   ├── src/theatarr/
 │   │   ├── adapters/       # Service integrations (Hue, Plex, etc.)
@@ -504,8 +503,8 @@ Contributions are welcome! Please:
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run the backend: `cd theatarr/backend && source venv/bin/activate && python -m uvicorn theatarr.main:app --reload --app-dir src`
-5. Run the frontend: `cd theatarr/frontend && npm run dev`
+4. Run the backend: `cd backend && source venv/bin/activate && python -m uvicorn theatarr.main:app --reload --app-dir src`
+5. Run the frontend: `cd frontend && npm run dev`
 6. Submit a pull request
 
 ---

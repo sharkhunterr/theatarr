@@ -1,0 +1,7 @@
+# Production configuration
+# Uses pre-built image from Docker Hub
+
+services:
+  theatarr:
+    image: sharkhunterr/theatarr:latest
+    build: !reset null

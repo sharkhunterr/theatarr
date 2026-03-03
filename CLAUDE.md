@@ -8,11 +8,11 @@
 
 ## Structure du projet
 
-- Backend : `theatarr/backend/` (FastAPI + SQLAlchemy + Alembic, SQLite)
-- Frontend : `theatarr/frontend/` (React + Vite + TailwindCSS + React Query)
-- Data : `theatarr/data/theatarr.db` (base SQLite)
-- Backend venv : `theatarr/backend/venv/` (PAS `.venv`)
-- Alembic : lancer depuis `theatarr/backend/` (ou se trouve `alembic.ini`), PAS depuis `src/`
+- Backend : `backend/` (FastAPI + SQLAlchemy + Alembic, SQLite)
+- Frontend : `frontend/` (React + Vite + TailwindCSS + React Query)
+- Data : `data/theatarr.db` (base SQLite)
+- Backend venv : `backend/venv/` (PAS `.venv`)
+- Alembic : lancer depuis `backend/` (ou se trouve `alembic.ini`), PAS depuis `src/`
 
 ## Login admin
 
@@ -24,24 +24,24 @@
 ### Backend (port 2273, accessible reseau local)
 
 ```bash
-cd /home/jeremie/Documents/Developpement/theatarr/theatarr/backend && \
+cd /home/jeremie/Documents/Developpement/theatarr/backend && \
 source venv/bin/activate && \
 python -m uvicorn theatarr.main:app --host 0.0.0.0 --port 2273 --reload --app-dir src
 ```
 
-IMPORTANT : lancer depuis `theatarr/backend/` (pas `src/`) car le `.env` est dans ce dossier.
+IMPORTANT : lancer depuis `backend/` (pas `src/`) car le `.env` est dans ce dossier.
 
 ### Frontend (port 2173, accessible reseau local)
 
 ```bash
-cd /home/jeremie/Documents/Developpement/theatarr/theatarr/frontend && \
+cd /home/jeremie/Documents/Developpement/theatarr/frontend && \
 npm run dev -- --host 0.0.0.0 --port 2173
 ```
 
 ### Migrations Alembic
 
 ```bash
-cd /home/jeremie/Documents/Developpement/theatarr/theatarr/backend && \
+cd /home/jeremie/Documents/Developpement/theatarr/backend && \
 source venv/bin/activate && \
 alembic upgrade head
 ```

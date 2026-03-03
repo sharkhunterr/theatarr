@@ -1,0 +1,48 @@
+# Theatarr - Docker Compose Configuration
+# Home Cinema Orchestration System
+
+services:
+  theatarr:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: theatarr
+    ports:
+      - "${THEATARR_PORT:-8080}:${THEATARR_PORT:-8080}"
+    environment:
+      - THEATARR_PORT=${THEATARR_PORT:-8080}
+      - THEATARR_LOG_LEVEL=${THEATARR_LOG_LEVEL:-INFO}
+      - SECRET_KEY=${SECRET_KEY:-development-secret-key-at-least-32-characters-long}
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Europe/Paris}
+      # HTTPS (set THEATARR_HTTPS=true to enable, auto-generates self-signed cert)
+      - THEATARR_HTTPS=${THEATARR_HTTPS:-false}
+      # - THEATARR_SSL_CERT=/data/certs/cert.pem
+      # - THEATARR_SSL_KEY=/data/certs/key.pem
+    volumes:
+      - theatarr-data:/data
+      # --- Optional: mount individual directories for direct access ---
+      # - ./trailers:/data/trailers        # Trailer video files
+      # - ./sounds:/data/sounds            # Audio files (ambiance, effects)
+      # - ./prerolls:/data/prerolls        # Pre-roll videos
+      # - ./certs:/data/certs:ro           # Custom HTTPS certificates
+    networks:
+      - theatarr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:${THEATARR_PORT:-8080}/health || curl -sf -k https://localhost:${THEATARR_PORT:-8080}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  theatarr-data:
+    name: theatarr-data
+
+networks:
+  theatarr-network:
+    name: theatarr-network
+    driver: bridge
