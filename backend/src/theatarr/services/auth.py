@@ -1,5 +1,7 @@
 """Authentication service for Theatarr."""
 
+import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -8,12 +10,14 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from theatarr.config import settings
-from theatarr.database import get_db
+from theatarr.database import async_session_maker, get_db
 from theatarr.models.user import User
+
+logger = logging.getLogger(__name__)
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -136,6 +140,27 @@ async def get_current_user(
 
 # Type alias for dependency injection
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def ensure_default_admin() -> None:
+    """Create a default admin account if no users exist in the database."""
+    async with async_session_maker() as db:
+        result = await db.execute(select(func.count()).select_from(User))
+        count = result.scalar()
+        if count and count > 0:
+            return
+
+        username = os.environ.get("THEATARR_ADMIN_USER", "admin")
+        password = os.environ.get("THEATARR_ADMIN_PASSWORD", "adminadmin")
+
+        user = User(
+            username=username,
+            password_hash=hash_password(password),
+            role="admin",
+        )
+        db.add(user)
+        await db.commit()
+        logger.info("Theatarr: Default admin account created (username: %s)", username)
 
 
 async def create_user(

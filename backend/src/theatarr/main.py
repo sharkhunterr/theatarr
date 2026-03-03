@@ -43,6 +43,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     discover_adapters()
     await init_db()
 
+    from theatarr.services.auth import ensure_default_admin
+    await ensure_default_admin()
+
     scheduler = get_scheduler()
     await scheduler.start()
 
